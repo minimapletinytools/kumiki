@@ -3,6 +3,8 @@
 Drop-in Dovetail Butt Joint Patterns (蟻仕口 / Ari Shiguchi)
 """
 
+__title__ = {"en": "Drop-in dovetail butt joint", "ja": "蟻落し"}
+
 from typing import Optional
 from dataclasses import replace
 
@@ -13,6 +15,8 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -34,7 +38,7 @@ OPTIONS = kiwari(
 )
 
 
-@pattern('butt/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers', kiwari=OPTIONS)
+@pattern('butt/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers', name={"en": "Drop-in dovetail butt joint", "ja": "蟻落し"}, kiwari=OPTIONS)
 def create_dovetail_butt_joint_example(k: Optional[Kiwari]=None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.

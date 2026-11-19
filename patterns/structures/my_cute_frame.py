@@ -21,6 +21,8 @@ mortise-and-tenon joints (with 15mm draw-bore pegs), inset from the ends so
 the mortises sit safely away from the timber ends.
 """
 
+__title__ = {"en": "My cute frame", "ja": "かわいい架構"}
+
 from kumiki import *
 
 

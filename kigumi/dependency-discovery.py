@@ -170,6 +170,11 @@ def _scan_patternbook_records(file_paths: List[str]) -> List[Dict[str, Any]]:
                 "patternbookName": base,
                 "patternNames": pattern_names if pattern_names else [base],
                 "groupNames": sorted(set(rec.get("group_names") or [])),
+                "patterns": [
+                    {"path": p.get("path"), **({"names": p["names"]} if p.get("names") else {})}
+                    for p in rec.get("patterns") or [] if p.get("path")
+                ],
+                "title": rec.get("title"),
             }
         )
 
@@ -191,6 +196,23 @@ def _scan_patternbook_records(file_paths: List[str]) -> List[Dict[str, Any]]:
 
     rows.sort(key=lambda row: row["sourceFile"])
     return rows
+
+
+def _example_titles(file_paths) -> Dict[str, Any]:
+    """Each example file's ``__title__`` names, read without importing it; files without one are left out."""
+    try:
+        from kumiki.librarian import analyze_file
+    except Exception:
+        return {}
+    titles: Dict[str, Any] = {}
+    for fp in sorted(file_paths):
+        try:
+            title = analyze_file(fp).title
+        except Exception:
+            continue
+        if title:
+            titles[fp] = title
+    return titles
 
 
 def _collect_site_roots() -> List[str]:
@@ -287,6 +309,7 @@ def main() -> None:
             dependency_examples.update(ke)
 
     payload = {
+        "exampleTitles": _example_titles(kumiki_examples | dependency_examples),
         "kumikiPatterns": sorted(kumiki_patterns),
         "kumikiPatternbooks": _scan_patternbook_records(list(kumiki_patterns)),
         "kumikiExamples": sorted(kumiki_examples),

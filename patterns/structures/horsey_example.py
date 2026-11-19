@@ -25,6 +25,8 @@ This example creates a sawhorse with:
 All joints are mortise and tenon with pegs.
 """
 
+__title__ = {"en": "Sawhorse", "ja": "馬（作業台）"}
+
 from kumiki import *
 
 # Define timber dimensions

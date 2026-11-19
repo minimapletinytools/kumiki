@@ -3,7 +3,11 @@
 Plain Cross Lap Joint Patterns
 """
 
+__title__ = {"en": "Cross lap joints", "ja": "相欠き（十字）"}
+
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -104,11 +108,11 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('cross/cut_plain_cross_lap_house_joint', tags=["main"])
+@pattern('cross/cut_plain_cross_lap_house_joint', name={"en": "Cross lap housing", "ja": "渡り腮"}, tags=["main"])
 def cut_plain_cross_lap_house_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_house_joint_example(create_v3(0, 0, 0)), name='Plain Cross Lap House Joint')
 
 
-@pattern('cross/cut_plain_cross_lap_joint')
+@pattern('cross/cut_plain_cross_lap_joint', name={"en": "Cross lap joint", "ja": "相欠き（十字）"})
 def cut_plain_cross_lap_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_cross_lap_joint_example(create_v3(0, 0, 0)), name='Plain Cross Lap Joint')

@@ -3,9 +3,13 @@
 Rebated Oblique and Dadoed Scarf Joint Patterns (Kanawa Tsugi / 金輪継ぎ)
 """
 
+__title__ = {"en": "Half-blind tenoned dadoed rabbeted scarf", "ja": "金輪継ぎ"}
+
 from typing import Optional
 
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -22,7 +26,7 @@ SCARF = kiwari(
 )
 
 
-@pattern('splice/rebated_oblique_and_dadoed_scarf_joint', kiwari=SCARF)
+@pattern('splice/rebated_oblique_and_dadoed_scarf_joint', name={"en": "Half-blind tenoned dadoed rabbeted scarf", "ja": "金輪継ぎ"}, kiwari=SCARF)
 def create_rebated_oblique_and_dadoed_scarf_example(k: Optional[Kiwari] = None, *, position: Optional[V3] = None) -> Frame:
     """
     Create a rebated oblique and dadoed scarf joint (Kanawa Tsugi

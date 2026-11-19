@@ -21,6 +21,8 @@ from kumiki.librarian import (
 FRAME_SOURCE = """
 from kumiki import *
 
+__title__ = "Frame A"
+
 
 @frame
 def build_frame(k: Kiwari) -> Frame:
@@ -28,10 +30,14 @@ def build_frame(k: Kiwari) -> Frame:
 """
 
 PATTERN_LIST_SOURCE = """
-from kumiki import Frame, pattern
+from kumiki import Frame, pattern, pattern_folders
+
+__title__ = {"en": "Things", "ja": "もの"}
+
+pattern_folders({"things": {"en": "All things", "ja": "すべてのもの"}})
 
 
-@pattern("things/a_thing", tags=["main"])
+@pattern("things/a_thing", name={"en": "A thing", "ja": "ひとつのもの"}, tags=["main"])
 def a_thing() -> Frame:
     return Frame(cut_timbers=[], name="Thing")
 """
@@ -161,3 +167,34 @@ def test_extra_dependency_names_still_gated(tmp_path: Path):
         str(tmp_path), extra_dependency_names=["sympy"]
     )
     assert not any(r.name == "sympy" for r in roots)
+
+
+def test_index_carries_titles_and_names(sample_root: Path):
+    index = build_pattern_index(str(sample_root))
+    book = index["entries"]["patterns/b.py"]
+
+    assert book["title"] == {"en": "Things", "ja": "もの"}
+    assert book["patternbook"]["folder_names"] == {"things": {"en": "All things", "ja": "すべてのもの"}}
+    assert book["patternbook"]["patterns"][0]["names"] == {"en": "A thing", "ja": "ひとつのもの"}
+    frame = next(item for item in index["frame_examples"] if item["relative_path"] == "frames/a.py")
+    assert frame["title"] == {"en": "Frame A"}
+
+
+def test_scan_index_carries_titles_and_names(sample_root: Path):
+    from kumiki.librarian import scan_library_index
+
+    index = scan_library_index(str(sample_root))
+    book = index["patternbooks"][0]
+
+    assert (book["title"], book["folder_names"]["things"]["en"]) == ({"en": "Things", "ja": "もの"}, "All things")
+    assert book["patterns"][0]["names"]["ja"] == "ひとつのもの"
+    assert next(f for f in index["frame_examples"] if f["relative_path"] == "frames/a.py")["title"] == {"en": "Frame A"}
+
+
+def test_a_title_that_is_not_literal_is_a_warning(tmp_path: Path):
+    from kumiki.librarian import analyze_source
+
+    info = analyze_source("NAME = 'x'\n__title__ = NAME\n", "f.py")
+
+    assert info.title is None
+    assert "__title__ is not used" in info.warnings[0]

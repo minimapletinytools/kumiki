@@ -18,6 +18,8 @@ Tiny House 120 sqft - A 15' x 8' timber frame tiny house
 Posts are on the INSIDE of the footprint. Front is the 15' side.
 """
 
+__title__ = {"en": "Tiny house 120", "ja": "タイニーハウス 120"}
+
 import sys
 from dataclasses import replace
 

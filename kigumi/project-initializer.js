@@ -186,6 +186,8 @@ function getInlineExampleFrameContent() {
         'the mortises sit safely away from the timber ends.',
         '"""',
         '',
+        '__title__ = {"en": "My cute frame", "ja": "かわいい架構"}',
+        '',
         'from kumiki import *',
         '',
         '',

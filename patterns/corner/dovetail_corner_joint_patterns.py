@@ -1,9 +1,13 @@
 # Last checked on kumiki 0.9.0
 """Through and half-blind dovetail corners."""
 
+__title__ = {"en": "Dovetail corner joints", "ja": "隅の蟻組み"}
+
 from typing import Optional
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_right_angle_corner_joint_timbers
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 DOVETAIL = kiwari(
     small_width=kiwari.length(inches(1, 2), minimum=inches(1, 8)),
@@ -23,12 +27,12 @@ def _dovetail(k: Kiwari, depth: Optional[Numeric]) -> Joint:
             for _ in range(2)])
 
 
-@pattern("corner/dovetail_corner_joint/through", kiwari=DOVETAIL)
+@pattern("corner/dovetail_corner_joint/through", name={"en": "Through dovetail", "ja": "通し蟻組み"}, kiwari=DOVETAIL)
 def through(k: Optional[Kiwari] = None) -> Joint:
     return _dovetail(DOVETAIL.resolve(k), None)
 
 
-@pattern("corner/dovetail_corner_joint/half_blind", kiwari=HALF_BLIND)
+@pattern("corner/dovetail_corner_joint/half_blind", name={"en": "Half-blind dovetail", "ja": "包み蟻組み"}, kiwari=HALF_BLIND)
 def half_blind(k: Optional[Kiwari] = None) -> Joint:
     k = HALF_BLIND.resolve(k)
     return _dovetail(k, k.length("depth"))

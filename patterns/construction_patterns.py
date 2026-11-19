@@ -4,7 +4,11 @@ Construction Examples - Testing join_face_aligned_on_face_aligned_timbers
 with different reference features
 """
 
+__title__ = {"en": "Placing timbers", "ja": "材の配置"}
+
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 def inches(value):
     """Convert inches to meters using exact rational arithmetic."""
@@ -408,61 +412,61 @@ def make_footprint_horizontal_example():
 
     return Frame(cut_timbers=cut_timbers, accessories=[], footprints=footprints)
 
-@pattern("construction/join_face_aligned_on_face_aligned_timbers", tags=["main"])
+@pattern("construction/join_face_aligned_on_face_aligned_timbers", name={"en": "Join face-aligned timbers", "ja": "面を揃えた材をつなぐ"}, tags=["main"])
 def join_face_aligned_on_face_aligned_timbers_pattern() -> Frame:
     return make_join_face_aligned_on_face_aligned_timbers_example()
 
 
-@pattern("construction/attach_face_aligned_timber", tags=["main"])
+@pattern("construction/attach_face_aligned_timber", name={"en": "Attach a face-aligned timber", "ja": "面を揃えて材を取り付ける"}, tags=["main"])
 def attach_face_aligned_timber_pattern() -> Frame:
     return make_attach_face_aligned_timber_example()
 
 
-@pattern("construction/attach_face_aligned_timber_flush", tags=["main"])
+@pattern("construction/attach_face_aligned_timber_flush", name={"en": "Attach a face-aligned timber, flush", "ja": "面を揃えて材を面一に取り付ける"}, tags=["main"])
 def attach_face_aligned_timber_flush_pattern() -> Frame:
     return make_attach_face_aligned_timber_flush_example()
 
 
-@pattern("construction/attach_face_aligned_timber/stickout/inside", tags=["main"])
+@pattern("construction/attach_face_aligned_timber/stickout/inside", name={"en": "Inside", "ja": "内側"}, tags=["main"])
 def inside_pattern() -> Frame:
     return make_attach_face_aligned_timber_stickout_example(StickoutReference.INSIDE)
 
 
-@pattern("construction/attach_face_aligned_timber/stickout/outside", tags=["main"])
+@pattern("construction/attach_face_aligned_timber/stickout/outside", name={"en": "Outside", "ja": "外側"}, tags=["main"])
 def outside_pattern() -> Frame:
     return make_attach_face_aligned_timber_stickout_example(StickoutReference.OUTSIDE)
 
 
-@pattern("construction/attach_face_aligned_timber/stickout/centerline", tags=["main"])
+@pattern("construction/attach_face_aligned_timber/stickout/centerline", name={"en": "Centerline", "ja": "芯"}, tags=["main"])
 def centerline_pattern() -> Frame:
     return make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE)
 
 
-@pattern("construction/attach_face_aligned_timber/stickout/centerline_with_stickout", tags=["main"])
+@pattern("construction/attach_face_aligned_timber/stickout/centerline_with_stickout", name={"en": "Centerline, with stickout", "ja": "芯から突き出す"}, tags=["main"])
 def centerline_with_stickout_pattern() -> Frame:
     return make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE, stickout_length=feet(1))
 
 
-@pattern("construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example", tags=["main"])
+@pattern("construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example", name={"en": "Target projection", "ja": "取り付け先への投影"}, tags=["main"])
 def make_attach_face_aligned_timber_target_projection_example_pattern() -> Frame:
     return make_attach_face_aligned_timber_target_projection_example()
 
 
-@pattern("construction/attach_plane_aligned_timber_brace", tags=["main"])
+@pattern("construction/attach_plane_aligned_timber_brace", name={"en": "Attach a brace", "ja": "方杖を取り付ける"}, tags=["main"])
 def attach_plane_aligned_timber_brace_pattern() -> Frame:
     return make_attach_plane_aligned_timber_brace_example()
 
 
-@pattern("construction/attach_timber", tags=["main"])
+@pattern("construction/attach_timber", name={"en": "Attach a timber", "ja": "材を取り付ける"}, tags=["main"])
 def attach_timber_pattern() -> Frame:
     return make_attach_timber_example()
 
 
-@pattern("construction/footprint/vertical", tags=["main"])
+@pattern("construction/footprint/vertical", name={"en": "Vertical", "ja": "垂直"}, tags=["main"])
 def vertical_pattern() -> Frame:
     return make_footprint_vertical_example()
 
 
-@pattern("construction/footprint/horizontal", tags=["main"])
+@pattern("construction/footprint/horizontal", name={"en": "Horizontal", "ja": "水平"}, tags=["main"])
 def horizontal_pattern() -> Frame:
     return make_footprint_horizontal_example()

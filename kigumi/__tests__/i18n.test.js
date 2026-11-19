@@ -1,4 +1,4 @@
-const { SUPPORTED_LOCALES, DEFAULT_LOCALE, resolveLocale, loadCatalog, createTranslator, LANGUAGE_CHOICES, chooseLanguage } = require('../i18n');
+const { SUPPORTED_LOCALES, DEFAULT_LOCALE, resolveLocale, loadCatalog, createTranslator, LANGUAGE_CHOICES, chooseLanguage, localName } = require('../i18n');
 const en = require('../i18n/locales/en.json');
 const ja = require('../i18n/locales/ja.json');
 
@@ -82,3 +82,15 @@ describe('createTranslator', () => {
 // in kumiki/drawings/measure.py -- so the test went with it. It still reads these same
 // locale files, and still generates rather than hard-codes the list, which is
 // the whole point of it.
+
+describe('localName', () => {
+    test('a name in the language, else English, else any; text as is; nothing as null', () => {
+        const names = { en: 'Corner joints', ja: '隅の仕口' };
+        expect(localName(names, 'ja-JP')).toBe('隅の仕口');
+        expect(localName(names, 'fr')).toBe('Corner joints');
+        expect(localName({ ja: '隅の仕口' }, 'en')).toBe('隅の仕口');
+        expect(localName('Corner', 'ja')).toBe('Corner');
+        expect(localName(null, 'ja')).toBeNull();
+        expect(localName({ en: '' }, 'en')).toBeNull();
+    });
+});

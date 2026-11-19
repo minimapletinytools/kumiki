@@ -39,6 +39,8 @@ a ridge, and paired rafters housed into the side beams.
 Measured from the pavilion, so changing the spacing moves only the models.
 """
 
+__title__ = {"en": "Several frames", "ja": "複数の架構"}
+
 from dataclasses import replace
 
 from kumiki import *

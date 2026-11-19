@@ -32,6 +32,8 @@ surface is cross-lapped into all four posts, and its top face carries a
 1"-deep tray recess between the posts with a 3/4" border all around.
 """
 
+__title__ = {"en": "Double sawhorse workbench", "ja": "二連の馬（作業台）"}
+
 from kumiki import *
 
 # --- Dimensions -------------------------------------------------------------

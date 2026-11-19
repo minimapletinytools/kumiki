@@ -1,6 +1,8 @@
 # Last checked on kumiki 0.9.0
 """Tongue-and-groove board joint example using PatternBook."""
 
+__title__ = {"en": "Board joints", "ja": "板の仕口"}
+
 from dataclasses import replace
 from enum import Enum
 from typing import Optional
@@ -15,8 +17,10 @@ from kumiki.rule import degrees, feet, inches, Matrix
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
-@pattern('board/tongue_and_groove', tags=["main"])
+
+@pattern('board/tongue_and_groove', name={"en": "Tongue and groove", "ja": "本実"}, tags=["main"])
 def example_tongue_and_groove(position=None) -> Joint:
     """Single tongue-and-groove pattern with one tongue board and one groove board."""
     if position is None:
@@ -70,7 +74,7 @@ GROOVED_FRAME = kiwari(
 )
 
 
-@pattern('board/board_in_grooved_frame', tags=["main"], kiwari=GROOVED_FRAME)
+@pattern('board/board_in_grooved_frame', name={"en": "Board in a grooved frame", "ja": "溝付きの枠にはめた板"}, tags=["main"], kiwari=GROOVED_FRAME)
 def example_board_in_grooved_frame(k: Optional[Kiwari]=None) -> Frame:
     """Boards fitted into a grooved rectangular frame."""
     k = GROOVED_FRAME.resolve(k)
@@ -263,7 +267,7 @@ SLIDING_DOVETAIL = kiwari(
 )
 
 
-@pattern("board/sliding_dovetail/side_to_face", kiwari=SLIDING_DOVETAIL)
+@pattern("board/sliding_dovetail/side_to_face", name={"en": "Side to face", "ja": "側面から平面へ"}, kiwari=SLIDING_DOVETAIL)
 def sliding_dovetail_side_to_face(k: Optional[Kiwari] = None) -> Joint:
     k = SLIDING_DOVETAIL.resolve(k)
     return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
@@ -271,7 +275,7 @@ def sliding_dovetail_side_to_face(k: Optional[Kiwari] = None) -> Joint:
         k.length("depth"), k.length("width"), k.angle("angle"))
 
 
-@pattern("board/sliding_dovetail/end_to_face", kiwari=SLIDING_DOVETAIL)
+@pattern("board/sliding_dovetail/end_to_face", name={"en": "End to face", "ja": "木口から平面へ"}, kiwari=SLIDING_DOVETAIL)
 def sliding_dovetail_end_to_face(k: Optional[Kiwari] = None) -> Joint:
     k = SLIDING_DOVETAIL.resolve(k)
     return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(

@@ -8,6 +8,8 @@ allow each leg's placement to be written back independently. Dimensions are sour
 The placement example starts with a rectangular placeholder; select it and choose Edit STL placement to align
 its STL. Four stopped mortise-and-tenon joints connect the legs to the tabletop.
 """
+
+__title__ = {"en": "Cabriole table", "ja": "猫脚のテーブル"}
 from typing import Optional
 from kumiki import (
     Frame, Kiwari, TimberTicket, create_timber, create_v2, create_v3,

@@ -138,6 +138,35 @@ describe('scanning', () => {
 
     expect(model.state.shippedPatterns.map((p) => p.name)).toEqual(['bridle_joint', 'half_lap']);
   });
+
+  test('shipped patterns and examples are shown by their names in the host language, by full path', async () => {
+    setHost({ locale: 'ja', workspaceRoots: () => workspaceRoots, getConfig: (_key, fallback) => fallback });
+    discoverDependencyContent.mockResolvedValue({
+      kumikiPatternbooks: [{
+        sourceFile: '/deps/kumiki/patterns/basic.py',
+        patternbookName: 'basic',
+        patternNames: ['face_aligned'],
+        patterns: [
+          { path: 'basic/miter/face_aligned', names: { en: 'Face-aligned miter', ja: '面を揃えた留め' } },
+          { path: 'basic/butt/face_aligned' },
+        ],
+        title: { en: 'Basic joints', ja: '基本の継手・仕口' },
+      }],
+      kumikiExamples: ['/deps/kumiki/patterns/structures/shed.py'],
+      exampleTitles: { '/deps/kumiki/patterns/structures/shed.py': { en: 'Shed', ja: '小屋' } },
+      dependencyPatternbooks: [],
+      dependencyExamples: [],
+    });
+    const model = new SidebarModel();
+    await model.refresh(true);
+    const group = findNode(model.getTree(), (node) => node.type === 'patternbookGroup');
+    const example = findNode(model.getTree(), (node) => node.key === 'frame-file:library:/deps/kumiki/patterns/structures/shed.py');
+
+    expect(group.label).toBe('基本の継手・仕口');
+    expect(group.children.map((child) => [child.label, child.data.patternName])).toEqual([
+      ['face_aligned', 'basic/butt/face_aligned'], ['面を揃えた留め', 'basic/miter/face_aligned']]);
+    expect(example.label).toBe('小屋');
+  });
 });
 
 describe('status rows', () => {
@@ -243,6 +272,29 @@ describe('tree', () => {
     expect(shed.action).toEqual({ command: 'kigumi.openPatternFromSidebar', arguments: [{ sourceFile: '/ws/book.py', patternName: 'shed' }] });
     expect(shed.children.map((child) => child.label)).toEqual(['wall']);
     expect(stool.action.arguments).toEqual([{ sourceFile: '/ws/book.py', patternName: 'stool' }]);
+  });
+
+  test('workspace patterns and folders show their names; the first book to name a folder wins', () => {
+    const model = new SidebarModel();
+    model._state.workspacePatternbooks = [
+      { filePath: '/ws/a.py', patternbookName: 'a', folderNames: { corner: { en: 'Corner joints' } },
+        patterns: [{ path: 'corner/miter', tags: [], names: { en: 'Miter' } }] },
+      { filePath: '/ws/b.py', patternbookName: 'b', folderNames: { corner: { en: 'Corners' } },
+        patterns: [{ path: 'corner/lap', tags: [] }] },
+    ];
+    const workspace = findNode(model.getTree(), (node) => node.key === 'pattern-section:workspace-patternbooks');
+    const [corner] = workspace.children;
+
+    expect(corner.label).toBe('Corner joints');
+    expect(corner.children.map((child) => child.label)).toEqual(['lap', 'Miter']);
+  });
+
+  test('a workspace frame with a title shows it, with its path on hover', () => {
+    const model = new SidebarModel();
+    model._state.frames = [{ filePath: '/ws/shed.py', relativePath: 'shed.py', title: { en: 'Shed' } }];
+    const row = findNode(model.getTree(), (node) => node.key === 'frame-file:workspace:/ws/shed.py');
+
+    expect([row.label, row.tooltip]).toEqual(['Shed', 'shed.py']);
   });
 
   test('ungrouped, workspace patterns are a flat sorted list', () => {

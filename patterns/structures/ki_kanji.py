@@ -22,6 +22,8 @@ from the post at 45 degrees below the beam, each in a mortise and tenon with one
 The beams' tops arch down to their tips; the side strokes' tops are scooped so they sweep up.
 """
 
+__title__ = {"en": "Ki (木)", "ja": "「木」の字"}
+
 from dataclasses import replace
 from typing import Optional
 

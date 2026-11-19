@@ -3,6 +3,8 @@
 Mortise and Tenon Joints Patterns
 """
 
+__title__ = {"en": "Mortise and tenon joints", "ja": "枘差し"}
+
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -34,6 +36,8 @@ from kumiki.construction import (
 )
 from kumiki.ticket import TimberTicket
 
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
+
 
 def _maybe_round_timber_config(use_round_timbers: bool):
     if not use_round_timbers:
@@ -50,7 +54,7 @@ EXAMPLE_ROUND_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_OPTIONS = kiwari(
 )
 
 
-@pattern('mixed/mortise_and_tenon/round_face_aligned', kiwari=EXAMPLE_ROUND_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_OPTIONS)
+@pattern('mixed/mortise_and_tenon/round_face_aligned', name={"en": "Round, face-aligned", "ja": "丸枘、面を揃える"}, kiwari=EXAMPLE_ROUND_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_OPTIONS)
 def example_round_mortise_and_tenon_on_face_aligned_timbers(k: Optional[Kiwari] = None, *, position=None, use_round_timbers=False) -> Joint:
     """
     Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
@@ -96,7 +100,7 @@ EXAMPLE_BASIC_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_WITH_THROUGH_TENON_OPTIO
 )
 
 
-@pattern('mixed/mortise_and_tenon/through_tenon', kiwari=EXAMPLE_BASIC_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_WITH_THROUGH_TENON_OPTIONS)
+@pattern('mixed/mortise_and_tenon/through_tenon', name={"en": "Through tenon", "ja": "通し枘"}, kiwari=EXAMPLE_BASIC_MORTISE_AND_TENON_ON_FACE_ALIGNED_TIMBERS_WITH_THROUGH_TENON_OPTIONS)
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(k: Optional[Kiwari] = None, *, position=None, use_round_timbers=False) -> Joint:
     """
     Through tenon with 3" stickout past the mortise timber, and the tenon offset
@@ -145,7 +149,7 @@ ANGLED_TENON = kiwari(
 )
 
 
-@pattern('mixed/mortise_and_tenon/compound_angled', kiwari=ANGLED_TENON)
+@pattern('mixed/mortise_and_tenon/compound_angled', name={"en": "Compound angle", "ja": "二方向に傾いた枘"}, kiwari=ANGLED_TENON)
 def example_double_angled_mortise_and_tenon(k: Optional[Kiwari] = None, *, position=None) -> Joint:
     """
     Mortise and tenon with timbers meeting at two non-orthogonal angles.
@@ -211,7 +215,7 @@ NOTCH_STYLE = kiwari(
 )
 
 
-@pattern('mixed/mortise_and_tenon/joint_plane_aligned_notched_2sided', kiwari=NOTCH_STYLE)
+@pattern('mixed/mortise_and_tenon/joint_plane_aligned_notched_2sided', name={"en": "Notched on two sides", "ja": "両側を欠き込んだ枘"}, kiwari=NOTCH_STYLE)
 def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(k: Optional[Kiwari]=None) -> Joint:
     """
     Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
@@ -292,7 +296,7 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(k: Optional[Kiw
     )
 
 
-@pattern('mixed/mortise_and_tenon/brace_joint_mortise_and_tenon')
+@pattern('mixed/mortise_and_tenon/brace_joint_mortise_and_tenon', name={"en": "Brace", "ja": "方杖の枘差し"})
 def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
     """
     Create a brace joint with mortise and tenon connections.
@@ -310,7 +314,7 @@ def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
                                  name="Brace Joint with Mortise and Tenon")
 
 
-@pattern('mixed/mortise_and_tenon/steep_brace_joint_mortise_and_tenon')
+@pattern('mixed/mortise_and_tenon/steep_brace_joint_mortise_and_tenon', name={"en": "Steep brace", "ja": "急な方杖の枘差し"})
 def example_steep_brace_joint(position=None, use_round_timbers=False) -> Frame:
     """
     The brace joint with an uneven brace: it meets timber1 at its middle and timber2 a quarter
@@ -422,7 +426,7 @@ def _mortised_brace_frame(position, use_round_timbers, share_of_timber1, share_o
     return Frame.from_joints([miter_joint, joint1, joint2], name=name)
 
 
-@pattern('mixed/mortise_and_tenon/mortise_and_tenon_corner_joint')
+@pattern('mixed/mortise_and_tenon/mortise_and_tenon_corner_joint', name={"en": "Corner", "ja": "隅の枘差し"})
 def example_mortise_and_tenon_corner_joint(position=None, use_round_timbers=False) -> Joint:
     """
     Corner mortise and tenon joint via cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers.
@@ -473,7 +477,7 @@ def _make_rough_receiving_timber_arrangement(position=None):
     return replace(arrangement, receiving_timber=receiving_timber)
 
 
-@pattern('mixed/mortise_and_tenon/compound_offset_parallel_shoulder')
+@pattern('mixed/mortise_and_tenon/compound_offset_parallel_shoulder', name={"en": "Offset with a parallel shoulder", "ja": "胴付きを平行にずらした枘"})
 def example_compound_angle_offset_parallel_shoulder(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon joint with compound angle (45 degrees in both axes),
@@ -552,7 +556,7 @@ STOPPED_MORTISE = kiwari(
 )
 
 
-@pattern("mixed/mortise_and_tenon/stopped_face_aligned", kiwari=STOPPED_MORTISE)
+@pattern("mixed/mortise_and_tenon/stopped_face_aligned", name={"en": "Stopped, face-aligned", "ja": "止め枘、面を揃える"}, kiwari=STOPPED_MORTISE)
 def stopped_face_aligned(k: Optional[Kiwari] = None) -> Joint:
     """Cut a stopped mortise with adjustable tenon, shoulder inset, and peg."""
     k = STOPPED_MORTISE.resolve(k)
@@ -580,7 +584,7 @@ ROUND_ANGLED = kiwari(
 )
 
 
-@pattern("mixed/mortise_and_tenon/round_plane_aligned", kiwari=ROUND_ANGLED)
+@pattern("mixed/mortise_and_tenon/round_plane_aligned", name={"en": "Round, plane-aligned", "ja": "丸枘、同一平面"}, kiwari=ROUND_ANGLED)
 def round_plane_aligned(k: Optional[Kiwari] = None) -> Joint:
     k = ROUND_ANGLED.resolve(k)
     brace = create_canonical_example_brace_joint_timbers()
@@ -620,11 +624,11 @@ def _tusked(k: Kiwari, entry: TuskEntryFace) -> Joint:
             tusk_back_stickout=inches(1), entry_face=entry))
 
 
-@pattern("mixed/tusked_mortise_and_tenon/front_entry", kiwari=TUSKED)
+@pattern("mixed/tusked_mortise_and_tenon/front_entry", name={"en": "From the front", "ja": "正面から差す"}, kiwari=TUSKED)
 def tusked_front(k: Optional[Kiwari] = None) -> Joint:
     return _tusked(TUSKED.resolve(k), TuskEntryFace.Front)
 
 
-@pattern("mixed/tusked_mortise_and_tenon/top_entry", kiwari=TUSKED)
+@pattern("mixed/tusked_mortise_and_tenon/top_entry", name={"en": "From the top", "ja": "上から差す"}, kiwari=TUSKED)
 def tusked_top(k: Optional[Kiwari] = None) -> Joint:
     return _tusked(TUSKED.resolve(k), TuskEntryFace.Top)

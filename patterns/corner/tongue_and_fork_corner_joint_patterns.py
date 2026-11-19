@@ -3,6 +3,8 @@
 Tongue and Fork Corner Joint Patterns
 """
 
+__title__ = {"en": "Tongue and fork corner joints", "ja": "隅の組手"}
+
 from kumiki import *
 from kumiki.example_shavings import (
     RoundTimberConfig,
@@ -10,6 +12,8 @@ from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -45,11 +49,11 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timber
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90')
+@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90', name={"en": "At 90°", "ja": "90°"})
 def cut_tongue_and_fork_corner_joint_90_pattern() -> Frame:
     return Frame(cut_timbers=make_tongue_and_fork_corner_joint_90_example(create_v3(0, 0, 0)), name='Tongue and Fork Corner Joint 90°')
 
 
-@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135')
+@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135', name={"en": "At 135°", "ja": "135°"})
 def cut_tongue_and_fork_corner_joint_135_pattern() -> Frame:
     return Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(create_v3(0, 0, 0)), name='Tongue and Fork Corner Joint 135°')

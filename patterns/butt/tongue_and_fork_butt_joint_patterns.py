@@ -3,6 +3,8 @@
 Tongue and Fork Butt Joint Patterns
 """
 
+__title__ = {"en": "Tongue and fork butt joints", "ja": "T字の組手"}
+
 from typing import Union, List, Optional
 
 from kumiki import *
@@ -12,6 +14,8 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -127,7 +131,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_90', tags=["main"], kiwari=ROUND_STOCK)
+@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_90', name={"en": "At 90°", "ja": "90°"}, tags=["main"], kiwari=ROUND_STOCK)
 def tongue_and_fork_butt_joint_90_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Tongue and Fork Butt Joint 90°")
@@ -139,7 +143,7 @@ ANGLED_OPTIONS = kiwari(
 )
 
 
-@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_angled', kiwari=ANGLED_OPTIONS)
+@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_angled', name={"en": "Angled", "ja": "斜め"}, kiwari=ANGLED_OPTIONS)
 def tongue_and_fork_butt_joint_angled_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ANGLED_OPTIONS.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(create_v3(0, 0, 0), use_round_timbers=on_round, shoulder_inset=ANGLED_OPTIONS.resolve(k).length("shoulder_inset")), name="Tongue and Fork Butt Joint (Angled)")

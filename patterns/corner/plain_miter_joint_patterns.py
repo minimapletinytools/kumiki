@@ -3,6 +3,8 @@
 Plain Miter Joint Patterns
 """
 
+__title__ = {"en": "Miter joints", "ja": "留め"}
+
 from dataclasses import replace
 
 from kumiki import *
@@ -12,6 +14,8 @@ from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -124,16 +128,16 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('corner/plain_miter_joint/cut_plain_miter_joint', tags=["main"])
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint', name={"en": "Miter", "ja": "留め"}, tags=["main"])
 def cut_plain_miter_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_example(create_v3(0, 0, 0)), name='Plain Miter Joint')
 
 
-@pattern('corner/plain_miter_joint/cut_plain_miter_joint_face_aligned')
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint_face_aligned', name={"en": "Face-aligned miter", "ja": "面を揃えた留め"})
 def cut_plain_miter_joint_face_aligned_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_face_aligned_example(create_v3(0, 0, 0)), name='Plain Miter Joint (Face Aligned)')
 
 
-@pattern('corner/plain_miter_joint/cut_plain_miter_joint_3d')
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint_3d', name={"en": "Miter in 3D", "ja": "立体的な留め"})
 def cut_plain_miter_joint_3d_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_3d_angles_example(create_v3(0, 0, 0)), name='Plain Miter Joint (3D)')

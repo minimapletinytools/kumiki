@@ -133,6 +133,8 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
             relativePath: relPath,
             patternbookName: path.basename(rec.file_path || '', '.py'),
             patterns: sidebarPatterns,
+            title: rec.title || null,
+            folderNames: rec.folder_names || {},
             loadError: rec.load_error || null,
         });
     }
@@ -147,6 +149,7 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
             chosenFrameKind: rec.chosen_frame_kind || null,
             allFrameNames: Array.isArray(rec.all_frame_names) ? rec.all_frame_names : [],
             multipleFrames: !!rec.multiple_frames,
+            title: rec.title || null,
             loadError: rec.load_error || null,
         });
     }

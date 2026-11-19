@@ -1,8 +1,12 @@
 # Last checked on kumiki 0.9.0
 """Three-member cross-lap chain with adjustable cut boundaries."""
 
+__title__ = {"en": "Multiple cross lap joint", "ja": "多段の相欠き（十字）"}
+
 from typing import Optional
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 CHAIN = kiwari(
     first_boundary=kiwari.number(scalar(1, 3), minimum=0.1, maximum=0.45),
@@ -11,7 +15,7 @@ CHAIN = kiwari(
 )
 
 
-@pattern("cross/multi_cross_lap_joint", kiwari=CHAIN)
+@pattern("cross/multi_cross_lap_joint", name={"en": "Multiple cross lap joint", "ja": "多段の相欠き（十字）"}, kiwari=CHAIN)
 def multi_cross_lap(k: Optional[Kiwari] = None) -> Joint:
     k = CHAIN.resolve(k)
     timber_size = create_v2(inches(6), inches(4))

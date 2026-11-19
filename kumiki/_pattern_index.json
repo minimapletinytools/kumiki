@@ -8,6 +8,140 @@
       "module_name": "giraffe_librarian_dynamic_CSG_debug_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cube_cutout",
           "halfspace_cut",
@@ -23,6 +157,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Cube cutout",
+              "ja": "\u7acb\u65b9\u4f53\u306e\u5207\u308a\u629c\u304d"
+            },
             "path": "csg_debug/cube_cutout",
             "pattern_type": "csg",
             "tags": [
@@ -31,6 +169,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Half-space cut",
+              "ja": "\u534a\u7a7a\u9593\u3067\u306e\u5207\u65ad"
+            },
             "path": "csg_debug/halfspace_cut",
             "pattern_type": "csg",
             "tags": [
@@ -38,6 +180,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Positioned cube",
+              "ja": "\u914d\u7f6e\u3057\u305f\u7acb\u65b9\u4f53"
+            },
             "path": "csg_debug/positioned_cube",
             "pattern_type": "csg",
             "tags": [
@@ -45,6 +191,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Union of cubes",
+              "ja": "\u7acb\u65b9\u4f53\u306e\u548c"
+            },
             "path": "csg_debug/union_cubes",
             "pattern_type": "csg",
             "tags": [
@@ -52,6 +202,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Hexagon extrusion",
+              "ja": "\u516d\u89d2\u5f62\u306e\u62bc\u3057\u51fa\u3057"
+            },
             "path": "csg_debug/hexagon_extrusion",
             "pattern_type": "csg",
             "tags": [
@@ -59,6 +213,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Asymmetric frustum loft",
+              "ja": "\u975e\u5bfe\u79f0\u306a\u9310\u53f0\u306e\u30ed\u30d5\u30c8"
+            },
             "path": "csg_debug/asymmetric_frustum_loft",
             "pattern_type": "csg",
             "tags": [
@@ -66,6 +224,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Lap cut on a timber",
+              "ja": "\u6750\u306e\u76f8\u6b20\u304d\u52a0\u5de5"
+            },
             "path": "csg_debug/lap_cut_timber",
             "pattern_type": "csg",
             "tags": [
@@ -73,6 +235,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Gooseneck profile cut",
+              "ja": "\u938c\u306e\u5f62\u306e\u5207\u308a\u629c\u304d"
+            },
             "path": "csg_debug/gooseneck_profile_cut",
             "pattern_type": "csg",
             "tags": [
@@ -80,6 +246,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Shoulder notch on a timber",
+              "ja": "\u6750\u306e\u80f4\u4ed8\u304d\u306e\u6b20\u304d\u8fbc\u307f"
+            },
             "path": "csg_debug/shoulder_notch_on_timber",
             "pattern_type": "csg",
             "tags": [
@@ -87,6 +257,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Shoulder notch, raw cut",
+              "ja": "\u80f4\u4ed8\u304d\u306e\u6b20\u304d\u8fbc\u307f\uff08\u52a0\u5de5\u306e\u307f\uff09"
+            },
             "path": "csg_debug/chop_shoulder_notch_raw",
             "pattern_type": "csg",
             "tags": [
@@ -94,6 +268,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Angled shoulder notch",
+              "ja": "\u659c\u3081\u306e\u80f4\u4ed8\u304d\u306e\u6b20\u304d\u8fbc\u307f"
+            },
             "path": "csg_debug/angled_shoulder_notch",
             "pattern_type": "csg",
             "tags": [
@@ -103,7 +281,11 @@
         ]
       },
       "relative_path": "CSG_debug_patterns.py",
-      "sha256": "3c68e0972c402fada0a7ef131481f02b6c161d3a9d5186a508dd61e84aeb3314",
+      "sha256": "4e95f00a7b9e95218024bb0f19a98543480f6d2e9a731c038142cf34ff1933fc",
+      "title": {
+        "en": "CSG debugging",
+        "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+      },
       "warnings": []
     },
     "patterns/basic_joints_patterns.py": {
@@ -114,6 +296,140 @@
       "module_name": "giraffe_librarian_dynamic_basic_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "angled",
           "face_aligned",
@@ -150,6 +466,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Angled miter",
+              "ja": "\u659c\u3081\u306e\u7559\u3081"
+            },
             "path": "basic_joints/miter_joint/angled",
             "pattern_type": "frame",
             "tags": [
@@ -157,51 +477,91 @@
             ]
           },
           {
+            "names": {
+              "en": "Face-aligned miter",
+              "ja": "\u9762\u3092\u63c3\u3048\u305f\u7559\u3081"
+            },
             "path": "basic_joints/miter_joint/face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Tongue and fork corner joint",
+              "ja": "\u9685\u306e\u7d44\u624b"
+            },
             "path": "basic_joints/tongue_and_fork_corner_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Face-aligned butt joint",
+              "ja": "\u9762\u3092\u63c3\u3048\u305f\u7a81\u304d\u4ed8\u3051"
+            },
             "path": "basic_joints/plain_butt_joint/face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Butt splice",
+              "ja": "\u7a81\u304d\u4ed8\u3051\u7d99\u304e"
+            },
             "path": "basic_joints/butt_splice_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Cross lap joint",
+              "ja": "\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+            },
             "path": "basic_joints/cross_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Housed joint",
+              "ja": "\u5927\u5165\u308c"
+            },
             "path": "basic_joints/house_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Plain",
+              "ja": "\u57fa\u672c"
+            },
             "path": "basic_joints/splined_opposing_double_butt_joint/plain",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "With stub tenons",
+              "ja": "\u77ed\u6798\u4ed8\u304d"
+            },
             "path": "basic_joints/splined_opposing_double_butt_joint/with_stubby_tenons",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Splice half-lap",
+              "ja": "\u76f8\u6b20\u304d\u7d99\u304e"
+            },
             "path": "basic_joints/splice_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Face-aligned mortise and tenon",
+              "ja": "\u9762\u3092\u63c3\u3048\u305f\u6798\u5dee\u3057"
+            },
             "path": "basic_joints/mortise_and_tenon/face_aligned",
             "pattern_type": "frame",
             "tags": [
@@ -209,6 +569,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Wedged half-dovetail mortise and tenon",
+              "ja": "\u6954\u4ed8\u304d\u7247\u87fb\u306e\u6798\u5dee\u3057"
+            },
             "path": "basic_joints/wedged_half_dovetail_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": [
@@ -216,101 +580,181 @@
             ]
           },
           {
+            "names": {
+              "en": "Lapped gooseneck splice",
+              "ja": "\u8170\u639b\u938c\u7d99\u304e"
+            },
             "path": "basic_joints/lapped_gooseneck_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Drop-in dovetail butt joint",
+              "ja": "\u87fb\u843d\u3057"
+            },
             "path": "basic_joints/dropin_dovetail_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Drop-in housed butt joint",
+              "ja": "\u5927\u5165\u308c\u4ed5\u53e3"
+            },
             "path": "basic_joints/dropin_housed_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Mitered and keyed corner lap",
+              "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+            },
             "path": "basic_joints/mitered_and_keyed_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Half-blind tenoned dadoed rabbeted scarf",
+              "ja": "\u91d1\u8f2a\u7d99\u304e"
+            },
             "path": "basic_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Tusked through mortise and tenon",
+              "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+            },
             "path": "basic_joints/tusked_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Angled butt joint",
+              "ja": "\u659c\u3081\u306e\u7a81\u304d\u4ed8\u3051"
+            },
             "path": "basic_joints/plain_butt_joint/angled",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Tongue and fork butt joint",
+              "ja": "T\u5b57\u306e\u7d44\u624b"
+            },
             "path": "basic_joints/tongue_and_fork_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Corner lap joint",
+              "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+            },
             "path": "basic_joints/plain_corner_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Multiple cross lap joint",
+              "ja": "\u591a\u6bb5\u306e\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+            },
             "path": "basic_joints/multi_cross_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Angled mortise and tenon",
+              "ja": "\u659c\u3081\u306e\u6798\u5dee\u3057"
+            },
             "path": "basic_joints/mortise_and_tenon/angled",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Angled round mortise and tenon",
+              "ja": "\u659c\u3081\u306e\u4e38\u6798\u5dee\u3057"
+            },
             "path": "basic_joints/round_mortise_and_tenon/angled",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Through dovetail",
+              "ja": "\u901a\u3057\u87fb\u7d44\u307f"
+            },
             "path": "basic_joints/dovetail_corner_joint/through",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Mortise and tenon corner joint",
+              "ja": "\u9685\u306e\u6798\u5dee\u3057"
+            },
             "path": "basic_joints/mortise_and_tenon_corner_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Roundover",
+              "ja": "\u89d2\u306e\u4e38\u9762"
+            },
             "path": "basic_joints/decorative_roundover",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Rounded end",
+              "ja": "\u4e38\u304f\u7d0d\u3081\u305f\u6728\u53e3"
+            },
             "path": "basic_joints/decorative_rounded_end",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Rafter tail scallop",
+              "ja": "\u5782\u6728\u9f3b\u306e\u7e70\u308a\u5f62"
+            },
             "path": "basic_joints/decorative_rafter_tail_scallop",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Tongue and groove",
+              "ja": "\u672c\u5b9f"
+            },
             "path": "basic_joints/tongue_and_groove",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Side to face",
+              "ja": "\u5074\u9762\u304b\u3089\u5e73\u9762\u3078"
+            },
             "path": "basic_joints/sliding_dovetail/side_to_face",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Half-blind dovetail",
+              "ja": "\u5305\u307f\u87fb\u7d44\u307f"
+            },
             "path": "basic_joints/dovetail_corner_joint/half_blind",
             "pattern_type": "frame",
             "tags": []
@@ -318,7 +762,11 @@
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "386af0bad6dde1ee925b835e6f6b8dadca99b646441c77c4e4e52d714374c3bf",
+      "sha256": "126f3d030209d5180febcca8d0e5f3d312d33c5431e87d10f85e43c3a3640d3d",
+      "title": {
+        "en": "Basic joints",
+        "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+      },
       "warnings": []
     },
     "patterns/board/board_joints_patterns.py": {
@@ -329,6 +777,140 @@
       "module_name": "giraffe_librarian_dynamic_board_board_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "tongue_and_groove",
           "board_in_grooved_frame",
@@ -337,6 +919,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Tongue and groove",
+              "ja": "\u672c\u5b9f"
+            },
             "path": "board/tongue_and_groove",
             "pattern_type": "frame",
             "tags": [
@@ -344,6 +930,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Board in a grooved frame",
+              "ja": "\u6e9d\u4ed8\u304d\u306e\u67a0\u306b\u306f\u3081\u305f\u677f"
+            },
             "path": "board/board_in_grooved_frame",
             "pattern_type": "frame",
             "tags": [
@@ -351,11 +941,19 @@
             ]
           },
           {
+            "names": {
+              "en": "Side to face",
+              "ja": "\u5074\u9762\u304b\u3089\u5e73\u9762\u3078"
+            },
             "path": "board/sliding_dovetail/side_to_face",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "End to face",
+              "ja": "\u6728\u53e3\u304b\u3089\u5e73\u9762\u3078"
+            },
             "path": "board/sliding_dovetail/end_to_face",
             "pattern_type": "frame",
             "tags": []
@@ -363,7 +961,11 @@
         ]
       },
       "relative_path": "board/board_joints_patterns.py",
-      "sha256": "cdce012b01913dba6bbe8b2950c91e7111a69320fe6f7809ed11affbd57d14dd",
+      "sha256": "f180c9bbcde8f4a79402b3ff4ff5ca5e1734e65ee371645a35048766c6d5bf8d",
+      "title": {
+        "en": "Board joints",
+        "ja": "\u677f\u306e\u4ed5\u53e3"
+      },
       "warnings": []
     },
     "patterns/butt/dropin_dovetail_butt_joint_patterns.py": {
@@ -374,11 +976,149 @@
       "module_name": "giraffe_librarian_dynamic_butt_dropin_dovetail_butt_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_dropin_dovetail_butt_joint_on_face_aligned_timbers"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Drop-in dovetail butt joint",
+              "ja": "\u87fb\u843d\u3057"
+            },
             "path": "butt/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers",
             "pattern_type": "frame",
             "tags": []
@@ -386,7 +1126,11 @@
         ]
       },
       "relative_path": "butt/dropin_dovetail_butt_joint_patterns.py",
-      "sha256": "c34ce561bf8df99d88e474fb30863099dd27788ca46e5dcdff5b7698dc2b16a5",
+      "sha256": "bd77e7cc010982ee32b248006fda93acedfdb6236502713a85d40cf7b81ecdce",
+      "title": {
+        "en": "Drop-in dovetail butt joint",
+        "ja": "\u87fb\u843d\u3057"
+      },
       "warnings": []
     },
     "patterns/butt/dropin_housed_butt_joint_patterns.py": {
@@ -397,11 +1141,149 @@
       "module_name": "giraffe_librarian_dynamic_butt_dropin_housed_butt_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_dropin_housed_butt_joint_on_face_aligned_timbers"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Drop-in housed butt joint",
+              "ja": "\u5927\u5165\u308c\u4ed5\u53e3"
+            },
             "path": "butt/cut_dropin_housed_butt_joint_on_face_aligned_timbers",
             "pattern_type": "frame",
             "tags": []
@@ -409,7 +1291,11 @@
         ]
       },
       "relative_path": "butt/dropin_housed_butt_joint_patterns.py",
-      "sha256": "85cbd38076cfc98f7068fa84ff8587a32d796a4d05d77a1267bc7a588cf44f64",
+      "sha256": "eebbca9277a7b66e3ec0a500e0c2d49ac04c3620b75d92e48a2214e7c0a32c5b",
+      "title": {
+        "en": "Drop-in housed butt joint",
+        "ja": "\u5927\u5165\u308c\u4ed5\u53e3"
+      },
       "warnings": []
     },
     "patterns/butt/plain_butt_joint_patterns.py": {
@@ -420,17 +1306,159 @@
       "module_name": "giraffe_librarian_dynamic_butt_plain_butt_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "plain_butt_joint",
           "plain_butt_joint_3d"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Plain butt joint",
+              "ja": "\u7a81\u304d\u4ed8\u3051"
+            },
             "path": "butt/plain_butt_joint/plain_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Plain butt joint in 3D",
+              "ja": "\u7acb\u4f53\u7684\u306a\u7a81\u304d\u4ed8\u3051"
+            },
             "path": "butt/plain_butt_joint/plain_butt_joint_3d",
             "pattern_type": "frame",
             "tags": []
@@ -438,7 +1466,11 @@
         ]
       },
       "relative_path": "butt/plain_butt_joint_patterns.py",
-      "sha256": "31ccacd2bdb5680e668e5af365aa99dc8d8accdd87000d16cc8f94acc543fc40",
+      "sha256": "bf0292ed5b9c6c0a2cb8123c2ea853443aefa3983d7b5268018f1fa505c4a248",
+      "title": {
+        "en": "Plain butt joints",
+        "ja": "\u7a81\u304d\u4ed8\u3051"
+      },
       "warnings": []
     },
     "patterns/butt/splined_opposing_double_butt_joint_patterns.py": {
@@ -449,11 +1481,149 @@
       "module_name": "giraffe_librarian_dynamic_butt_splined_opposing_double_butt_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "splined_opposing_double_butt_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Splined opposing double butt joint",
+              "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+            },
             "path": "butt/splined_opposing_double_butt_joint",
             "pattern_type": "frame",
             "tags": [
@@ -463,7 +1633,11 @@
         ]
       },
       "relative_path": "butt/splined_opposing_double_butt_joint_patterns.py",
-      "sha256": "ce1ea5744736dbfa28fc83853c3f545935508eccd8e5c8a0ccf6963ac9af82c1",
+      "sha256": "709ae0f7c2ff34ac7c994e4fa14e6325d808d3bf61cc6fc635304349a1f66db0",
+      "title": {
+        "en": "Splined opposing double butt joint",
+        "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+      },
       "warnings": []
     },
     "patterns/butt/tongue_and_fork_butt_joint_patterns.py": {
@@ -474,12 +1648,150 @@
       "module_name": "giraffe_librarian_dynamic_butt_tongue_and_fork_butt_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "tongue_and_fork_butt_joint_90",
           "tongue_and_fork_butt_joint_angled"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "At 90\u00b0",
+              "ja": "90\u00b0"
+            },
             "path": "butt/tongue_and_fork/tongue_and_fork_butt_joint_90",
             "pattern_type": "frame",
             "tags": [
@@ -487,6 +1799,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Angled",
+              "ja": "\u659c\u3081"
+            },
             "path": "butt/tongue_and_fork/tongue_and_fork_butt_joint_angled",
             "pattern_type": "frame",
             "tags": []
@@ -494,7 +1810,11 @@
         ]
       },
       "relative_path": "butt/tongue_and_fork_butt_joint_patterns.py",
-      "sha256": "494d1c953523f44743f4554cedd6cf241137f7e240d821bac8ca5ff2e4d4d9e1",
+      "sha256": "67958530ec2a726c11846ec9473d18eac63886e3d95d211ad6eb6f918c60e0fb",
+      "title": {
+        "en": "Tongue and fork butt joints",
+        "ja": "T\u5b57\u306e\u7d44\u624b"
+      },
       "warnings": []
     },
     "patterns/butt/wedged_half_dovetail_joint_patterns.py": {
@@ -505,11 +1825,149 @@
       "module_name": "giraffe_librarian_dynamic_butt_wedged_half_dovetail_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "wedged_half_dovetail_mortise_and_tenon"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Wedged half-dovetail mortise and tenon",
+              "ja": "\u6954\u4ed8\u304d\u7247\u87fb\u306e\u6798\u5dee\u3057"
+            },
             "path": "butt/wedged_half_dovetail_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
@@ -517,7 +1975,11 @@
         ]
       },
       "relative_path": "butt/wedged_half_dovetail_joint_patterns.py",
-      "sha256": "aa4adaee0e9ff7d2ed9d2c912722f903cde28c2dfab6583eb6a4e990eed95af7",
+      "sha256": "cde248b4e6ed0451b26eed63da40b09a1e6c4b1d6db31a8174490203a6be5b09",
+      "title": {
+        "en": "Wedged half-dovetail mortise and tenon",
+        "ja": "\u6954\u4ed8\u304d\u7247\u87fb\u306e\u6798\u5dee\u3057"
+      },
       "warnings": []
     },
     "patterns/construction_patterns.py": {
@@ -528,6 +1990,140 @@
       "module_name": "giraffe_librarian_dynamic_construction_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "join_face_aligned_on_face_aligned_timbers",
           "attach_face_aligned_timber",
@@ -544,6 +2140,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Join face-aligned timbers",
+              "ja": "\u9762\u3092\u63c3\u3048\u305f\u6750\u3092\u3064\u306a\u3050"
+            },
             "path": "construction/join_face_aligned_on_face_aligned_timbers",
             "pattern_type": "frame",
             "tags": [
@@ -551,6 +2151,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Attach a face-aligned timber",
+              "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+            },
             "path": "construction/attach_face_aligned_timber",
             "pattern_type": "frame",
             "tags": [
@@ -558,6 +2162,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Attach a face-aligned timber, flush",
+              "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u9762\u4e00\u306b\u53d6\u308a\u4ed8\u3051\u308b"
+            },
             "path": "construction/attach_face_aligned_timber_flush",
             "pattern_type": "frame",
             "tags": [
@@ -565,6 +2173,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Inside",
+              "ja": "\u5185\u5074"
+            },
             "path": "construction/attach_face_aligned_timber/stickout/inside",
             "pattern_type": "frame",
             "tags": [
@@ -572,6 +2184,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Outside",
+              "ja": "\u5916\u5074"
+            },
             "path": "construction/attach_face_aligned_timber/stickout/outside",
             "pattern_type": "frame",
             "tags": [
@@ -579,6 +2195,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Centerline",
+              "ja": "\u82af"
+            },
             "path": "construction/attach_face_aligned_timber/stickout/centerline",
             "pattern_type": "frame",
             "tags": [
@@ -586,6 +2206,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Centerline, with stickout",
+              "ja": "\u82af\u304b\u3089\u7a81\u304d\u51fa\u3059"
+            },
             "path": "construction/attach_face_aligned_timber/stickout/centerline_with_stickout",
             "pattern_type": "frame",
             "tags": [
@@ -593,6 +2217,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Target projection",
+              "ja": "\u53d6\u308a\u4ed8\u3051\u5148\u3078\u306e\u6295\u5f71"
+            },
             "path": "construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example",
             "pattern_type": "frame",
             "tags": [
@@ -600,6 +2228,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Attach a brace",
+              "ja": "\u65b9\u6756\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+            },
             "path": "construction/attach_plane_aligned_timber_brace",
             "pattern_type": "frame",
             "tags": [
@@ -607,6 +2239,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Attach a timber",
+              "ja": "\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+            },
             "path": "construction/attach_timber",
             "pattern_type": "frame",
             "tags": [
@@ -614,6 +2250,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Vertical",
+              "ja": "\u5782\u76f4"
+            },
             "path": "construction/footprint/vertical",
             "pattern_type": "frame",
             "tags": [
@@ -621,6 +2261,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Horizontal",
+              "ja": "\u6c34\u5e73"
+            },
             "path": "construction/footprint/horizontal",
             "pattern_type": "frame",
             "tags": [
@@ -630,7 +2274,11 @@
         ]
       },
       "relative_path": "construction_patterns.py",
-      "sha256": "f4d9d0c3a79a31550d1ef22077843a56a416593f0c5f0f0236277ecbae14dcc8",
+      "sha256": "fc7100661e667891de4912cec7e44de9a595451059ac1bc44213646e2f673b89",
+      "title": {
+        "en": "Placing timbers",
+        "ja": "\u6750\u306e\u914d\u7f6e"
+      },
       "warnings": []
     },
     "patterns/corner/dovetail_corner_joint_patterns.py": {
@@ -641,17 +2289,159 @@
       "module_name": "giraffe_librarian_dynamic_corner_dovetail_corner_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "through",
           "half_blind"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Through dovetail",
+              "ja": "\u901a\u3057\u87fb\u7d44\u307f"
+            },
             "path": "corner/dovetail_corner_joint/through",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Half-blind dovetail",
+              "ja": "\u5305\u307f\u87fb\u7d44\u307f"
+            },
             "path": "corner/dovetail_corner_joint/half_blind",
             "pattern_type": "frame",
             "tags": []
@@ -659,7 +2449,11 @@
         ]
       },
       "relative_path": "corner/dovetail_corner_joint_patterns.py",
-      "sha256": "92a7af88466e7dd7dd2dceccbb7ad3142ccc429e21cf5c31f88ceeaf5a3321da",
+      "sha256": "01fd566004ff53d5e5703b7cd730fc0c350a630af145c2604ebad55330414e29",
+      "title": {
+        "en": "Dovetail corner joints",
+        "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+      },
       "warnings": []
     },
     "patterns/corner/mitered_and_keyed_lap_joint_patterns.py": {
@@ -670,17 +2464,159 @@
       "module_name": "giraffe_librarian_dynamic_corner_mitered_and_keyed_lap_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_mitered_and_keyed_lap_joint_90",
           "cut_mitered_and_keyed_lap_joint_130"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "At 90\u00b0",
+              "ja": "90\u00b0"
+            },
             "path": "corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "At 130\u00b0",
+              "ja": "130\u00b0"
+            },
             "path": "corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130",
             "pattern_type": "frame",
             "tags": []
@@ -688,7 +2624,11 @@
         ]
       },
       "relative_path": "corner/mitered_and_keyed_lap_joint_patterns.py",
-      "sha256": "bc62c38bec2e49156a45da42237c391e9dd0bdf256d41e0e88d514812efc91d3",
+      "sha256": "7a7435ec373393567cc15fbf4c3d27236f741e0090e9abd61509f28457e99252",
+      "title": {
+        "en": "Mitered and keyed lap joints",
+        "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+      },
       "warnings": []
     },
     "patterns/corner/plain_corner_lap_joint_patterns.py": {
@@ -699,17 +2639,159 @@
       "module_name": "giraffe_librarian_dynamic_corner_plain_corner_lap_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "orthogonal",
           "angled"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Square",
+              "ja": "\u76f4\u89d2"
+            },
             "path": "corner/plain_corner_lap_joint/orthogonal",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Angled",
+              "ja": "\u659c\u3081"
+            },
             "path": "corner/plain_corner_lap_joint/angled",
             "pattern_type": "frame",
             "tags": []
@@ -717,7 +2799,11 @@
         ]
       },
       "relative_path": "corner/plain_corner_lap_joint_patterns.py",
-      "sha256": "f558c665e645775e9e63edfb079618ed3fbbc9a85ac9205a4ac188dfa7b542cc",
+      "sha256": "660f033c27e7ee6f868f06879b84fd187750eb7b8ba05b843e46e56a45951aeb",
+      "title": {
+        "en": "Corner lap joints",
+        "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+      },
       "warnings": []
     },
     "patterns/corner/plain_miter_joint_patterns.py": {
@@ -728,6 +2814,140 @@
       "module_name": "giraffe_librarian_dynamic_corner_plain_miter_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_plain_miter_joint",
           "cut_plain_miter_joint_face_aligned",
@@ -735,6 +2955,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Miter",
+              "ja": "\u7559\u3081"
+            },
             "path": "corner/plain_miter_joint/cut_plain_miter_joint",
             "pattern_type": "frame",
             "tags": [
@@ -742,11 +2966,19 @@
             ]
           },
           {
+            "names": {
+              "en": "Face-aligned miter",
+              "ja": "\u9762\u3092\u63c3\u3048\u305f\u7559\u3081"
+            },
             "path": "corner/plain_miter_joint/cut_plain_miter_joint_face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Miter in 3D",
+              "ja": "\u7acb\u4f53\u7684\u306a\u7559\u3081"
+            },
             "path": "corner/plain_miter_joint/cut_plain_miter_joint_3d",
             "pattern_type": "frame",
             "tags": []
@@ -754,7 +2986,11 @@
         ]
       },
       "relative_path": "corner/plain_miter_joint_patterns.py",
-      "sha256": "0968fed229de83987c69a776d87198caa7e71ed693aeb5186808627d1bbeb574",
+      "sha256": "3e7965a02b9ab5762daaee066fdf3e7c6c8b747427c60fa28ee0c0d43c60dbc4",
+      "title": {
+        "en": "Miter joints",
+        "ja": "\u7559\u3081"
+      },
       "warnings": []
     },
     "patterns/corner/tongue_and_fork_corner_joint_patterns.py": {
@@ -765,17 +3001,159 @@
       "module_name": "giraffe_librarian_dynamic_corner_tongue_and_fork_corner_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_tongue_and_fork_corner_joint_90",
           "cut_tongue_and_fork_corner_joint_135"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "At 90\u00b0",
+              "ja": "90\u00b0"
+            },
             "path": "corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "At 135\u00b0",
+              "ja": "135\u00b0"
+            },
             "path": "corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135",
             "pattern_type": "frame",
             "tags": []
@@ -783,7 +3161,11 @@
         ]
       },
       "relative_path": "corner/tongue_and_fork_corner_joint_patterns.py",
-      "sha256": "a91c54f99f7d88d4ee9f7c018daf32314dcb5016c8372c798ef8aace850920ca",
+      "sha256": "e0b6c656d1ebe9b5e56ada5ead3d68a731d90c245327809947ab5f2bd1691e0b",
+      "title": {
+        "en": "Tongue and fork corner joints",
+        "ja": "\u9685\u306e\u7d44\u624b"
+      },
       "warnings": []
     },
     "patterns/cross/multi_cross_lap_joint_patterns.py": {
@@ -794,11 +3176,149 @@
       "module_name": "giraffe_librarian_dynamic_cross_multi_cross_lap_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "multi_cross_lap_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Multiple cross lap joint",
+              "ja": "\u591a\u6bb5\u306e\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+            },
             "path": "cross/multi_cross_lap_joint",
             "pattern_type": "frame",
             "tags": []
@@ -806,7 +3326,11 @@
         ]
       },
       "relative_path": "cross/multi_cross_lap_joint_patterns.py",
-      "sha256": "8bef03117c58fb4cfd9227f9720ce803c737a6cbfb284b071eca5dbf11509189",
+      "sha256": "40fd5f1d5048ea26b4f4b3b5346d368855d3cbf42ff6279366e62fe647cc8989",
+      "title": {
+        "en": "Multiple cross lap joint",
+        "ja": "\u591a\u6bb5\u306e\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+      },
       "warnings": []
     },
     "patterns/cross/plain_cross_lap_joint_patterns.py": {
@@ -817,12 +3341,150 @@
       "module_name": "giraffe_librarian_dynamic_cross_plain_cross_lap_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "cut_plain_cross_lap_house_joint",
           "cut_plain_cross_lap_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Cross lap housing",
+              "ja": "\u6e21\u308a\u816e"
+            },
             "path": "cross/cut_plain_cross_lap_house_joint",
             "pattern_type": "frame",
             "tags": [
@@ -830,6 +3492,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Cross lap joint",
+              "ja": "\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+            },
             "path": "cross/cut_plain_cross_lap_joint",
             "pattern_type": "frame",
             "tags": []
@@ -837,7 +3503,11 @@
         ]
       },
       "relative_path": "cross/plain_cross_lap_joint_patterns.py",
-      "sha256": "65e8c9410f553fe7f74604016316b3a6dd2791945f4b85477c793c303235f773",
+      "sha256": "abbc773fee4954c1ad2a1e546fedc4d5ae9f6fb72208357367b070588e14d16a",
+      "title": {
+        "en": "Cross lap joints",
+        "ja": "\u76f8\u6b20\u304d\uff08\u5341\u5b57\uff09"
+      },
       "warnings": []
     },
     "patterns/decorative/decorative_joints_patterns.py": {
@@ -848,6 +3518,140 @@
       "module_name": "giraffe_librarian_dynamic_decorative_decorative_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "roundover",
           "roundover_imperfect",
@@ -858,6 +3662,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Roundover",
+              "ja": "\u89d2\u306e\u4e38\u9762"
+            },
             "path": "decorative/roundover",
             "pattern_type": "frame",
             "tags": [
@@ -865,6 +3673,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Imperfect roundover",
+              "ja": "\u4e0d\u63c3\u3044\u306a\u4e38\u9762"
+            },
             "path": "decorative/roundover_imperfect",
             "pattern_type": "frame",
             "tags": [
@@ -872,6 +3684,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Rafter tail scallop",
+              "ja": "\u5782\u6728\u9f3b\u306e\u7e70\u308a\u5f62"
+            },
             "path": "decorative/rafter_tail_scallop",
             "pattern_type": "frame",
             "tags": [
@@ -879,6 +3695,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Profiled corner end",
+              "ja": "\u8f2a\u90ed\u306b\u6cbf\u3063\u3066\u5207\u3063\u305f\u89d2\u306e\u6728\u53e3"
+            },
             "path": "decorative/path_extrusion_corner_end",
             "pattern_type": "frame",
             "tags": [
@@ -886,6 +3706,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Angled end cut",
+              "ja": "\u659c\u3081\u306b\u5207\u3063\u305f\u6728\u53e3"
+            },
             "path": "decorative/straight_angled_end_cut",
             "pattern_type": "frame",
             "tags": [
@@ -893,6 +3717,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Rounded end",
+              "ja": "\u4e38\u304f\u7d0d\u3081\u305f\u6728\u53e3"
+            },
             "path": "decorative/rounded_end",
             "pattern_type": "frame",
             "tags": []
@@ -900,7 +3728,11 @@
         ]
       },
       "relative_path": "decorative/decorative_joints_patterns.py",
-      "sha256": "1072df0fb7fcb82f851183c18290462b2ce5d702f04668ee3c0806b59ec58bf2",
+      "sha256": "f27dac4fcaa2861f90914ed951a3099875abf6871eaa782bf6fbc94d65771b15",
+      "title": {
+        "en": "Decorative cuts",
+        "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+      },
       "warnings": []
     },
     "patterns/free/free_dovetail_joint_patterns.py": {
@@ -911,12 +3743,150 @@
       "module_name": "giraffe_librarian_dynamic_free_free_dovetail_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "sliding",
           "tapered"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Sliding",
+              "ja": "\u9001\u308a\u87fb"
+            },
             "path": "free/free_dovetail_joint/sliding",
             "pattern_type": "frame",
             "tags": [
@@ -924,6 +3894,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Tapered",
+              "ja": "\u5148\u7d30\u308a\u306e\u87fb"
+            },
             "path": "free/free_dovetail_joint/tapered",
             "pattern_type": "frame",
             "tags": []
@@ -931,7 +3905,11 @@
         ]
       },
       "relative_path": "free/free_dovetail_joint_patterns.py",
-      "sha256": "fde95027411b79ca9d7ad231074362f5836ed962b924846ae592b75294b99a9b",
+      "sha256": "d4a04b51ee7da1e0b76e9c194a46086be5196eed7c42adcb3b65a4e2b74a895c",
+      "title": {
+        "en": "Free dovetail joints",
+        "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+      },
       "warnings": []
     },
     "patterns/free/free_house_joint_patterns.py": {
@@ -942,11 +3920,149 @@
       "module_name": "giraffe_librarian_dynamic_free_free_house_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "free_house_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Free housed joint",
+              "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u5927\u5165\u308c"
+            },
             "path": "free/free_house_joint",
             "pattern_type": "frame",
             "tags": []
@@ -954,7 +4070,11 @@
         ]
       },
       "relative_path": "free/free_house_joint_patterns.py",
-      "sha256": "005c69d6faef97e6e3ed29a7998fa92ac446560057a3fe1840d8cce81d508bb8",
+      "sha256": "a2bc3d856f26fc8a212734d104fc8578ee7b893a791ae7d5eab6d2f3955a67cc",
+      "title": {
+        "en": "Free housed joint",
+        "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u5927\u5165\u308c"
+      },
       "warnings": []
     },
     "patterns/mixed/mortise_and_tenon_joints_patterns.py": {
@@ -965,6 +4085,140 @@
       "module_name": "giraffe_librarian_dynamic_mixed_mortise_and_tenon_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "round_face_aligned",
           "through_tenon",
@@ -981,61 +4235,109 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Round, face-aligned",
+              "ja": "\u4e38\u6798\u3001\u9762\u3092\u63c3\u3048\u308b"
+            },
             "path": "mixed/mortise_and_tenon/round_face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Through tenon",
+              "ja": "\u901a\u3057\u6798"
+            },
             "path": "mixed/mortise_and_tenon/through_tenon",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Compound angle",
+              "ja": "\u4e8c\u65b9\u5411\u306b\u50be\u3044\u305f\u6798"
+            },
             "path": "mixed/mortise_and_tenon/compound_angled",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Notched on two sides",
+              "ja": "\u4e21\u5074\u3092\u6b20\u304d\u8fbc\u3093\u3060\u6798"
+            },
             "path": "mixed/mortise_and_tenon/joint_plane_aligned_notched_2sided",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Brace",
+              "ja": "\u65b9\u6756\u306e\u6798\u5dee\u3057"
+            },
             "path": "mixed/mortise_and_tenon/brace_joint_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Steep brace",
+              "ja": "\u6025\u306a\u65b9\u6756\u306e\u6798\u5dee\u3057"
+            },
             "path": "mixed/mortise_and_tenon/steep_brace_joint_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Corner",
+              "ja": "\u9685\u306e\u6798\u5dee\u3057"
+            },
             "path": "mixed/mortise_and_tenon/mortise_and_tenon_corner_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Offset with a parallel shoulder",
+              "ja": "\u80f4\u4ed8\u304d\u3092\u5e73\u884c\u306b\u305a\u3089\u3057\u305f\u6798"
+            },
             "path": "mixed/mortise_and_tenon/compound_offset_parallel_shoulder",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Stopped, face-aligned",
+              "ja": "\u6b62\u3081\u6798\u3001\u9762\u3092\u63c3\u3048\u308b"
+            },
             "path": "mixed/mortise_and_tenon/stopped_face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "Round, plane-aligned",
+              "ja": "\u4e38\u6798\u3001\u540c\u4e00\u5e73\u9762"
+            },
             "path": "mixed/mortise_and_tenon/round_plane_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "From the front",
+              "ja": "\u6b63\u9762\u304b\u3089\u5dee\u3059"
+            },
             "path": "mixed/tusked_mortise_and_tenon/front_entry",
             "pattern_type": "frame",
             "tags": []
           },
           {
+            "names": {
+              "en": "From the top",
+              "ja": "\u4e0a\u304b\u3089\u5dee\u3059"
+            },
             "path": "mixed/tusked_mortise_and_tenon/top_entry",
             "pattern_type": "frame",
             "tags": []
@@ -1043,7 +4345,11 @@
         ]
       },
       "relative_path": "mixed/mortise_and_tenon_joints_patterns.py",
-      "sha256": "e3cc882221b0d6a9786c8031b8a86386b10d84e249db99574f5e283232aad30c",
+      "sha256": "b2c9be7c05461a5ef117b47bfb7fdc842b19d329ab31a9c1e736479990266903",
+      "title": {
+        "en": "Mortise and tenon joints",
+        "ja": "\u6798\u5dee\u3057"
+      },
       "warnings": []
     },
     "patterns/patternbook_patterns.py": {
@@ -1054,6 +4360,140 @@
       "module_name": "giraffe_librarian_dynamic_patternbook_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "short_post",
           "tall_post",
@@ -1067,6 +4507,10 @@
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Short post",
+              "ja": "\u77ed\u3044\u67f1"
+            },
             "path": "patternbook_examples/short_post",
             "pattern_type": "frame",
             "tags": [
@@ -1075,6 +4519,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Tall post",
+              "ja": "\u9577\u3044\u67f1"
+            },
             "path": "patternbook_examples/tall_post",
             "pattern_type": "frame",
             "tags": [
@@ -1082,6 +4530,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Wide post",
+              "ja": "\u592a\u3044\u67f1"
+            },
             "path": "patternbook_examples/wide_post",
             "pattern_type": "frame",
             "tags": [
@@ -1089,6 +4541,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Small beam",
+              "ja": "\u5c0f\u3055\u3044\u6881"
+            },
             "path": "patternbook_examples/small_beam",
             "pattern_type": "frame",
             "tags": [
@@ -1096,6 +4552,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Medium beam",
+              "ja": "\u4e2d\u304f\u3089\u3044\u306e\u6881"
+            },
             "path": "patternbook_examples/medium_beam",
             "pattern_type": "frame",
             "tags": [
@@ -1103,6 +4563,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Large beam",
+              "ja": "\u5927\u304d\u3044\u6881"
+            },
             "path": "patternbook_examples/large_beam",
             "pattern_type": "frame",
             "tags": [
@@ -1110,6 +4574,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Small box",
+              "ja": "\u5c0f\u3055\u3044\u7bb1"
+            },
             "path": "patternbook_examples/small_box",
             "pattern_type": "csg",
             "tags": [
@@ -1117,6 +4585,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Medium box",
+              "ja": "\u4e2d\u304f\u3089\u3044\u306e\u7bb1"
+            },
             "path": "patternbook_examples/medium_box",
             "pattern_type": "csg",
             "tags": [
@@ -1124,6 +4596,10 @@
             ]
           },
           {
+            "names": {
+              "en": "Large box",
+              "ja": "\u5927\u304d\u3044\u7bb1"
+            },
             "path": "patternbook_examples/large_box",
             "pattern_type": "csg",
             "tags": [
@@ -1133,7 +4609,11 @@
         ]
       },
       "relative_path": "patternbook_patterns.py",
-      "sha256": "2a079d6788461f5fad5c41fc17ad98b620bd297ad7b7c4174932b2b02262e473",
+      "sha256": "5beb64b15397f46c62b3d794eddad41e75601e5b9fecaba08aa2eb244e60797c",
+      "title": {
+        "en": "Pattern book examples",
+        "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+      },
       "warnings": []
     },
     "patterns/splice/half_blind_tenoned_dadoed_rabbeted_scarf_joint_patterns.py": {
@@ -1144,11 +4624,149 @@
       "module_name": "giraffe_librarian_dynamic_splice_half_blind_tenoned_dadoed_rabbeted_scarf_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "rebated_oblique_and_dadoed_scarf_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Half-blind tenoned dadoed rabbeted scarf",
+              "ja": "\u91d1\u8f2a\u7d99\u304e"
+            },
             "path": "splice/rebated_oblique_and_dadoed_scarf_joint",
             "pattern_type": "frame",
             "tags": []
@@ -1156,7 +4774,11 @@
         ]
       },
       "relative_path": "splice/half_blind_tenoned_dadoed_rabbeted_scarf_joint_patterns.py",
-      "sha256": "c0c5c8e16990d86684c649595a700e85774d3c7205d0a86b243cef1cb81041c7",
+      "sha256": "3f39a103b3342083c6644b785e34e7095511a42d85f61219dfea5e3c968e89ac",
+      "title": {
+        "en": "Half-blind tenoned dadoed rabbeted scarf",
+        "ja": "\u91d1\u8f2a\u7d99\u304e"
+      },
       "warnings": []
     },
     "patterns/splice/lapped_gooseneck_joint_patterns.py": {
@@ -1167,11 +4789,149 @@
       "module_name": "giraffe_librarian_dynamic_splice_lapped_gooseneck_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "lapped_gooseneck_splice_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Lapped gooseneck splice",
+              "ja": "\u8170\u639b\u938c\u7d99\u304e"
+            },
             "path": "splice/lapped_gooseneck_splice_joint",
             "pattern_type": "frame",
             "tags": []
@@ -1179,7 +4939,11 @@
         ]
       },
       "relative_path": "splice/lapped_gooseneck_joint_patterns.py",
-      "sha256": "d7392e3d3322c71ca08883ac333fd04c8ab63254fab4bc67ec6225d617165a28",
+      "sha256": "9ec0b1112c825abfc082c5cbe9184ee2d7a63e9b13e54c6057a617707a66773a",
+      "title": {
+        "en": "Lapped gooseneck splice",
+        "ja": "\u8170\u639b\u938c\u7d99\u304e"
+      },
       "warnings": []
     },
     "patterns/splice/plain_butt_splice_joint_patterns.py": {
@@ -1190,11 +4954,149 @@
       "module_name": "giraffe_librarian_dynamic_splice_plain_butt_splice_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "plain_butt_splice_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Butt splice",
+              "ja": "\u7a81\u304d\u4ed8\u3051\u7d99\u304e"
+            },
             "path": "splice/plain_butt_splice_joint",
             "pattern_type": "frame",
             "tags": [
@@ -1204,7 +5106,11 @@
         ]
       },
       "relative_path": "splice/plain_butt_splice_joint_patterns.py",
-      "sha256": "4bdafd12b61d73c8ba27837f65ae34f9ba2fa0cd994c09b9698a1b61ce9519d9",
+      "sha256": "f17b174a8d83036bc9aeab6c709e0217bda5f249d5c38bfc9b58b86ec453f15b",
+      "title": {
+        "en": "Butt splice",
+        "ja": "\u7a81\u304d\u4ed8\u3051\u7d99\u304e"
+      },
       "warnings": []
     },
     "patterns/splice/plain_splice_lap_joint_patterns.py": {
@@ -1215,11 +5121,149 @@
       "module_name": "giraffe_librarian_dynamic_splice_plain_splice_lap_joint_patterns",
       "multiple_frames": false,
       "patternbook": {
+        "folder_names": {
+          "basic_joints": {
+            "en": "Basic joints",
+            "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
+          },
+          "basic_joints/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "basic_joints/miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "basic_joints/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "basic_joints/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "basic_joints/round_mortise_and_tenon": {
+            "en": "Round mortise and tenon",
+            "ja": "\u4e38\u6798\u5dee\u3057"
+          },
+          "basic_joints/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "basic_joints/splined_opposing_double_butt_joint": {
+            "en": "Splined opposing double butt joints",
+            "ja": "\u96c7\u3044\u6798\u3067\u5411\u304b\u3044\u5408\u3046\u4ed5\u53e3"
+          },
+          "board": {
+            "en": "Board joints",
+            "ja": "\u677f\u306e\u4ed5\u53e3"
+          },
+          "board/sliding_dovetail": {
+            "en": "Sliding dovetails",
+            "ja": "\u9001\u308a\u87fb"
+          },
+          "butt": {
+            "en": "Butt joints",
+            "ja": "T\u5b57\u306e\u4ed5\u53e3"
+          },
+          "butt/plain_butt_joint": {
+            "en": "Plain butt joints",
+            "ja": "\u7a81\u304d\u4ed8\u3051"
+          },
+          "butt/tongue_and_fork": {
+            "en": "Tongue and fork butt joints",
+            "ja": "T\u5b57\u306e\u7d44\u624b"
+          },
+          "construction": {
+            "en": "Placing timbers",
+            "ja": "\u6750\u306e\u914d\u7f6e"
+          },
+          "construction/attach_face_aligned_timber": {
+            "en": "Attach a face-aligned timber",
+            "ja": "\u9762\u3092\u63c3\u3048\u3066\u6750\u3092\u53d6\u308a\u4ed8\u3051\u308b"
+          },
+          "construction/attach_face_aligned_timber/stickout": {
+            "en": "Stickout",
+            "ja": "\u7a81\u304d\u51fa\u3057"
+          },
+          "construction/footprint": {
+            "en": "Footprints",
+            "ja": "\u5e73\u9762\u306e\u5916\u5f62"
+          },
+          "corner": {
+            "en": "Corner joints",
+            "ja": "\u9685\u306e\u4ed5\u53e3"
+          },
+          "corner/dovetail_corner_joint": {
+            "en": "Dovetail corner joints",
+            "ja": "\u9685\u306e\u87fb\u7d44\u307f"
+          },
+          "corner/mitered_and_keyed_lap_joint": {
+            "en": "Mitered and keyed lap joints",
+            "ja": "\u7bb1\u76f8\u6b20\u304d\u8eca\u77e5\u6813\u4ed5\u53e3"
+          },
+          "corner/plain_corner_lap_joint": {
+            "en": "Corner lap joints",
+            "ja": "\u9685\u306e\u76f8\u6b20\u304d"
+          },
+          "corner/plain_miter_joint": {
+            "en": "Miter joints",
+            "ja": "\u7559\u3081"
+          },
+          "corner/tongue_and_fork_corner_joint": {
+            "en": "Tongue and fork corner joints",
+            "ja": "\u9685\u306e\u7d44\u624b"
+          },
+          "cross": {
+            "en": "Cross joints",
+            "ja": "\u4ea4\u5dee\u3059\u308b\u4ed5\u53e3"
+          },
+          "csg_debug": {
+            "en": "CSG debugging",
+            "ja": "CSG \u306e\u30c7\u30d0\u30c3\u30b0"
+          },
+          "decorative": {
+            "en": "Decorative cuts",
+            "ja": "\u88c5\u98fe\u306e\u52a0\u5de5"
+          },
+          "free": {
+            "en": "Free joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u4ed5\u53e3"
+          },
+          "free/free_dovetail_joint": {
+            "en": "Free dovetail joints",
+            "ja": "\u81ea\u7531\u306a\u914d\u7f6e\u306e\u87fb"
+          },
+          "mixed": {
+            "en": "Mixed joints",
+            "ja": "\u3044\u308d\u3044\u308d\u306a\u4ed5\u53e3"
+          },
+          "mixed/mortise_and_tenon": {
+            "en": "Mortise and tenon",
+            "ja": "\u6798\u5dee\u3057"
+          },
+          "mixed/tusked_mortise_and_tenon": {
+            "en": "Tusked mortise and tenon",
+            "ja": "\u5272\u308a\u6954\u306e\u901a\u3057\u6798"
+          },
+          "patternbook_examples": {
+            "en": "Pattern book examples",
+            "ja": "\u30d1\u30bf\u30fc\u30f3\u30d6\u30c3\u30af\u306e\u4f8b"
+          },
+          "splice": {
+            "en": "Splice joints",
+            "ja": "\u7d99\u624b"
+          }
+        },
         "pattern_names": [
           "plain_splice_lap_joint"
         ],
         "patterns": [
           {
+            "names": {
+              "en": "Splice half-lap",
+              "ja": "\u76f8\u6b20\u304d\u7d99\u304e"
+            },
             "path": "splice/plain_splice_lap_joint",
             "pattern_type": "frame",
             "tags": []
@@ -1227,7 +5271,11 @@
         ]
       },
       "relative_path": "splice/plain_splice_lap_joint_patterns.py",
-      "sha256": "0e706214ae723038caf3b823a28eda8a5f53a2802091ececba25da6f9a978329",
+      "sha256": "30344441eb59a611ce5da783927ddd7b53c25e7635b4ef0cc99afa5c563c9013",
+      "title": {
+        "en": "Splice half-lap",
+        "ja": "\u76f8\u6b20\u304d\u7d99\u304e"
+      },
       "warnings": []
     },
     "patterns/structures/cabriole_table.py": {
@@ -1236,12 +5284,12 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 26,
+          "lineno": 28,
           "name": "cabriole_table"
         },
         {
           "kind": "function",
-          "lineno": 43,
+          "lineno": 45,
           "name": "cabriole_placement"
         }
       ],
@@ -1250,7 +5298,11 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/cabriole_table.py",
-      "sha256": "4d546835dc9a5c7d3caffe3aa5e77947ab029d187f935d07fd6bd4bc25235203",
+      "sha256": "016f380901d95eb43f12270d745f103203ce83538d6eda1c179a44666a5f7ea6",
+      "title": {
+        "en": "Cabriole table",
+        "ja": "\u732b\u811a\u306e\u30c6\u30fc\u30d6\u30eb"
+      },
       "warnings": []
     },
     "patterns/structures/coffee_table.py": {
@@ -1259,7 +5311,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 22,
+          "lineno": 24,
           "name": "coffee_table"
         }
       ],
@@ -1268,7 +5320,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/coffee_table.py",
-      "sha256": "2b990c926d8cf0c67b41e1bdb47c5c93112b9aa7575bae79f9aa05774c831d3e",
+      "sha256": "ed51c7ae8dbdd66146a70511b36c4f9998b588e28f52ef970f182dd302df82ba",
+      "title": {
+        "en": "Coffee table",
+        "ja": "\u30b3\u30fc\u30d2\u30fc\u30c6\u30fc\u30d6\u30eb"
+      },
       "warnings": []
     },
     "patterns/structures/doublesawhorseworkbench.py": {
@@ -1277,7 +5333,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 273,
+          "lineno": 275,
           "name": "example"
         }
       ],
@@ -1286,7 +5342,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/doublesawhorseworkbench.py",
-      "sha256": "491a7ccf2b3c27b38f5eafb839ee0f7e6237a24b182735bb5c49d8f3e01724e7",
+      "sha256": "bf085b14a76d99354c96179fc6c9e115b949f6e25c8a801500488ed11d3a7dfd",
+      "title": {
+        "en": "Double sawhorse workbench",
+        "ja": "\u4e8c\u9023\u306e\u99ac\uff08\u4f5c\u696d\u53f0\uff09"
+      },
       "warnings": []
     },
     "patterns/structures/dovetailed_sawhorse.py": {
@@ -1295,7 +5355,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 518,
+          "lineno": 520,
           "name": "dovetailed_sawhorse"
         }
       ],
@@ -1304,7 +5364,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/dovetailed_sawhorse.py",
-      "sha256": "ff1274d784b2a4c539cd5b55ebe2f71e8601ff916aa0ca41a88c6c365f15ce16",
+      "sha256": "6ed072142868b412a2f43579b8e355a1e83e744a59cbe8f8e30aa28362f7619c",
+      "title": {
+        "en": "Dovetailed sawhorse",
+        "ja": "\u87fb\u3067\u7d44\u3093\u3060\u99ac"
+      },
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
@@ -1313,7 +5377,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 279,
+          "lineno": 281,
           "name": "example"
         }
       ],
@@ -1322,7 +5386,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
-      "sha256": "6097db8ebeda5c890048d1fc2daedaaca7bd3f404d70353c02bee57b4091f4b2",
+      "sha256": "5d834182af095d2d4be0acccc503186c2961eb8e21f9dc7a4b709c78562b024a",
+      "title": {
+        "en": "Sawhorse",
+        "ja": "\u99ac\uff08\u4f5c\u696d\u53f0\uff09"
+      },
       "warnings": []
     },
     "patterns/structures/ki_kanji.py": {
@@ -1331,7 +5399,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 151,
+          "lineno": 153,
           "name": "ki_kanji"
         }
       ],
@@ -1340,7 +5408,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/ki_kanji.py",
-      "sha256": "ca66eed4d8a7edd0e5ad19fc06726c36b05734fbf8449d8c5d2e610737e13d21",
+      "sha256": "afb4d37182f6890d75587b8fa9c5b943ffb3a5e201b8b93434c93a53d45c631e",
+      "title": {
+        "en": "Ki (\u6728)",
+        "ja": "\u300c\u6728\u300d\u306e\u5b57"
+      },
       "warnings": []
     },
     "patterns/structures/learn_to_timber_frame_shed.py": {
@@ -1349,7 +5421,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 178,
+          "lineno": 180,
           "name": "build_shed_frame"
         }
       ],
@@ -1358,7 +5430,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/learn_to_timber_frame_shed.py",
-      "sha256": "b98590efcf2531f3713629ca864d51de7b3b27aec9a2a8e62c7319d2315425d9",
+      "sha256": "336e11c53fdbc11a66f4a2f053969daef107b8cac141a8d62cb68ea49bca701d",
+      "title": {
+        "en": "Timber frame shed",
+        "ja": "\u6728\u7d44\u307f\u306e\u5c0f\u5c4b"
+      },
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1367,7 +5443,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 49,
+          "lineno": 51,
           "name": "example"
         }
       ],
@@ -1376,7 +5452,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/multi_cross_lap_post.py",
-      "sha256": "08c18934dac64c1508eef0440d0a81b1d1b0b3d9d812416a7e9989a0793e1f33",
+      "sha256": "8d8b7f33116b4cef86b05ad9f5cd09afce771d84d339787175323ccf71448485",
+      "title": {
+        "en": "Cross-lapped post",
+        "ja": "\u76f8\u6b20\u304d\u3067\u7d44\u3093\u3060\u67f1"
+      },
       "warnings": []
     },
     "patterns/structures/multiple_frames.py": {
@@ -1385,22 +5465,22 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 189,
+          "lineno": 191,
           "name": "cottage"
         },
         {
           "kind": "function",
-          "lineno": 205,
+          "lineno": 207,
           "name": "tower"
         },
         {
           "kind": "function",
-          "lineno": 222,
+          "lineno": 224,
           "name": "shed"
         },
         {
           "kind": "function",
-          "lineno": 236,
+          "lineno": 238,
           "name": "pavilion"
         }
       ],
@@ -1409,7 +5489,11 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/multiple_frames.py",
-      "sha256": "93cc5f064c333666a1752bea7550156be7b21ff0bcfddc9666e22c77e38786fc",
+      "sha256": "98ecd46f1a93444ee11c48ed1c7804128f8082a6d77155a8ccd6d4724410b993",
+      "title": {
+        "en": "Several frames",
+        "ja": "\u8907\u6570\u306e\u67b6\u69cb"
+      },
       "warnings": []
     },
     "patterns/structures/my_cute_frame.py": {
@@ -1418,7 +5502,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 48,
+          "lineno": 50,
           "name": "my_cute_frame"
         }
       ],
@@ -1427,7 +5511,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/my_cute_frame.py",
-      "sha256": "7fce9b7f3aca0bb25c773e3072c290e50dc6ab3620a82e916e7cd314fd947b79",
+      "sha256": "0e75c637d56f1ea3e27975497fd19fc358648d38ab228985db6b6b0f35c0e42c",
+      "title": {
+        "en": "My cute frame",
+        "ja": "\u304b\u308f\u3044\u3044\u67b6\u69cb"
+      },
       "warnings": []
     },
     "patterns/structures/oscarshed.py": {
@@ -1436,7 +5524,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1100,
+          "lineno": 1102,
           "name": "example"
         }
       ],
@@ -1445,7 +5533,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/oscarshed.py",
-      "sha256": "c63dff256df0a3a3fdb7f7945cee3ccc17f926dbc8dd0459618ec8172320cc8f",
+      "sha256": "421d62144040518026e8e62d021421ac82619038bf44c545da0d019e5332b380",
+      "title": {
+        "en": "Oscar's shed",
+        "ja": "\u30aa\u30b9\u30ab\u30fc\u306e\u5c0f\u5c4b"
+      },
       "warnings": []
     },
     "patterns/structures/tinyhouse120.py": {
@@ -1454,7 +5546,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1573,
+          "lineno": 1575,
           "name": "example"
         }
       ],
@@ -1463,11 +5555,15 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/tinyhouse120.py",
-      "sha256": "12d8ab13f445bad65a1df7dba22f2508256a7ee9a7d87527f6af52c1b8d20241",
+      "sha256": "e5ba9db29df6e4d25c40bcd21656f434a692e9b5e4b1d5a4b57ba0c3964c3195",
+      "title": {
+        "en": "Tiny house 120",
+        "ja": "\u30bf\u30a4\u30cb\u30fc\u30cf\u30a6\u30b9 120"
+      },
       "warnings": []
     }
   },
-  "generated_at": "2026-11-14T04:42:47.519120+00:00",
+  "generated_at": "2026-11-19T04:22:20.733224+00:00",
   "root_folder": "patterns",
-  "schema_version": 1
+  "schema_version": 2
 }

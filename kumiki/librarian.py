@@ -135,6 +135,9 @@ class ModuleStaticInfo:
     frames: List[StaticEntry] = field(default_factory=list)
     pattern_functions: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
+    # The file's ``__title__``, as {language: text} (kumiki.names).
+    title: Optional[Dict[str, str]] = None
+    warnings: List[str] = field(default_factory=list)
 
     @property
     def has_anything(self) -> bool:
@@ -198,6 +201,16 @@ def _record_target_names(target: ast.expr) -> List[str]:
     return names
 
 
+def _read_title(value: ast.expr, info: ModuleStaticInfo) -> None:
+    """Set ``info.title`` from a ``__title__`` assignment, or note why it can't be read."""
+    from .names import names_of
+
+    try:
+        info.title = names_of(ast.literal_eval(value), "__title__")
+    except (ValueError, TypeError, SyntaxError) as exc:
+        info.warnings.append(f"__title__ is not used: write it as text or a {{language: text}} dict ({exc})")
+
+
 def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
     """Analyze raw source text and return its static info."""
     info = ModuleStaticInfo(file_path=file_path)
@@ -227,6 +240,8 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
             for name in _record_target_names(target):
                 if name in _LEGACY_NAMES:
                     info.frames.append(StaticEntry(name, "var", node.lineno))
+                elif name == "__title__" and node.value is not None:
+                    _read_title(node.value, info)
 
     return info
 
@@ -252,6 +267,8 @@ class LibrarianModuleRecord:
     load_error_traceback: Optional[str] = None
     static_info: Optional[ModuleStaticInfo] = None
     content_sha256: Optional[str] = None
+    # Pattern folder names the module gave with pattern_folders (kumiki.names).
+    folder_names: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -477,6 +494,7 @@ def _scan_single_file(
         module_name=module_name,
         static_info=static_info,
         content_sha256=sha,
+        warnings=list(static_info.warnings),
     )
 
     if not static_info.has_anything:
@@ -497,7 +515,10 @@ def _scan_single_file(
         return record
 
     if static_info.pattern_functions:
+        from .names import module_folder_names
+
         record.pattern_list = _resolve_pattern_list(module, record.warnings)
+        record.folder_names = module_folder_names(module)
     return record
 
 
@@ -552,11 +573,20 @@ def _frame_record_for_index(
         "chosen_frame_name": chosen_name,
         "chosen_frame_kind": chosen_kind,
         "all_frame_names": all_frame_names,
+        "title": static.title if static else None,
         "multiple_frames": bool(static and static.multiple_frames),
         "content_sha256": rec.content_sha256,
         "load_error": rec.load_error,
         "warnings": list(rec.warnings or []),
     }
+
+
+def _patterns_payload(pattern_list: List[Pattern]) -> List[Dict[str, Any]]:
+    return [
+        {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type,
+         **({"names": p.names} if p.names else {})}
+        for p in pattern_list
+    ]
 
 
 def build_scan_index(scan_result: LibrarianScanResult) -> Dict[str, Any]:
@@ -572,16 +602,14 @@ def build_scan_index(scan_result: LibrarianScanResult) -> Dict[str, Any]:
 
         if rec.pattern_list is not None or (static and static.pattern_functions):
             pl = rec.pattern_list or []
-            patterns_payload = [
-                {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
-                for p in pl
-            ]
             patternbooks.append({
                 "file_path": abs_path,
                 "relative_path": rec.relative_path,
                 "module_name": rec.module_name,
-                "patterns": patterns_payload,
+                "patterns": _patterns_payload(pl),
                 "pattern_names": [p.name for p in pl],
+                "title": static.title if static else None,
+                "folder_names": rec.folder_names,
                 "patternbook_loaded": rec.pattern_list is not None,
                 "content_sha256": rec.content_sha256,
                 "load_error": rec.load_error,
@@ -627,7 +655,7 @@ def scan_workspace_index(workspace_root: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-PATTERN_INDEX_SCHEMA_VERSION = 1
+PATTERN_INDEX_SCHEMA_VERSION = 2
 WORKSPACE_INDEX_RELATIVE_PATH = ".kigumi/pattern_index.json"
 PACKAGE_INDEX_FILENAME = "_pattern_index.json"
 
@@ -639,15 +667,13 @@ def _entry_from_static(static_frames: Iterable[StaticEntry]) -> List[Dict[str, A
     ]
 
 
-def _patternbook_payload(pattern_list: Optional[List[Pattern]]) -> Optional[Dict[str, Any]]:
-    if pattern_list is None:
+def _patternbook_payload(rec: LibrarianModuleRecord) -> Optional[Dict[str, Any]]:
+    if rec.pattern_list is None:
         return None
     return {
-        "patterns": [
-            {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
-            for p in pattern_list
-        ],
-        "pattern_names": [p.name for p in pattern_list],
+        "patterns": _patterns_payload(rec.pattern_list),
+        "pattern_names": [p.name for p in rec.pattern_list],
+        "folder_names": rec.folder_names,
     }
 
 
@@ -666,7 +692,8 @@ def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
         "multiple_frames": bool(static and static.multiple_frames),
         "warnings": list(rec.warnings or []),
         "load_error": rec.load_error,
-        "patternbook": _patternbook_payload(rec.pattern_list),
+        "patternbook": _patternbook_payload(rec),
+        "title": static.title if static else None,
     }
 
     return entry
@@ -733,6 +760,7 @@ def build_pattern_index(
             "chosen_frame_kind": entry.get("chosen_frame_kind"),
             "all_frame_names": [f["name"] for f in entry.get("frames", [])],
             "multiple_frames": entry.get("multiple_frames", False),
+            "title": entry.get("title"),
         }
         for entry in entries.values()
         if entry.get("frames")
