@@ -132,6 +132,19 @@ app.whenReady().then(async () => {
         result.drawn = await run('document.getElementById("messages").textContent');
         result.toolSaid = await run('document.querySelector(".tool-chip .tool-name").textContent');
 
+        // A reply is Markdown, never HTML: tags in it stay text, and a link does not navigate.
+        await send({ type: 'agent:replay', events: [
+            { type: 'agent:text', text: '## Plan\n- **one** `code`\n- [docs](https://kumiki.build)\n\n<img src=x onerror="window.pwned=1"><script>window.pwned=2</script>\n```py\nprint(1)\n```' },
+            { type: 'agent:done', isError: false },
+        ] });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        result.markdown = await run(`(() => {
+            const reply = [...document.querySelectorAll('#messages *')].filter((node) => node.textContent.includes('onerror')).pop().closest('div');
+            return { tags: [...new Set([...reply.querySelectorAll('*')].map((node) => node.tagName.toLowerCase()))].sort(),
+                text: reply.textContent, pwned: window.pwned || null, anchors: reply.querySelectorAll('a').length,
+                link: reply.querySelector('.md-link') && reply.querySelector('.md-link').title };
+        })()`);
+
         // Scrolled up to read, the newest is a button away; following again, the button goes.
         result.scrolling = await run(`(async () => {
             const messages = document.getElementById('messages');
