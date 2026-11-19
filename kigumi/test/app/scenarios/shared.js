@@ -13,7 +13,7 @@ const SHA = 'f'.repeat(64);
 
 module.exports = {
     name: 'shared',
-    async run({ check, inShell, waitFor, runAppCommand, connection, capture, clipboard, FRAME, REPO }) {
+    async run({ check, inShell, waitFor, runAppCommand, connection, capture, clipboard, reset, FRAME, REPO }) {
         const text = fs.readFileSync(FRAME, 'utf8');
         const manifest = { id: ID, title: 'Little shared frame', entry: 'little_shared_frame.py', kumikiVersion: '0.9.6',
             kigumiVersion: '0.9.6', createdAt: '2026-11-15T00:00:00.000Z', role: 'view',
@@ -140,6 +140,8 @@ module.exports = {
             const gone = await waitFor(async () => (await sidebarRow(`shared:${ID}`)) === null, { timeoutMs: 5000 }).then(() => true, () => false);
             check('removing it takes it off Shared and deletes the download', gone && !fs.existsSync(entryPath));
         } finally {
+            // Close the views first: a copy opens in one, and deleting its file under it fails its build.
+            await reset().catch(() => null);
             await runAppCommand('kigumi.testSetPublishBackend', null);
             server.close();
             fs.rmSync(sharing, { recursive: true, force: true });

@@ -938,6 +938,8 @@ class FrameViewSession {
                     { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
                 );
             } catch (err) {
+                // Closed while the tree was being built: there is nothing to report to.
+                if (this.isDisposed) return;
                 // An error, so read_view_log filtered to errors finds it; the frame still draws.
                 const details = extractRunnerErrorDetails(err);
                 const where = details.traceback ? describeTracebackLocation(details.traceback, { prefer: this.filePath }) : null;

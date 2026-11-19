@@ -155,8 +155,12 @@ app.whenReady().then(async () => {
             messages.dispatchEvent(new Event('scroll'));
             const shown = !button.hidden;
             button.click();
-            await new Promise((resolve) => setTimeout(resolve, 50));
-            const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 2;
+            // The scroll is smooth: give it up to 2 s to arrive.
+            let atEnd = false;
+            for (let waited = 0; !atEnd && waited < 2000; waited += 50) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 2;
+            }
             tall.remove();
             return { shown, atEnd, hiddenAfter: button.hidden };
         })()`);
