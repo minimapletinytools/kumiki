@@ -425,6 +425,13 @@ describe('firstLoadCameraPlan', () => {
         expect(plan[0].frame.orbitDist).toBeGreaterThan(bounds.radius);
     });
 
+    it('on a tall screen, pulls back far enough for the width', () => {
+        const wide = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, aspect: 1.5 })[0].frame.orbitDist;
+        const tall = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, aspect: 0.5 })[0].frame.orbitDist;
+        expect(wide).toBeCloseTo(firstLoadCameraPlan([{ id: 'main' }], bounds)[0].frame.orbitDist);
+        expect(tall).toBeGreaterThan(wide * 1.5);
+    });
+
     it('pushes the camera back further for a bigger model', () => {
         const near = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, radius: 1 })[0];
         const far = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, radius: 10 })[0];

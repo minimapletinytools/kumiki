@@ -1,0 +1,150 @@
+/* The view on a phone (viewer-compact.js): no sidebar, a menu at the top left, the sidebar's pages
+   opened as a sheet. Clear of the shell's buttons at the top right (webview/shell/phone.css). */
+
+#view-layout.is-compact {
+    --compact-top: max(8px, env(safe-area-inset-top));
+    position: relative;
+}
+
+#view-layout.is-compact #view-sidebar {
+    display: none;
+}
+
+#view-layout.is-compact.has-sheet #view-sidebar {
+    display: flex;
+    position: absolute;
+    top: calc(var(--compact-top) + 56px);
+    left: 8px;
+    right: 8px;
+    max-height: calc(100% - var(--compact-top) - 72px);
+    z-index: 30;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    font-size: 14px;
+}
+
+#view-layout.is-compact .vsb-tabs,
+#view-layout.is-compact .vsb-collapse,
+#view-layout.is-compact .vsb-expand,
+#view-layout.is-compact .vsb-resize {
+    display: none;
+}
+
+#compact-menu-btn {
+    position: absolute;
+    top: var(--compact-top);
+    left: 8px;
+    z-index: 31;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    max-width: calc(100% - 140px);
+    padding: 0 14px;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 10px;
+    background: var(--hv-control-bg-solid);
+    color: var(--hv-title);
+    font: 600 15px 'Segoe UI', sans-serif;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.compact-menu-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#compact-menu-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+}
+
+#compact-menu {
+    position: absolute;
+    top: calc(var(--compact-top) + 52px);
+    left: 8px;
+    z-index: 31;
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    max-width: calc(100% - 16px);
+    max-height: calc(100% - var(--compact-top) - 64px);
+    overflow: auto;
+    padding: 6px 0;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 12px;
+    background: var(--hv-control-bg-solid);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+}
+
+.compact-menu-item {
+    min-height: 44px;
+    padding: 0 16px;
+    border: none;
+    background: transparent;
+    color: var(--hv-title);
+    font: 15px 'Segoe UI', sans-serif;
+    text-align: left;
+}
+
+.compact-menu-item:active {
+    background: var(--hv-accent-mid);
+}
+
+.compact-menu-heading {
+    padding: 10px 16px 4px;
+    color: var(--hv-dim);
+    font: 12px 'Segoe UI', sans-serif;
+}
+
+#compact-sheet-close {
+    position: absolute;
+    top: calc(var(--compact-top) + 62px);
+    right: 16px;
+    z-index: 32;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: var(--hv-panel-border);
+    color: var(--hv-title);
+    font-size: 16px;
+}
+
+/* What is selected: a tap frames it. */
+#compact-selection-chip {
+    position: absolute;
+    top: calc(var(--compact-top) + 56px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 12;
+    max-width: calc(100% - 32px);
+    height: 36px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 999px;
+    background: var(--hv-accent);
+    color: white;
+    font: 600 14px 'Segoe UI', sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+/* Below the shell's buttons at the top right. */
+#view-layout.is-compact #gizmo-panel {
+    top: calc(var(--compact-top) + 56px);
+    right: 8px;
+}
+
+#view-layout.is-compact #back-to-3d-btn {
+    top: var(--compact-top);
+    left: 8px;
+    height: 44px;
+    font-size: 15px;
+}

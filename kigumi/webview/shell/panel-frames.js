@@ -9,8 +9,9 @@
  * @param {(type: string, payload: object) => boolean} [options.intercept]  a panel's own message to the
  *   layout (one that starts `shell-ui:`); true if handled, so it doesn't go on to the core
  * @param {(command: string) => void} options.onKeyCommand  a shortcut pressed in a panel
+ * @param {(panel: object) => void} [options.loaded]  after a panel's page loads (again, if it is replaced)
  */
-export function createPanelFrames({ core, place, intercept = () => false, onKeyCommand }) {
+export function createPanelFrames({ core, place, intercept = () => false, onKeyCommand, loaded = () => {} }) {
     const frames = new Map(); // panel id -> { iframe, url, loaded, queue, panel }
     let keyBindings = null;
 
@@ -38,6 +39,7 @@ export function createPanelFrames({ core, place, intercept = () => false, onKeyC
                     iframe.contentWindow.postMessage(message, '*');
                 }
                 sendKeysTo(iframe);
+                loaded(frame.panel);
                 core.send({ type: 'panel:loaded', id: panel.id });
             });
             frames.set(panel.id, frame);

@@ -44,6 +44,7 @@ function init() {
         place: (panel, iframe) => layout.place(panel, iframe),
         intercept: (type, message) => Boolean(layout.intercept && layout.intercept(type, message)),
         onKeyCommand: (name) => command('keyCommand', name),
+        loaded: (panel) => layout.loaded && layout.loaded(panel),
     });
     layout = layoutName === 'phone'
         ? createPhoneLayout({ core, command, frames })

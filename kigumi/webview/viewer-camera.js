@@ -165,7 +165,10 @@ export const CameraMixin = (Base) => class extends Base {
         // drives the orthographic frustum size too (see updateOrthographicFrustum), so this
         // keeps "fit to bounds" framing consistent across both projections.
         const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
-        const targetDist = radius / Math.sin(fovRad / 2) * 1.3;
+        // The narrower of the two half-angles: on a tall screen (a phone upright) that is the width.
+        const aspect = this.perspectiveCamera.aspect || 1;
+        const halfAngle = Math.min(fovRad / 2, Math.atan(Math.tan(fovRad / 2) * aspect));
+        const targetDist = radius / Math.sin(halfAngle) * 1.3;
         this.animateCameraTo(
             { x: 0, y: -1, z: 0 },
             targetDist,

@@ -11,7 +11,10 @@
 </head>
 <body>
     <div class="agent-panel">
+        <!-- On a phone, the folded sheet while the agent is off: one bar that opens it. -->
+        <button id="phone-agent-bar" class="phone-agent-bar" type="button"><span class="codicon codicon-sparkle"></span> <span data-i18n="agent.title">Agent</span></button>
         <header class="agent-header">
+            <button id="phone-collapse" class="icon-btn phone-collapse" type="button" title="Fold away" data-i18n-title="agent.phone.collapse"><span class="codicon codicon-chevron-down"></span></button>
             <span class="agent-title"><span class="codicon codicon-sparkle"></span> <span data-i18n="agent.title">Agent</span></span>
             <div class="agent-actions">
                 <select id="model-select" class="model-select" title="Model" data-i18n-title="agent.model"></select>

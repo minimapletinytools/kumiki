@@ -206,7 +206,10 @@ export class SelectionPanel {
     }
 
     updateInfo(frameData) {
+        const renamed = (this.app.currentFrameData || {}).name !== (frameData || {}).name;
         this.app.currentFrameData = frameData || {};
+        // The phone layout's menu is named for the frame (viewer-compact.js).
+        if (renamed) this.app.requestUpdate();
         const selectedMembers = this.app.selectionManager.getSelectedTimbers();
         let selectedSingleName = '';
         let selectedKnownCount = 0;

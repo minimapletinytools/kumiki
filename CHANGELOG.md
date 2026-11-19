@@ -16,6 +16,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 ### kigumi
 
 #### Added
+- The browser version on a phone: one frame fills the screen, with its kiwari, options and drawings in a menu at the top left, the project's frames, examples and patterns behind ☰ at the top right, and the agent in a sheet along the bottom. Examples and patterns open read-only with a Back button to the frame you were on. `?layout=desktop` or `?layout=phone` picks a layout.
 - Touchscreens: one finger orbits, two fingers pan and pinch to zoom, a tap selects and a long press opens the timber's menu.
 - Trackpads: a pinch zooms smoothly. A view option makes a two-finger scroll orbit (shift pans) instead of zooming.
 - A view option hides the mouse controls hint.
@@ -27,6 +28,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - A drawing's panel is headed "📏 measurements", its viewports and members lists start closed, and clicking a viewport in it selects that view.
 
 #### Fixed
+- Closing a frame's view while a pattern from it is open no longer stops the pattern's view.
+- A frame first fits the view across its width too, so it isn't cut off on a tall window.
 - A drawing's centerlines and perfect faces are dashed lines that look the same at any zoom, instead of bars across the line when the sheet is zoomed.
 - A viewer in a hidden tab no longer redraws into a 0×0 canvas, which flooded the app's output with GL_INVALID_FRAMEBUFFER_OPERATION errors.
 - Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.

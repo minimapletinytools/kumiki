@@ -6,6 +6,8 @@
 // agent each lay themselves out for it. A panel asks the layout for things with `shell-ui:` messages
 // (panel-frames.js intercept).
 
+import { SHELL_UI } from '../shell-ui.js';
+
 const $ = (id) => document.getElementById(id);
 
 function el(tag, className, text) {
@@ -19,11 +21,12 @@ function icon(name) {
     return el('span', `codicon codicon-${name}`);
 }
 
-/** Whether `filePath` is one of the open project's own files. */
+/** Whether `filePath` is one of the open project's own files. `workspace.root` is its folder, where a
+ * host shows something else as its `path` (the browser version shows the project's name). */
 export function inProject(filePath, workspace) {
-    if (!filePath || !workspace || !workspace.path) return false;
-    const root = workspace.path.endsWith('/') ? workspace.path : `${workspace.path}/`;
-    return filePath.startsWith(root);
+    const folder = workspace && (workspace.root || workspace.path);
+    if (!filePath || !folder) return false;
+    return filePath.startsWith(folder.endsWith('/') ? folder : `${folder}/`);
 }
 
 /**
@@ -76,7 +79,7 @@ export function createPhoneLayout({ core, command, frames }) {
 
     function setAgentExpanded(expanded) {
         agentExpanded = expanded;
-        if (agentId) frames.send(agentId, { type: 'shell-ui:agent-sheet', expanded });
+        if (agentId) frames.send(agentId, { type: SHELL_UI.agentSheet, expanded });
         render(state);
     }
 
@@ -151,22 +154,25 @@ export function createPhoneLayout({ core, command, frames }) {
             else if (panel.slot === 'right') agent.append(iframe);
             else if (panel.slot === 'center') main.append(iframe);
             else { iframe.hidden = true; root.append(iframe); }
-            frames.send(panel.id, { type: 'shell-ui:form', form: 'phone' });
+        },
+        loaded(panel) {
+            frames.send(panel.id, { type: SHELL_UI.form, form: 'phone' });
+            if (panel.slot === 'right') frames.send(panel.id, { type: SHELL_UI.agentSheet, expanded: agentExpanded });
         },
         shown(panel, current) {
             if (panel.slot === 'center') return panel.id === current.activeId;
             return panel.slot === 'left' || panel.slot === 'right';
         },
         intercept(type, message) {
-            if (type === 'shell-ui:agent-expand') {
+            if (type === SHELL_UI.agentExpand) {
                 if (!agentExpanded) setAgentExpanded(true);
                 return true;
             }
-            if (type === 'shell-ui:agent-collapse') {
+            if (type === SHELL_UI.agentCollapse) {
                 if (agentExpanded) setAgentExpanded(false);
                 return true;
             }
-            if (type === 'shell-ui:close-menu') {
+            if (type === SHELL_UI.closeMenu) {
                 setMenuOpen(false);
                 return true;
             }

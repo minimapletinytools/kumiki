@@ -41,6 +41,8 @@ export class ViewSidebar {
         this.collapsed = saved.collapsed === true;
         this.width = Number.isFinite(saved.width) ? clampWidth(saved.width) : DEFAULT_WIDTH_PX;
         this._drag = null;
+        // Shown as a sheet over the view, one page at a time (the phone layout, viewer-compact.js).
+        this.sheet = false;
         this.onResizeStart = this.onResizeStart.bind(this);
     }
 
@@ -105,7 +107,7 @@ export class ViewSidebar {
     sync(root) {
         const aside = root.querySelector('#view-sidebar');
         if (aside) {
-            aside.style.width = this.collapsed ? '' : `${this.width}px`;
+            aside.style.width = this.collapsed || this.sheet ? '' : `${this.width}px`;
         }
     }
 

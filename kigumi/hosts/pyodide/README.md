@@ -51,6 +51,21 @@ Page (dist/index.html)                         Web Worker (dist/worker.js)
   the policy of the page that made it, so `index.html`'s content security policy allows inline
   scripts and styles; each panel's own policy still applies on top.
 
+## On a phone
+
+On a small touch screen the page is laid out for a phone (`webview/shell/phone-layout.js`); `?layout=phone`
+or `?layout=desktop` picks one. The shell chooses once, at load, and tells the core in `shell:ready`, so
+the rest of the app has one answer (`formFactor`), and the core keeps one file open at a time.
+
+The panels are the desktop's, each told `shell-ui:form` once it loads (`webview/shell-ui.js` lists the
+messages): the viewer drops its sidebar for a menu at the top left and opens the sidebar's pages as a
+sheet (`webview/viewer-compact.js`); the explorer is the project menu behind ☰; the agent is a sheet
+along the bottom. Measuring, the timber list and the code editor aren't offered there.
+
+```sh
+npm run build && env -u ELECTRON_RUN_AS_NODE ../../node_modules/.bin/electron test/phone-smoke.cjs
+```
+
 ## Precision
 
 Manifold's WebAssembly build takes and hands back float32 vertices, though it works in double.

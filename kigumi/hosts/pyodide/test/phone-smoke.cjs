@@ -1,0 +1,160 @@
+/**
+ * Kigumi in a browser on a phone, end to end (webview/shell/phone-layout.js): a phone-sized window
+ * at ?layout=phone. The projects page, a new project's frames as the menu, the starter frame filling
+ * the screen with its menu at the top left, a pattern opened read-only with Back to the frame, the
+ * agent's sheet opening and folding, and closing the frame.
+ *
+ *   npm run build && env -u ELECTRON_RUN_AS_NODE ../../node_modules/.bin/electron test/phone-smoke.cjs
+ */
+const { app, BrowserWindow, session } = require('electron');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const HERE = path.join(__dirname, '..');
+const ARTIFACTS = path.join(HERE, 'test-artifacts', 'phone');
+const PORT = '8126';
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const results = [];
+function check(name, ok, detail = '') {
+    results.push(Boolean(ok));
+    console.log(`${ok ? 'PASS' : 'FAIL'} [phone] ${name}${detail ? ` -- ${detail}` : ''}`);
+}
+
+app.whenReady().then(async () => {
+    const server = spawn('node', [path.join(HERE, 'serve.mjs')], { env: { ...process.env, PORT }, stdio: 'ignore' });
+    await sleep(800);
+    fs.mkdirSync(ARTIFACTS, { recursive: true });
+    const window = new BrowserWindow({ width: 390, height: 844, show: false, useContentSize: true,
+        webPreferences: { backgroundThrottling: false } });
+    const errors = [];
+    window.webContents.on('console-message', (event) => {
+        const text = String(event.message || '');
+        if (/kigumi-backend.*blocked by CORS|kigumi-backend.*net::ERR_FAILED/.test(text)) return;
+        if (event.level === 'error' || /Uncaught/.test(text)) errors.push(text);
+    });
+    const js = (code) => window.webContents.executeJavaScript(code);
+    async function wait(code, timeoutMs = 60000) {
+        const deadline = Date.now() + timeoutMs;
+        for (;;) {
+            const result = await js(code).catch(() => null);
+            if (result) return result;
+            if (Date.now() > deadline) return null;
+            await sleep(300);
+        }
+    }
+    const shot = async (name) => fs.writeFileSync(path.join(ARTIFACTS, `${name}.png`), (await window.webContents.capturePage()).toPNG());
+    const menu = 'document.querySelector(".phone-menu iframe")?.contentDocument';
+    const view = 'document.querySelector(".phone-main iframe:not([hidden])")?.contentDocument';
+    const agent = 'document.querySelector(".phone-agent iframe")?.contentDocument';
+    const shown = (selector, doc = 'document') => `(() => { const e = ${doc}?.querySelector(${JSON.stringify(selector)});
+        return !!e && !e.hidden && e.getClientRects().length > 0; })()`;
+    try {
+        await session.defaultSession.clearStorageData();
+        await window.loadURL(`http://127.0.0.1:${PORT}/?layout=phone`);
+        window.showInactive();
+        check('Python, kumiki and Kigumi start in the page', await wait("document.body.classList.contains('kigumi-ready')", 240000) === true);
+        check('the page is laid out for a phone', await js("document.body.dataset.layout") === 'phone');
+        const projects = await wait(`${shown('.web-new-project')} && !${shown('.shell')}`, 30000);
+        await shot('1-projects');
+        check('with no project open, the projects page fills the screen', projects === true);
+
+        await js(`(() => {
+            document.querySelector('.web-new-project input').value = 'Shed';
+            document.querySelector('.web-new-project button').click();
+        })()`);
+        const starter = await wait(`[...(${menu}?.querySelectorAll('.ks-phone-button.is-frame') || [])]
+            .find((one) => one.textContent.includes('cute'))?.textContent.trim()`, 120000);
+        const home = await js(`document.querySelector('.phone').classList.contains('is-home')`);
+        await shot('2-home');
+        check('a new project shows its frames as the menu, with no file open', Boolean(starter) && home, starter);
+        check('the agent is a sheet along the bottom, folded to its text box',
+            await wait(`${agent}?.body.classList.contains('is-phone') && !${agent}.body.classList.contains('is-sheet-open') || null`, 30000) === true);
+
+        await js(`[...${menu}.querySelectorAll('.ks-phone-button.is-frame')].find((one) => one.textContent.includes('cute')).click()`);
+        const drawn = await wait(`${view}?.querySelector('canvas')?.width > 100 && ${view}.querySelector('#compact-menu-btn')?.textContent.trim() || null`, 240000);
+        await sleep(1500);
+        await shot('3-frame');
+        const chrome = await js(`({ sidebar: ${shown('#view-sidebar', view)}, menuHidden: !${shown('.phone-menu')},
+            back: ${shown('.phone-back')}, menuButton: ${shown('.phone-menu-button')} })`);
+        check('the frame fills the screen with its menu at the top left, and no sidebar', Boolean(drawn) && !chrome.sidebar
+            && chrome.menuHidden && !chrome.back && chrome.menuButton, `${drawn} ${JSON.stringify(chrome)}`);
+
+        await js(`${view}.querySelector('#compact-menu-btn').click()`);
+        const items = await wait(`[...(${view}?.querySelectorAll('#compact-menu .compact-menu-item') || [])].map((one) => one.dataset.item).join() || null`, 5000);
+        await shot('4-frame-menu');
+        await js(`${view}.querySelector('.compact-menu-item[data-item="options"]').click()`);
+        const sheet = await wait(`${shown('#view-sidebar', view)} && ${shown('#compact-sheet-close', view)} || null`, 5000);
+        await shot('5-options');
+        await js(`${view}.querySelector('#compact-sheet-close').click()`);
+        check("the frame's menu opens its options as a sheet, which closes", Boolean(items && items.includes('options')) && sheet === true
+            && await wait(`!${shown('#view-sidebar', view)} || null`, 5000) === true, items);
+
+        // Selecting a timber names it in a chip at the top; a tap on the chip frames it.
+        const chip = await js(`(async () => {
+            const app = ${view}.querySelector('kigumi-app');
+            const key = [...app.memberMetadataByKey.keys()][0];
+            app.selectionManager.selectTimber(key);
+            await app.updateComplete;
+            const shownChip = ${view}.querySelector('#compact-selection-chip');
+            const text = shownChip && shownChip.textContent.trim();
+            app.selectionManager.clearTimberSelection();
+            await app.updateComplete;
+            return { text, name: app.memberMetadataByKey.get(key).name, gone: !${view}.querySelector('#compact-selection-chip') };
+        })()`);
+        check('a selected timber is named in a chip at the top, gone once deselected', chip.text === chip.name && chip.gone, JSON.stringify(chip));
+
+        await js(`document.querySelector('.phone-menu-button').click()`);
+        const opened = await wait(`document.querySelector('.phone').classList.contains('is-menu-open') || null`, 5000);
+        await shot('6-project-menu');
+        await js(`[...${menu}.querySelectorAll('.ks-phone-button')].find((one) => one.textContent.includes('Patterns')).click()`);
+        // Open folders down to the first pattern, and open it.
+        const pattern = await wait(`(() => {
+            const doc = ${menu};
+            const rows = [...doc.querySelectorAll('.ks-phone-tree .ks-row')];
+            const closed = rows.find((row) => row.getAttribute('aria-expanded') === 'false');
+            const leaf = rows.find((row) => !row.hasAttribute('aria-expanded') && row.querySelector('.codicon-library'));
+            if (leaf) { leaf.click(); return leaf.textContent.trim(); }
+            if (closed) closed.click();
+            return null;
+        })()`, 60000);
+        const readOnly = await wait(`${shown('.phone-back')} && !document.querySelector('.phone').classList.contains('is-menu-open') || null`, 240000);
+        await sleep(1500);
+        await shot('7-pattern');
+        check('the project menu opens a pattern, closing itself, with Back to the frame', opened === true && Boolean(pattern) && readOnly === true, pattern);
+
+        await js(`document.querySelector('.phone-back').click()`);
+        const backAgain = await wait(`!${shown('.phone-back')} && ${view}?.querySelector('#compact-menu-btn')?.textContent.includes('Cute') || null`, 240000);
+        check('Back goes to the frame', backAgain === true);
+
+        await js(`(() => { const input = ${agent}.getElementById('prompt-input');
+            input.dispatchEvent(new input.ownerDocument.defaultView.PointerEvent('pointerdown', { bubbles: true })); input.focus(); })()`);
+        const expanded = await wait(`document.querySelector('.phone').classList.contains('is-agent-expanded')
+            && ${agent}.body.classList.contains('is-sheet-open') || null`, 5000);
+        await sleep(400);
+        await shot('8-agent');
+        await js(`document.querySelector('.phone-backdrop').click()`);
+        const folded = await wait(`!document.querySelector('.phone').classList.contains('is-agent-expanded') || null`, 5000);
+        check('tapping the text box opens the agent sheet, and a tap above folds it', expanded === true && folded === true);
+
+        await js(`document.querySelector('.phone-menu-button').click()`);
+        await wait(`document.querySelector('.phone').classList.contains('is-menu-open') || null`, 5000);
+        await js(`document.querySelector('.phone-close-file').click()`);
+        check('Close this frame goes back to the frames', await wait(`document.querySelector('.phone').classList.contains('is-home') || null`, 10000) === true);
+        await shot('9-closed');
+
+        // Turned sideways: still laid out, the frame's view as wide as the screen.
+        window.setContentSize(844, 390);
+        await sleep(800);
+        await shot('10-landscape');
+
+        check('no errors in the page', errors.length === 0, errors.slice(0, 3).join(' | '));
+    } catch (error) {
+        check('the run finishes', false, error.stack || String(error));
+    } finally {
+        server.kill();
+        const passed = results.filter(Boolean).length;
+        console.log(`${passed} passed, ${results.length - passed} failed`);
+        app.exit(results.every(Boolean) ? 0 : 1);
+    }
+});

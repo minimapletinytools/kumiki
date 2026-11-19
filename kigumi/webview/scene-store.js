@@ -378,7 +378,10 @@ function firstLoadCameraPlan(viewports, bounds) {
     const center = source.center || { x: 0, y: 0, z: 0 };
     const near = Math.max(0.1, radius * 0.03);
     const far = Math.max(200, radius * 20);
-    const orbitDist = (radius / Math.sin((fovDegrees * Math.PI) / 360)) * 1.3;
+    // The narrower of the two half-angles: on a tall screen (`aspect` below 1) that is the width.
+    const aspect = Number(source.aspect) > 0 ? Number(source.aspect) : 1;
+    const halfFov = (fovDegrees * Math.PI) / 360;
+    const orbitDist = (radius / Math.sin(Math.min(halfFov, Math.atan(Math.tan(halfFov) * aspect)))) * 1.3;
     return (viewports || []).map((viewport) => ({
         id: viewport && viewport.id,
         near,

@@ -29,6 +29,7 @@ const WEBVIEW_ASSETS = [
     ['__STYLES_ASSEMBLY_CSS_URI__', 'styles/assembly.css'],
     ['__STYLES_MEMBERS_LOG_CSS_URI__', 'styles/members-log.css'],
     ['__STYLES_LAYERS_CSS_URI__', 'styles/layers.css'],
+    ['__STYLES_COMPACT_CSS_URI__', 'styles/compact.css'],
     ['__THREE_JS_URI__', 'vendor/three.min.js'],
     ['__REFLECTOR_JS_URI__', 'vendor/Reflector.js'],
     ['__LINE_SEGMENTS_GEOMETRY_JS_URI__', 'vendor/LineSegmentsGeometry.js'],
@@ -146,6 +147,8 @@ function getWebviewContent(surface, frameData, geometryData, profiling, uiState 
         locale,
         payload: {
             frame: frameData,
+            // What the view is called when its frame has no name of its own (a pattern made from a joint).
+            fileName: surface && surface.filePath ? path.basename(surface.filePath, '.py') : null,
             geometry: geometryData,
             profiling: profiling || null,
             uiState: uiState || null,
