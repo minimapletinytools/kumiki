@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.9.0
+# Last checked on kumiki 0.9.7
 """
 Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
@@ -29,6 +29,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_tongue_and_groove_joint,
     cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards,
     cut_basic_plain_miter_joint,
+    cut_basic_mitsudomoe_joint,
     cut_basic_plain_miter_joint_on_face_aligned_timbers,
     cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
     cut_basic_plain_butt_joint_on_face_aligned_timbers,
@@ -52,6 +53,7 @@ from kumiki.example_shavings import (
     ROUND_STOCK,
     RoundTimberConfig,
     create_canonical_example_corner_joint_timbers,
+    create_canonical_example_tri_corner_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_splice_joint_timbers,
@@ -80,6 +82,11 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     return RoundTimberConfig(
         diameter=max(_CANONICAL_EXAMPLE_TIMBER_SIZE[0], _CANONICAL_EXAMPLE_TIMBER_SIZE[1]) * sqrt(2)
     )
+
+
+@pattern("basic_joints/mitsudomoe_joint", name={"en": "Mitsudomoe joint", "ja": "三つ巴の仕口"})
+def example_basic_mitsudomoe_joint() -> Joint:
+    return cut_basic_mitsudomoe_joint(create_canonical_example_tri_corner_timbers())
 
 
 @pattern("basic_joints/miter_joint/angled", name={"en": "Angled miter", "ja": "斜めの留め"}, tags=["main"])

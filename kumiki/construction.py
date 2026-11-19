@@ -2009,6 +2009,58 @@ class CornerJointTimberArrangement:
 
 
 @dataclass(frozen=True)
+class TriCornerArrangement:
+    """Order three timber ends around a corner. Timber 3 joins back to timber 1."""
+
+    timber1: TimberLike
+    timber2: TimberLike
+    timber3: TimberLike
+    timber1_end: TimberEnd
+    timber2_end: TimberEnd
+    timber3_end: TimberEnd
+
+    @property
+    def members(self) -> tuple[tuple[TimberLike, TimberEnd], ...]:
+        return ((self.timber1, self.timber1_end), (self.timber2, self.timber2_end),
+                (self.timber3, self.timber3_end))
+
+    def locate_outside_corner_global(self) -> V3:
+        """Return the intersection of the three outside long edges, extending the ends as needed.
+
+        Each outside edge faces away from the bodies of both other timbers.
+        The timbers must be face-aligned with mutually perpendicular length axes.
+        """
+        members = self.members
+        for i, (timber, _) in enumerate(members):
+            neighbor = members[(i + 1) % 3][0]
+            assert are_timbers_orthogonal(timber, neighbor), "Timber axes must be mutually perpendicular"
+
+        reference_global = self.timber1.get_bottom_position_global()
+        corner_global = reference_global
+        for i, (timber, end) in enumerate(members):
+            first = members[(i + 1) % 3][0]
+            second = members[(i + 2) % 3][0]
+            outward_global = timber.get_face_direction_global(end)
+
+            def outside_plane_offset(neighbor: TimberLike) -> Numeric:
+                face = neighbor.get_closest_oriented_long_face_from_global_direction(outward_global)
+                plane = locate_face(neighbor, face)
+                assert are_vectors_parallel(plane.normal, outward_global), "Timbers must be face-aligned"
+                return safe_dot_product(plane.point - reference_global, outward_global)
+
+            offset = outside_plane_offset(first)
+            assert safe_equality_test(offset, outside_plane_offset(second)), "Outside long edges must meet at one point"
+            corner_global = corner_global + outward_global * offset
+        return corner_global
+
+    def check_perfection(self) -> Optional[str]:
+        for i, (timber, _) in enumerate(self.members, start=1):
+            if not timber.is_perfect_timber():
+                return f"timber{i} must be perfect"
+        return None
+
+
+@dataclass(frozen=True)
 class CrossJointTimberArrangement:
     timber1: TimberLike
     timber2: TimberLike
@@ -2241,7 +2293,7 @@ class ExtendedTimberArrangement:
 
 Arrangement = Union[ButtJointTimberArrangement, DoubleButtJointTimberArrangement, TripleButtJointTimberArrangement,
                     QuadrupleButtJointTimberArrangement, CrossCapJointTimberArrangement, SpliceJointTimberArrangement,
-                    CornerJointTimberArrangement, CrossJointTimberArrangement, BraceJointTimberArrangement,
+                    CornerJointTimberArrangement, TriCornerArrangement, CrossJointTimberArrangement, BraceJointTimberArrangement,
                     ButtJointBoardArrangement, PanelBoardArrangement, ExtendedTimberArrangement]
 
 
