@@ -142,6 +142,35 @@ app.whenReady().then(async () => {
         })()`);
         check('a selected timber is named in a chip at the top, gone once deselected', chip.text === chip.name && chip.gone, JSON.stringify(chip));
 
+        // Two fingers dragged together pan: the center moves, the camera doesn't turn or zoom.
+        const pan = await js(`(async () => {
+            const app = ${view}.querySelector('kigumi-app');
+            const canvas = app.renderRoot.querySelector('#c');
+            const win = canvas.ownerDocument.defaultView;
+            const c = app.cameraController;
+            const before = { center: [c.cx, c.cy, c.cz], dist: c.orbitDist, dir: [c.cameraOffsetDir.x, c.cameraOffsetDir.y, c.cameraOffsetDir.z] };
+            const rect = canvas.getBoundingClientRect();
+            const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+            const fire = (type, id, px, py) => canvas.dispatchEvent(new win.PointerEvent(type,
+                { pointerId: id, pointerType: 'touch', clientX: px, clientY: py, bubbles: true, cancelable: true, isPrimary: id === 11 }));
+            fire('pointerdown', 11, x - 40, y);
+            fire('pointerdown', 12, x + 40, y);
+            for (let step = 1; step <= 10; step++) {
+                fire('pointermove', 11, x - 40 + step * 8, y + step * 4);
+                fire('pointermove', 12, x + 40 + step * 8, y + step * 4);
+            }
+            fire('pointerup', 11, x + 40, y + 40);
+            fire('pointerup', 12, x + 120, y + 40);
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            const after = { center: [c.cx, c.cy, c.cz], dist: c.orbitDist, dir: [c.cameraOffsetDir.x, c.cameraOffsetDir.y, c.cameraOffsetDir.z] };
+            const moved = Math.hypot(...after.center.map((v, i) => v - before.center[i]));
+            const turned = Math.hypot(...after.dir.map((v, i) => v - before.dir[i]));
+            Object.assign(c, { cx: before.center[0], cy: before.center[1], cz: before.center[2], orbitDist: before.dist });
+            app.updateCamera();
+            return { moved, turned, zoom: after.dist / before.dist };
+        })()`);
+        check('two fingers dragged together pan the view', pan.moved > 0.01 && pan.turned < 1e-6 && Math.abs(pan.zoom - 1) < 0.01, JSON.stringify(pan));
+
         await js(`document.querySelector('.phone-menu-button').click()`);
         const opened = await wait(`document.querySelector('.phone').classList.contains('is-menu-open') || null`, 5000);
         await shot('6-project-menu');
@@ -179,7 +208,11 @@ app.whenReady().then(async () => {
         await js(`document.querySelector('.phone-menu-button').click()`);
         await js(`document.querySelector('.phone-back').click()`);
         const backAgain = await wait(`!${shown('.phone-back')} && ${view}?.querySelector('#compact-menu-btn')?.textContent.includes('Cute') || null`, 240000);
-        check('Back goes to the frame', backAgain === true);
+        check('Back goes to the frame', backAgain === true, backAgain === true ? '' : JSON.stringify(await js(`(() => {
+            const app = ${view}?.querySelector('kigumi-app');
+            return { button: ${view}?.querySelector('#compact-menu-btn')?.textContent.trim(), data: app && app.currentFrameData,
+                phase: app && app.viewState.phase, back: ${shown('.phone-back')} };
+        })()`)));
 
         await js(`(() => { const input = ${agent}.getElementById('prompt-input');
             input.dispatchEvent(new input.ownerDocument.defaultView.PointerEvent('pointerdown', { bubbles: true })); input.focus(); })()`);
