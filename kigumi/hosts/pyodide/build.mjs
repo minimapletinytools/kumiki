@@ -128,9 +128,10 @@ const SHELL_POLICY = [
     "connect-src 'self' https://cloudflareinsights.com",
 ].join('; ');
 
-// Cloudflare Web Analytics: cookieless page counts, at kumiki.build/try only (not local builds and tests).
+// Cloudflare Web Analytics: cookieless page counts, at kumiki.build/try only (not /try-staging, local
+// builds or tests).
 const ANALYTICS = `<script>
-    if (location.hostname === 'kumiki.build') {
+    if (location.hostname === 'kumiki.build' && location.pathname.startsWith('/try/')) {
       const beacon = document.createElement('script');
       beacon.type = 'module';
       beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
