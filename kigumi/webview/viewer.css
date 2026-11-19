@@ -168,9 +168,13 @@ canvas { display: block; width: 100%; height: 100%; }
     border: 1.5px solid currentColor;
     border-top: none;
 }
+/* Touch gestures on the view move the camera (touch-navigation.js), not the page. */
+#c {
+    touch-action: none;
+}
 #hint {
     position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-    color: var(--hv-hint); font: 11px 'Segoe UI', sans-serif;
+    color: var(--hv-hint); font: 13px 'Segoe UI', sans-serif;
     pointer-events: none; user-select: none; white-space: nowrap;
 }
 #to-v3d {

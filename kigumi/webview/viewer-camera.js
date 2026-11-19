@@ -222,7 +222,8 @@ export const CameraMixin = (Base) => class extends Base {
         return this.cameraController.getAdaptiveZoomFactor(isZoomingOut);
     }
 
-    zoomTowardPointer(clientX, clientY, zoomFactor) {
+    /** Zoom toward the pointer by `zoomFactor` (> 1 zooms out), animated unless `immediate` (a pinch). */
+    zoomTowardPointer(clientX, clientY, zoomFactor, { immediate = false } = {}) {
         const oldDist = Math.max(0.01, this.cameraController.orbitDist);
         const nextDist = Math.max(0.01, oldDist * zoomFactor);
         const planeCenter = this.getCameraCenterVector(this.tempOrbitCenter);
@@ -238,6 +239,12 @@ export const CameraMixin = (Base) => class extends Base {
             };
         }
 
+        if (immediate) {
+            this.cameraController.cancelAnimation();
+            this.cameraController.orbitDist = nextDist;
+            Object.assign(this.cameraController, { cx: targetCenter.x, cy: targetCenter.y, cz: targetCenter.z });
+            return;
+        }
         this.animateCameraTo(
             { x: this.cameraController.cameraOffsetDir.x, y: this.cameraController.cameraOffsetDir.y, z: this.cameraController.cameraOffsetDir.z },
             nextDist,
