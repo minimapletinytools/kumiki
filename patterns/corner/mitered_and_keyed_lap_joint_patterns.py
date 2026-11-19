@@ -3,6 +3,8 @@
 Mitered and Keyed Lap Joint Patterns (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi)
 """
 
+__title__ = {"en": "Mitered and keyed lap joints", "ja": "箱相欠き車知栓仕口"}
+
 from typing import Optional
 from dataclasses import replace
 
@@ -12,8 +14,10 @@ from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
 )
 
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
-@pattern('corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90')
+
+@pattern('corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90', name={"en": "At 90°", "ja": "90°"})
 def create_mitered_and_keyed_lap_joint_example(position: Optional[V3]=None) -> Frame:
     """
     Create a mitered and keyed lap joint (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi)
@@ -46,7 +50,7 @@ def create_mitered_and_keyed_lap_joint_example(position: Optional[V3]=None) -> F
     return frame
 
 
-@pattern('corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130')
+@pattern('corner/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130', name={"en": "At 130°", "ja": "130°"})
 def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3]=None) -> Frame:
     """
     Create a mitered and keyed lap joint at 130 degrees using canonical 4"x5"x4' timbers.

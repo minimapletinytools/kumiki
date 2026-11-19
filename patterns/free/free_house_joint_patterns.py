@@ -3,13 +3,17 @@
 Free House Joint Patterns
 """
 
+__title__ = {"en": "Free housed joint", "ja": "自由な配置の大入れ"}
+
 from kumiki import *
 
 
 from kumiki.example_shavings import create_canonical_example_cross_joint_timbers
 
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
-@pattern("free/free_house_joint")
+
+@pattern("free/free_house_joint", name={"en": "Free housed joint", "ja": "自由な配置の大入れ"})
 def free_house_joint() -> Joint:
     """Cut a housing following a crossing timber's body."""
     arrangement = create_canonical_example_cross_joint_timbers(lateral_offset=inches(2))

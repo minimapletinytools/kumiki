@@ -29,6 +29,8 @@ STLs in millimetres: one for a leg's socket in the beam, and one for its tail. T
 mirrored pairs, so there are two sets: A for legs +x +y and -x -y, B for +x -y and -x +y.
 """
 
+__title__ = {"en": "Dovetailed sawhorse", "ja": "蟻で組んだ馬"}
+
 
 import pathlib
 from enum import Enum

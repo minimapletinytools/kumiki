@@ -3,6 +3,8 @@
 Plain Butt Joint Patterns
 """
 
+__title__ = {"en": "Plain butt joints", "ja": "突き付け"}
+
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -13,6 +15,8 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -114,13 +118,13 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('butt/plain_butt_joint/plain_butt_joint', kiwari=ROUND_STOCK)
+@pattern('butt/plain_butt_joint/plain_butt_joint', name={"en": "Plain butt joint", "ja": "突き付け"}, kiwari=ROUND_STOCK)
 def plain_butt_joint_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_butt_joint_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint")
 
 
-@pattern('butt/plain_butt_joint/plain_butt_joint_3d', kiwari=ROUND_STOCK)
+@pattern('butt/plain_butt_joint/plain_butt_joint_3d', name={"en": "Plain butt joint in 3D", "ja": "立体的な突き付け"}, kiwari=ROUND_STOCK)
 def plain_butt_joint_3d_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_butt_joint_3d_angles_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint (3D)")

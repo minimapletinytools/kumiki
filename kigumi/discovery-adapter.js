@@ -44,6 +44,8 @@ function normalizePatternbookRecords(records, fallbackPaths) {
             patternbookName: record.patternbookName || fallbackName,
             patternNames: Array.from(new Set(patternNames)).sort((a, b) => a.localeCompare(b)),
             groupNames: Array.from(new Set(groupNames)).sort((a, b) => a.localeCompare(b)),
+            ...(Array.isArray(record.patterns) ? { patterns: record.patterns } : {}),
+            title: record.title || null,
         });
     }
 
@@ -184,6 +186,7 @@ async function discoverDependencyContent(workspaceRoot, options = {}) {
                 dependencyPatterns: dependencyPatternPaths,
                 dependencyPatternbooks: normalizePatternbookRecords(raw.dependencyPatternbooks, dependencyPatternPaths),
                 dependencyExamples: dedupeAndSortPaths(raw.dependencyExamples || []),
+                exampleTitles: raw.exampleTitles || {},
             };
         } catch (error) {
             const wrappedError = new Error(`Python candidate '${candidate}' failed: ${error.message || error}`);

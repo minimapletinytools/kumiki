@@ -3,6 +3,8 @@
 Wedged Half-Dovetail Joint Patterns
 """
 
+__title__ = {"en": "Wedged half-dovetail mortise and tenon", "ja": "楔付き片蟻の枘差し"}
+
 from typing import Optional
 from dataclasses import replace
 
@@ -16,6 +18,8 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -36,7 +40,7 @@ OPTIONS = kiwari(
 )
 
 
-@pattern('butt/wedged_half_dovetail_mortise_and_tenon', kiwari=OPTIONS)
+@pattern('butt/wedged_half_dovetail_mortise_and_tenon', name={"en": "Wedged half-dovetail mortise and tenon", "ja": "楔付き片蟻の枘差し"}, kiwari=OPTIONS)
 def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'

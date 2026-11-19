@@ -4,6 +4,8 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
+__title__ = {"en": "Basic joints", "ja": "基本の継手・仕口"}
+
 from dataclasses import replace
 from typing import Optional
 from kumiki import Frame, Joint, Kiwari, create_v3, pattern
@@ -80,7 +82,7 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("basic_joints/miter_joint/angled", tags=["main"])
+@pattern("basic_joints/miter_joint/angled", name={"en": "Angled miter", "ja": "斜めの留め"}, tags=["main"])
 def example_basic_miter_joint(position=None) -> Joint:
     """
     Create a basic miter joint using canonical corner joint timbers at a 120-degree angle.
@@ -97,7 +99,7 @@ def example_basic_miter_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/miter_joint/face_aligned")
+@pattern("basic_joints/miter_joint/face_aligned", name={"en": "Face-aligned miter", "ja": "面を揃えた留め"})
 def example_basic_miter_joint_face_aligned(position=None) -> Joint:
     """
     Create a basic miter joint on face-aligned timbers using canonical corner joint timbers.
@@ -111,7 +113,7 @@ def example_basic_miter_joint_face_aligned(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/tongue_and_fork_corner_joint")
+@pattern("basic_joints/tongue_and_fork_corner_joint", name={"en": "Tongue and fork corner joint", "ja": "隅の組手"})
 def example_basic_tongue_and_fork_joint(position=None) -> Joint:
     """
     Create a basic tongue-and-fork corner joint using canonical corner joint timbers.
@@ -125,7 +127,7 @@ def example_basic_tongue_and_fork_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/plain_butt_joint/face_aligned", kiwari=ROUND_STOCK)
+@pattern("basic_joints/plain_butt_joint/face_aligned", name={"en": "Face-aligned butt joint", "ja": "面を揃えた突き付け"}, kiwari=ROUND_STOCK)
 def example_basic_butt_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic butt joint using canonical butt joint timbers.
@@ -142,7 +144,7 @@ def example_basic_butt_joint(k: Optional[Kiwari]=None, *, position=None) -> Join
     return joint
 
 
-@pattern("basic_joints/butt_splice_joint")
+@pattern("basic_joints/butt_splice_joint", name={"en": "Butt splice", "ja": "突き付け継ぎ"})
 def example_basic_butt_splice_joint(position=None) -> Joint:
     """
     Create a basic butt splice joint using canonical splice joint timbers.
@@ -156,7 +158,7 @@ def example_basic_butt_splice_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/cross_lap_joint")
+@pattern("basic_joints/cross_lap_joint", name={"en": "Cross lap joint", "ja": "相欠き（十字）"})
 def example_basic_cross_lap_joint(position=None) -> Joint:
     """
     Create a basic cross lap joint using canonical cross joint timbers.
@@ -170,7 +172,7 @@ def example_basic_cross_lap_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/house_joint")
+@pattern("basic_joints/house_joint", name={"en": "Housed joint", "ja": "大入れ"})
 def example_basic_house_joint(position=None) -> Joint:
     """
     Create a basic house joint using canonical cross joint timbers.
@@ -185,7 +187,7 @@ def example_basic_house_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/splined_opposing_double_butt_joint/plain")
+@pattern("basic_joints/splined_opposing_double_butt_joint/plain", name={"en": "Plain", "ja": "基本"})
 def example_basic_splined_opposing_double_butt_joint(position=None) -> Joint:
     """
     Create a basic splined opposing double butt joint using canonical timbers.
@@ -202,7 +204,7 @@ def example_basic_splined_opposing_double_butt_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/splined_opposing_double_butt_joint/with_stubby_tenons")
+@pattern("basic_joints/splined_opposing_double_butt_joint/with_stubby_tenons", name={"en": "With stub tenons", "ja": "短枘付き"})
 def example_basic_splined_opposing_double_butt_joint_with_stubby_tenons(position=None) -> Joint:
     """
     Create a basic splined opposing double butt joint with three stubby tenons on each butt timber.
@@ -217,7 +219,7 @@ def example_basic_splined_opposing_double_butt_joint_with_stubby_tenons(position
     )
 
 
-@pattern("basic_joints/splice_lap_joint")
+@pattern("basic_joints/splice_lap_joint", name={"en": "Splice half-lap", "ja": "相欠き継ぎ"})
 def example_basic_splice_lap_joint(position=None) -> Joint:
     """
     Create a basic splice lap joint using canonical splice joint timbers.
@@ -239,7 +241,7 @@ def example_basic_splice_lap_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/mortise_and_tenon/face_aligned", tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
+@pattern("basic_joints/mortise_and_tenon/face_aligned", name={"en": "Face-aligned mortise and tenon", "ja": "面を揃えた枘差し"}, tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
 def example_basic_mortise_and_tenon_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic mortise and tenon joint using canonical butt joint timbers.
@@ -263,7 +265,7 @@ def example_basic_mortise_and_tenon_joint(k: Optional[Kiwari]=None, *, position=
     return joint
 
 
-@pattern("basic_joints/wedged_half_dovetail_mortise_and_tenon", tags=["main"], kiwari=WEDGED_DOVETAIL_OPTIONS)
+@pattern("basic_joints/wedged_half_dovetail_mortise_and_tenon", name={"en": "Wedged half-dovetail mortise and tenon", "ja": "楔付き片蟻の枘差し"}, tags=["main"], kiwari=WEDGED_DOVETAIL_OPTIONS)
 def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic wedged half-dovetail mortise and tenon joint using canonical butt joint timbers.
@@ -285,7 +287,7 @@ def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k: Optional[Kiwar
     return joint
 
 
-@pattern("basic_joints/lapped_gooseneck_joint")
+@pattern("basic_joints/lapped_gooseneck_joint", name={"en": "Lapped gooseneck splice", "ja": "腰掛鎌継ぎ"})
 def example_basic_lapped_gooseneck_joint(position=None) -> Joint:
     """
     Create a basic lapped gooseneck joint.
@@ -305,7 +307,7 @@ def example_basic_lapped_gooseneck_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/dropin_dovetail_butt_joint")
+@pattern("basic_joints/dropin_dovetail_butt_joint", name={"en": "Drop-in dovetail butt joint", "ja": "蟻落し"})
 def example_basic_dropin_dovetail_butt_joint(position=None) -> Joint:
     """
     Create a basic housed dovetail butt joint.
@@ -323,7 +325,7 @@ def example_basic_dropin_dovetail_butt_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/dropin_housed_butt_joint")
+@pattern("basic_joints/dropin_housed_butt_joint", name={"en": "Drop-in housed butt joint", "ja": "大入れ仕口"})
 def example_basic_dropin_housed_butt_joint(position=None) -> Joint:
     """
     Create a basic housed drop-in butt joint.
@@ -344,7 +346,7 @@ def example_basic_dropin_housed_butt_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/mitered_and_keyed_lap_joint")
+@pattern("basic_joints/mitered_and_keyed_lap_joint", name={"en": "Mitered and keyed corner lap", "ja": "箱相欠き車知栓仕口"})
 def example_basic_mitered_and_keyed_lap_joint(position=None) -> Joint:
     """
     Create a basic mitered and keyed lap joint using canonical corner joint timbers.
@@ -360,7 +362,7 @@ def example_basic_mitered_and_keyed_lap_joint(position=None) -> Joint:
     return joint
 
 
-@pattern("basic_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint")
+@pattern("basic_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint", name={"en": "Half-blind tenoned dadoed rabbeted scarf", "ja": "金輪継ぎ"})
 def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None) -> Joint:
     """
     Create a basic half-blind tenoned, dadoed, rabbeted scarf joint (金輪継ぎ / Kanawa Tsugi)
@@ -383,7 +385,7 @@ def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None) 
     return joint
 
 
-@pattern("basic_joints/tusked_mortise_and_tenon")
+@pattern("basic_joints/tusked_mortise_and_tenon", name={"en": "Tusked through mortise and tenon", "ja": "割り楔の通し枘"})
 def example_basic_tusked_mortise_and_tenon_joint(position=None) -> Joint:
     """
     Create a basic tusked through mortise-and-tenon joint using canonical butt joint timbers.
@@ -406,9 +408,12 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers,
     cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers,
 )
+from kumiki import KUMIKI_PATTERN_FOLDERS, pattern_folders
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
-@pattern("basic_joints/plain_butt_joint/angled")
+@pattern("basic_joints/plain_butt_joint/angled", name={"en": "Angled butt joint", "ja": "斜めの突き付け"})
 def basic_plain_butt_angled() -> Joint:
     """Cut a plain butt joint on a brace arrangement."""
     from kumiki.example_shavings import create_canonical_example_brace_joint_timbers
@@ -418,21 +423,21 @@ def basic_plain_butt_angled() -> Joint:
         brace.brace_timber, brace.timber1, TimberEnd.BOTTOM))
 
 
-@pattern("basic_joints/tongue_and_fork_butt_joint")
+@pattern("basic_joints/tongue_and_fork_butt_joint", name={"en": "Tongue and fork butt joint", "ja": "T字の組手"})
 def basic_tongue_and_fork_butt() -> Joint:
     """Cut a tongue-and-fork butt joint with default proportions."""
     return cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         create_canonical_example_butt_joint_timbers())
 
 
-@pattern("basic_joints/plain_corner_lap_joint")
+@pattern("basic_joints/plain_corner_lap_joint", name={"en": "Corner lap joint", "ja": "隅の相欠き"})
 def basic_corner_lap() -> Joint:
     """Cut a half-depth corner lap."""
     return cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(
         create_canonical_example_corner_joint_timbers(corner_angle=degrees(120)))
 
 
-@pattern("basic_joints/multi_cross_lap_joint")
+@pattern("basic_joints/multi_cross_lap_joint", name={"en": "Multiple cross lap joint", "ja": "多段の相欠き（十字）"})
 def basic_multi_cross_lap() -> Joint:
     """Cut uniformly spaced laps in a two-member chain."""
     arrangement = create_canonical_example_cross_joint_timbers()
@@ -467,22 +472,22 @@ def _angled_butt() -> ButtJointTimberArrangement:
     return ButtJointTimberArrangement(brace.brace_timber, brace.timber1, TimberEnd.BOTTOM)
 
 
-@pattern("basic_joints/mortise_and_tenon/angled")
+@pattern("basic_joints/mortise_and_tenon/angled", name={"en": "Angled mortise and tenon", "ja": "斜めの枘差し"})
 def rectangular_tenon() -> Joint:
     return cut_basic_mortise_and_tenon_joint(_angled_butt())
 
 
-@pattern("basic_joints/round_mortise_and_tenon/angled")
+@pattern("basic_joints/round_mortise_and_tenon/angled", name={"en": "Angled round mortise and tenon", "ja": "斜めの丸枘差し"})
 def round_tenon() -> Joint:
     return cut_basic_round_mortise_and_tenon_joint(_angled_butt())
 
 
-@pattern("basic_joints/dovetail_corner_joint/through", kiwari=DOVETAIL_LAYOUT)
+@pattern("basic_joints/dovetail_corner_joint/through", name={"en": "Through dovetail", "ja": "通し蟻組み"}, kiwari=DOVETAIL_LAYOUT)
 def dovetail_corner(k: Optional[Kiwari] = None) -> Joint:
     return cut_basic_dovetail_corner_joint(_dovetail_arrangement(k))
 
 
-@pattern("basic_joints/mortise_and_tenon_corner_joint")
+@pattern("basic_joints/mortise_and_tenon_corner_joint", name={"en": "Mortise and tenon corner joint", "ja": "隅の枘差し"})
 def corner_tenon() -> Joint:
     return cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
         create_canonical_example_corner_joint_timbers(corner_angle=degrees(120)))
@@ -493,25 +498,25 @@ def _decorative_timber() -> Timber:
                   transform=Transform.identity(), ticket=TimberTicket(path="timber"))
 
 
-@pattern("basic_joints/decorative_roundover")
+@pattern("basic_joints/decorative_roundover", name={"en": "Roundover", "ja": "角の丸面"})
 def roundover() -> Joint:
     return cut_basic_practice_roundover_decoration(
         _decorative_timber(), list(TimberEdge))
 
 
-@pattern("basic_joints/decorative_rounded_end")
+@pattern("basic_joints/decorative_rounded_end", name={"en": "Rounded end", "ja": "丸く納めた木口"})
 def rounded_end() -> Joint:
     return cut_basic_practice_rounded_end_decoration(
         _decorative_timber(), TimberFace.RIGHT, TimberFace.TOP)
 
 
-@pattern("basic_joints/decorative_rafter_tail_scallop")
+@pattern("basic_joints/decorative_rafter_tail_scallop", name={"en": "Rafter tail scallop", "ja": "垂木鼻の繰り形"})
 def rafter_tail() -> Joint:
     return cut_basic_practice_rafter_tail_scallop_corner_end_decoration(
         _decorative_timber(), TimberShortEdge.TOP_BACK)
 
 
-@pattern("basic_joints/tongue_and_groove")
+@pattern("basic_joints/tongue_and_groove", name={"en": "Tongue and groove", "ja": "本実"})
 def tongue_and_groove() -> Joint:
     board_size = create_v2(inches(7), inches(3, 4))
     tongue = Board(length=feet(4), size=board_size, transform=Transform.identity(),
@@ -523,13 +528,13 @@ def tongue_and_groove() -> Joint:
     return cut_basic_tongue_and_groove_joint(tongue, groove)
 
 
-@pattern("basic_joints/sliding_dovetail/side_to_face")
+@pattern("basic_joints/sliding_dovetail/side_to_face", name={"en": "Side to face", "ja": "側面から平面へ"})
 def sliding_dovetail() -> Joint:
     from kumiki.example_shavings import create_canonical_example_board_butt_joint_boards_side_to_face
     return cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(
         create_canonical_example_board_butt_joint_boards_side_to_face())
 
 
-@pattern("basic_joints/dovetail_corner_joint/half_blind", kiwari=DOVETAIL_LAYOUT)
+@pattern("basic_joints/dovetail_corner_joint/half_blind", name={"en": "Half-blind dovetail", "ja": "包み蟻組み"}, kiwari=DOVETAIL_LAYOUT)
 def half_blind_dovetail_corner(k: Optional[Kiwari] = None) -> Joint:
     return cut_basic_dovetail_corner_joint(_dovetail_arrangement(k), half_blind=True)

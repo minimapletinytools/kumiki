@@ -3,8 +3,12 @@
 Decorative Joints Patterns
 """
 
+__title__ = {"en": "Decorative cuts", "ja": "装飾の加工"}
+
 from kumiki import *
 from kumiki.csg.pathcsg import StraightSegment, ArcSegment
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 EXAMPLE_ROUNDOVER_DECORATION_OPTIONS = kiwari(
@@ -12,7 +16,7 @@ EXAMPLE_ROUNDOVER_DECORATION_OPTIONS = kiwari(
 )
 
 
-@pattern('decorative/roundover', tags=["main"], kiwari=EXAMPLE_ROUNDOVER_DECORATION_OPTIONS)
+@pattern('decorative/roundover', name={"en": "Roundover", "ja": "角の丸面"}, tags=["main"], kiwari=EXAMPLE_ROUNDOVER_DECORATION_OPTIONS)
 def example_roundover_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A single timber with all 12 edges rounded over."""
     k = EXAMPLE_ROUNDOVER_DECORATION_OPTIONS.resolve(k)
@@ -34,7 +38,7 @@ EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS = kiwari(
 )
 
 
-@pattern('decorative/roundover_imperfect', tags=["main"], kiwari=EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS)
+@pattern('decorative/roundover_imperfect', name={"en": "Imperfect roundover", "ja": "不揃いな丸面"}, tags=["main"], kiwari=EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS)
 def example_roundover_imperfect(k: Optional[Kiwari] = None) -> Joint:
     """A single edge rounded over on an imperfect timber."""
     k = EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS.resolve(k)
@@ -61,7 +65,7 @@ EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS = kiwari(
 )
 
 
-@pattern('decorative/rafter_tail_scallop', tags=["main"], kiwari=EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS)
+@pattern('decorative/rafter_tail_scallop', name={"en": "Rafter tail scallop", "ja": "垂木鼻の繰り形"}, tags=["main"], kiwari=EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS)
 def example_rafter_tail_scallop_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A rafter tail with a scalloped decorative cut on its underside near the tail end."""
     k = EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS.resolve(k)
@@ -79,7 +83,7 @@ def example_rafter_tail_scallop_decoration(k: Optional[Kiwari] = None) -> Joint:
     )
 
 
-@pattern('decorative/path_extrusion_corner_end', tags=["main"])
+@pattern('decorative/path_extrusion_corner_end', name={"en": "Profiled corner end", "ja": "輪郭に沿って切った角の木口"}, tags=["main"])
 def example_path_extrusion_corner_end_decoration() -> Joint:
     """
     A carved corner scoop at the bottom-right end of a timber.
@@ -113,7 +117,7 @@ EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS = kiwari(
 )
 
 
-@pattern('decorative/straight_angled_end_cut', tags=["main"], kiwari=EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS)
+@pattern('decorative/straight_angled_end_cut', name={"en": "Angled end cut", "ja": "斜めに切った木口"}, tags=["main"], kiwari=EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS)
 def example_straight_angled_end_cut_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A single timber with an angled cut decoration on its top end."""
     k = EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS.resolve(k)
@@ -138,7 +142,7 @@ def example_straight_angled_end_cut_decoration(k: Optional[Kiwari] = None) -> Jo
 ROUNDED_END = kiwari(radius=kiwari.length(inches(5)), distance=kiwari.length(inches(5)))
 
 
-@pattern("decorative/rounded_end", kiwari=ROUNDED_END)
+@pattern("decorative/rounded_end", name={"en": "Rounded end", "ja": "丸く納めた木口"}, kiwari=ROUNDED_END)
 def rounded_end(k: Optional[Kiwari] = None) -> Joint:
     k = ROUNDED_END.resolve(k)
     timber = Timber(length=feet(4), size=create_v2(inches(4), inches(6)),

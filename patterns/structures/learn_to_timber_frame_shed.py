@@ -18,6 +18,8 @@ Recipe notes
 Timber Frame Shed - Base, Floor Joists, and Mudsill Joints
 """
 
+__title__ = {"en": "Timber frame shed", "ja": "木組みの小屋"}
+
 from kumiki import *
 from kumiki.timber import Frame, CutTimber, PegShape
 from kumiki.construction import (

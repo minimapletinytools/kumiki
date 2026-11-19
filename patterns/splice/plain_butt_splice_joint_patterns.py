@@ -3,6 +3,8 @@
 Plain Butt Splice Joint Patterns
 """
 
+__title__ = {"en": "Butt splice", "ja": "突き付け継ぎ"}
+
 from dataclasses import replace
 
 from kumiki import *
@@ -11,6 +13,8 @@ from kumiki.example_shavings import (
     create_canonical_example_splice_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -54,6 +58,6 @@ def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[Cut
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern('splice/plain_butt_splice_joint', tags=["main"])
+@pattern('splice/plain_butt_splice_joint', name={"en": "Butt splice", "ja": "突き付け継ぎ"}, tags=["main"])
 def plain_butt_splice_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_splice_joint_example(create_v3(0, 0, 0)), name='Plain Butt Splice Joint')

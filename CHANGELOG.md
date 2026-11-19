@@ -8,6 +8,19 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Added
+- Names in several languages for the sidebar: `@pattern(..., name={"en": ..., "ja": ...})`, `pattern_folders(...)` for pattern folders (kumiki's own in `KUMIKI_PATTERN_FOLDERS`), and a file's `__title__`. Every shipped pattern, folder and example has English and Japanese names.
+
+### kigumi
+
+#### Changed
+- The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
+
+#### Fixed
+- Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.
+
 ## [kumiki 0.9.7 / kigumi 0.9.10] - 2026-11-17
 
 ### kumiki

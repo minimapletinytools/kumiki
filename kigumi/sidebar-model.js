@@ -14,11 +14,13 @@ const { scanWorkspaceForFrames } = require('./frame-scanner');
 const { discoverDependencyContent } = require('./discovery-adapter');
 const { getInitializationStatus, isInitializationInProgress } = require('./project-initializer');
 const { groupPatternsByPatternbook } = require('./pattern-source-utils');
-const { createTranslator } = require('./i18n');
+const { createTranslator, localName } = require('./i18n');
 const { FileTree, DEFAULT_FILES_EXCLUDE } = require('./sidebar-files');
 const { getHost } = require('./host');
 
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
+// A name from kumiki (i18n localName) in the host's language, else `fallback`.
+const nameOr = (names, fallback) => localName(names, getHost().locale) || fallback;
 
 // What the system's file manager is called, for "reveal in …".
 const REVEAL_LABEL_KEY = { darwin: 'sidebar.action.revealInFinder', win32: 'sidebar.action.revealInExplorer' }[process.platform]
@@ -367,9 +369,11 @@ class SidebarModel {
             pythonCommand: this.options.getPythonCommand?.(),
         });
 
+        const titles = dep.exampleTitles || {};
         const toItem = (filePath) => ({
             sourceFile: filePath,
             name: path.basename(filePath, '.py'),
+            label: nameOr(titles[filePath], path.basename(filePath, '.py')),
             groups: [],
         });
 
@@ -390,6 +394,16 @@ class SidebarModel {
                     continue;
                 }
                 const patternbookName = rec.patternbookName || path.basename(sourceFile, '.py');
+                const patternbookLabel = nameOr(rec.title, patternbookName);
+                if (Array.isArray(rec.patterns) && rec.patterns.length > 0) {
+                    // By full path: two patterns in one book can share a last segment.
+                    const paths = rec.patterns.map((p) => p.path);
+                    for (const p of rec.patterns) {
+                        items.push({ sourceFile, name: p.path, label: nameOr(p.names, p.path.split('/').pop()),
+                            patternbookName, patternbookLabel, groups: [], patternNames: paths });
+                    }
+                    continue;
+                }
                 const names = Array.isArray(rec.patternNames) && rec.patternNames.length > 0
                     ? rec.patternNames
                     : [patternbookName];
@@ -399,12 +413,13 @@ class SidebarModel {
                         sourceFile,
                         name,
                         patternbookName,
+                        patternbookLabel,
                         groups: Array.isArray(rec.groupNames) ? rec.groupNames : [],
                         patternNames: uniqueNames,
                     });
                 }
             }
-            items.sort((a, b) => `${a.patternbookName}:${a.name}`.localeCompare(`${b.patternbookName}:${b.name}`));
+            items.sort((a, b) => `${a.patternbookLabel}:${a.label || a.name}`.localeCompare(`${b.patternbookLabel}:${b.label || b.name}`));
             return items;
         };
 
@@ -744,11 +759,12 @@ class SidebarModel {
         return node({ key, type: 'placeholder', label, description, icon: 'circle-slash' });
     }
 
-    _frameNode(key, label, filePath, data, rowActions = ['viewSource', 'openInViewer']) {
+    _frameNode(key, label, filePath, data, rowActions = ['viewSource', 'openInViewer'], tooltip = undefined) {
         return node({
             key,
             type: 'frameFile',
             label,
+            tooltip,
             icon: 'fish2-very-sad',
             action: open('kigumi.openFrameFromSidebar', filePath),
             rowActions,
@@ -771,10 +787,11 @@ class SidebarModel {
         }
         nodes.push(...frames.map((frameFile) => this._frameNode(
             `frame-file:workspace:${frameFile.filePath}`,
-            frameFile.relativePath,
+            nameOr(frameFile.title, frameFile.relativePath),
             frameFile.filePath,
             frameFile,
             this.options.publishes ? ['viewSource', 'openInViewer', 'sharePublicly', 'deleteFile'] : ['viewSource', 'openInViewer', 'deleteFile'],
+            frameFile.relativePath,
         )));
         // Last in the list: a row that makes a new frame file.
         if (this._state.workspaceRoot) {
@@ -797,8 +814,8 @@ class SidebarModel {
             label,
             icon,
             expanded: false,
-            children: items.map((item) => this._frameNode(`frame-file:library:${item.sourceFile}`, item.name, item.sourceFile, item,
-                ['viewSource', 'duplicate', 'openInViewer'])),
+            children: items.map((item) => this._frameNode(`frame-file:library:${item.sourceFile}`, item.label || item.name, item.sourceFile, item,
+                ['viewSource', 'duplicate', 'openInViewer'])).sort(byLabelThenDescription),
             data: { items },
         });
 
@@ -877,14 +894,25 @@ class SidebarModel {
         const all = [];
         for (const pb of this._state.workspacePatternbooks) {
             for (const p of (Array.isArray(pb.patterns) ? pb.patterns : [])) {
-                all.push({ path: p.path, tags: p.tags, sourceFile: pb.filePath });
+                all.push({ path: p.path, tags: p.tags, names: p.names, sourceFile: pb.filePath });
             }
         }
         return all;
     }
 
+    // Folder path -> names, from every workspace pattern book's pattern_folders; the first book to name a folder wins.
+    _workspaceFolderNames() {
+        const named = {};
+        for (const pb of this._state.workspacePatternbooks) {
+            for (const [folder, names] of Object.entries(pb.folderNames || {})) {
+                if (!(folder in named)) named[folder] = names;
+            }
+        }
+        return named;
+    }
+
     _workspacePatternTree() {
-        const nodes = this._patternFolderNodes(this._allWorkspacePatterns(), null);
+        const nodes = this._patternFolderNodes(this._allWorkspacePatterns(), null, this._workspaceFolderNames());
         if (nodes.length === 0) {
             return [this._placeholder('workspace-patternbooks-empty', t('sidebar.noPatternsFound'), t('sidebar.noPatternsFoundHint'))];
         }
@@ -892,7 +920,7 @@ class SidebarModel {
     }
 
     // Pattern paths ("a/b/c") as nested folders under `parentPath`.
-    _patternFolderNodes(allPatterns, parentPath) {
+    _patternFolderNodes(allPatterns, parentPath, folderNames = {}) {
         const prefix = parentPath ? `${parentPath}/` : '';
         const childSegments = new Set();
         for (const p of allPatterns) {
@@ -913,20 +941,20 @@ class SidebarModel {
                 nodes.push(node({
                     key: `workspace-pattern-folder:${childPath}`,
                     type: 'workspacePatternFolder',
-                    label: seg,
+                    label: nameOr(folderNames[childPath], seg),
                     description: isMain ? t('sidebar.mainBadge') : undefined,
                     tooltip: childPath,
                     icon: isMain ? 'folder-library' : 'folder',
                     expanded: false,
                     action: isMain ? open('kigumi.openPatternFromSidebar', { sourceFile, patternName: childPath }) : undefined,
                     rowActions: isMain ? ['viewSource'] : undefined,
-                    children: this._patternFolderNodes(allPatterns, childPath),
+                    children: this._patternFolderNodes(allPatterns, childPath, folderNames),
                     data: { pathPrefix: childPath, sourceFile },
                 }));
             } else if (patternAtPath) {
                 nodes.push(this._patternNode({
                     key: `workspace-pattern:${patternAtPath.sourceFile}:${childPath}`,
-                    label: seg,
+                    label: nameOr(patternAtPath.names, seg),
                     tooltip: `${childPath} — ${patternAtPath.sourceFile}`,
                     sourceFile: patternAtPath.sourceFile,
                     patternName: childPath,
@@ -934,7 +962,7 @@ class SidebarModel {
                 }));
             }
         }
-        return nodes;
+        return nodes.sort((a, b) => a.label.localeCompare(b.label));
     }
 
     _flatWorkspacePatternNodes() {
@@ -944,8 +972,8 @@ class SidebarModel {
                 const segments = (p.path || '').split('/');
                 nodes.push(this._patternNode({
                     key: `workspace-pattern-flat:${pb.filePath}:${p.path}`,
-                    label: segments[segments.length - 1] || p.path || '',
-                    description: pb.patternbookName,
+                    label: nameOr(p.names, segments[segments.length - 1] || p.path || ''),
+                    description: nameOr(pb.title, pb.patternbookName),
                     tooltip: `${p.path} — ${pb.filePath}`,
                     sourceFile: pb.filePath,
                     patternName: p.path,
@@ -966,7 +994,7 @@ class SidebarModel {
 
         const itemNode = (item, key, description) => this._patternNode({
             key,
-            label: item.name || path.basename(item.sourceFile, '.py'),
+            label: item.label || item.name || path.basename(item.sourceFile, '.py'),
             description,
             tooltip: item.sourceFile,
             sourceFile: item.sourceFile,
@@ -979,7 +1007,7 @@ class SidebarModel {
                 .map((item) => itemNode(
                     item,
                     `pattern-item-flat:${sectionKey}:${item.sourceFile}:${item.name || path.basename(item.sourceFile, '.py')}`,
-                    path.basename(item.sourceFile, '.py'),
+                    item.patternbookLabel || path.basename(item.sourceFile, '.py'),
                 ))
                 .sort(byLabelThenDescription);
         }
@@ -990,7 +1018,7 @@ class SidebarModel {
             nodes.push(node({
                 key: `patternbook-group:${sectionKey}:${patternbookName}`,
                 type: 'patternbookGroup',
-                label: patternbookName,
+                label: items[0].patternbookLabel || patternbookName,
                 description: items.length === 1
                     ? t('sidebar.patternCount.singular', { count: items.length })
                     : t('sidebar.patternCount.plural', { count: items.length }),

@@ -14,6 +14,8 @@ Roundovers soften edges. The recipe demonstrates fitting several joints around s
 Sizes and offsets are source constants; it does not expose Kiwari controls.
 """
 
+__title__ = {"en": "Coffee table", "ja": "コーヒーテーブル"}
+
 from kumiki import *
 from dataclasses import replace
 

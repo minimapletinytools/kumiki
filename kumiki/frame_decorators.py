@@ -40,9 +40,10 @@ import inspect
 import types
 import typing
 from dataclasses import dataclass, replace
-from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar
 
 from .kiwari import Kiwari
+from .names import Names, names_of
 
 __all__ = ["frame", "pattern"]
 
@@ -68,20 +69,24 @@ class PatternDeclaration:
     path: str
     tags: Tuple[str, ...]
     kiwari: Optional[Kiwari]
+    names: Optional[Dict[str, str]] = None
 
 
-def pattern(path: str, *, tags: Sequence[str] = (), kiwari: Optional[Kiwari] = None) -> Callable[[F], F]:
+def pattern(path: str, *, name: Optional[Names] = None, tags: Sequence[str] = (),
+            kiwari: Optional[Kiwari] = None) -> Callable[[F], F]:
     """Marks a function as one of a pattern book's patterns, at `path`, with its own kiwari if it takes one.
 
     `path` is hierarchical ("corner_joints/plain_miter_joint"); each segment is also a tag. Of the
     tags, 'main' shows the pattern when the file is opened and 'poop' hides it from the sidebar.
+    `name` is what the sidebar shows (kumiki.names); without one it shows the path's last segment.
     """
     if not isinstance(path, str) or not path:
         raise TypeError("@pattern needs a path, e.g. @pattern(\"corner_joints/plain_miter_joint\")")
+    names = None if name is None else names_of(name, f"@pattern({path!r}) name")
 
     def mark(function: F) -> F:
         setattr(function, _MARK, PATTERN)
-        setattr(function, _PATTERN_DECLARATION, PatternDeclaration(path, tuple(tags), kiwari))
+        setattr(function, _PATTERN_DECLARATION, PatternDeclaration(path, tuple(tags), kiwari, names))
         return function
 
     return mark
@@ -213,7 +218,7 @@ def module_patterns(module: Any) -> Tuple[List[Any], Tuple[Rejected, ...]]:
         else:
             lambda_, pattern_type = make_pattern_from_frame(function), "frame"
         patterns.append(Pattern(path=declaration.path, lambda_=lambda_, tags=list(declaration.tags),
-                                pattern_type=pattern_type, kiwari=declaration.kiwari))
+                                pattern_type=pattern_type, kiwari=declaration.kiwari, names=declaration.names))
     return patterns, tuple(rejected)
 
 

@@ -6,7 +6,11 @@ A post standing on a beam, held by a sliding dovetail across the post's width: t
 gets the socket, the post the tongue.
 """
 
+__title__ = {"en": "Free dovetail joints", "ja": "自由な配置の蟻"}
+
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def _post_on_beam_with_dovetail(position, taper_angle):
@@ -29,13 +33,13 @@ def _post_on_beam_with_dovetail(position, taper_angle):
     return cut_free_dovetail_joint(post, beam, dovetail)
 
 
-@pattern('free/free_dovetail_joint/sliding', tags=["main"])
+@pattern('free/free_dovetail_joint/sliding', name={"en": "Sliding", "ja": "送り蟻"}, tags=["main"])
 def example_free_sliding_dovetail(position=None) -> Joint:
     """A straight sliding dovetail."""
     return _post_on_beam_with_dovetail(position, scalar(0))
 
 
-@pattern('free/free_dovetail_joint/tapered')
+@pattern('free/free_dovetail_joint/tapered', name={"en": "Tapered", "ja": "先細りの蟻"})
 def example_free_tapered_dovetail(position=None) -> Joint:
     """The same, tapering toward its forward end, so it tightens as it slides home."""
     return _post_on_beam_with_dovetail(position, degrees(5))

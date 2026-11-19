@@ -29,11 +29,12 @@ def csg_shape() -> CutCSG:
     ...  # returns a CutCSG
 ```
 
-`@pattern(path, tags=[...], kiwari=...)`:
+`@pattern(path, name=..., tags=[...], kiwari=...)`:
 
 | Argument | Description |
 |----------|-------------|
 | `path` | Required. Hierarchical, like `"category/name"`. Each segment is an implicit tag. |
+| `name` | Optional. What Kigumi's sidebar shows: text, or a name per language like `{"en": "Miter", "ja": "留め"}`. Without one it shows the path's last segment. |
 | `tags` | Optional. See special tags below. |
 | `kiwari` | Optional. The numbers this pattern can be adjusted by in Kigumi's parameters panel. Each pattern declares its own. |
 
@@ -43,6 +44,13 @@ The function is checked when the file is loaded, and one that doesn't fit is ski
 - Its return annotation is `Joint`, `Frame` or `CutCSG`. A joint is shown as a frame of its timbers; a `CutCSG` makes it a CSG pattern.
 
 The decorator only marks the function, so it is still an ordinary function to call from a script or a test.
+
+### Names in other languages
+
+Kigumi shows each name in its own language, else English, else the path or file name.
+
+- **Folders.** A path's leading segments are folders in the sidebar. Name them with `pattern_folders({"category": {"en": "Corner joints", "ja": "隅の仕口"}})` at the top of the file. kumiki's own folders are in `KUMIKI_PATTERN_FOLDERS`, so `pattern_folders(KUMIKI_PATTERN_FOLDERS)` reuses them. If two files name a folder differently, the first file wins.
+- **Files.** A frame file or pattern book names itself with `__title__ = {"en": "Sawhorse", "ja": "馬（作業台）"}` at the top level. Kigumi reads it without running the file, so it must be written out, not computed.
 
 ### Where a pattern is built
 

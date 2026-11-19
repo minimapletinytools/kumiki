@@ -14,6 +14,8 @@ NOTE: Prism positioning follows the Timber convention:
 - So a prism at position=(0,0,0) with size=[1,1] spans X=[-0.5,0.5], Y=[-0.5,0.5]
 """
 
+__title__ = {"en": "CSG debugging", "ja": "CSG のデバッグ"}
+
 from kumiki import CutCSG, pattern
 from kumiki.csg.cutcsg import *
 from kumiki.rule import Orientation, Transform, inches, feet, scalar, Matrix, eye, sqrt
@@ -21,9 +23,12 @@ from kumiki.timber import Timber, TimberEnd, TimberFace, create_timber
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
 from kumiki.joints.workshop.shavings.shavings import draw_gooseneck_polygon
+from kumiki import KUMIKI_PATTERN_FOLDERS, pattern_folders
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
-@pattern("csg_debug/cube_cutout", tags=["main", "poop"])
+@pattern("csg_debug/cube_cutout", name={"en": "Cube cutout", "ja": "立方体の切り抜き"}, tags=["main", "poop"])
 def example_cube_with_cube_cutout() -> CutCSG:
     """
     2x2x2 cube with 1x1x1 cube cut out, both centered at origin.
@@ -66,7 +71,7 @@ def example_cube_with_cube_cutout() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/halfspace_cut", tags=["poop"])
+@pattern("csg_debug/halfspace_cut", name={"en": "Half-space cut", "ja": "半空間での切断"}, tags=["poop"])
 def example_cube_with_halfspace_cut() -> CutCSG:
     """
     1x1x1 cube with bottom half removed by HalfSpace at Z=0.5.
@@ -107,7 +112,7 @@ def example_cube_with_halfspace_cut() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/positioned_cube", tags=["poop"])
+@pattern("csg_debug/positioned_cube", name={"en": "Positioned cube", "ja": "配置した立方体"}, tags=["poop"])
 def example_cube_at_position() -> CutCSG:
     """
     Simple 1x1x1 cube centered at (2, 3, 1).
@@ -131,7 +136,7 @@ def example_cube_at_position() -> CutCSG:
     return cube
 
 
-@pattern("csg_debug/union_cubes", tags=["poop"])
+@pattern("csg_debug/union_cubes", name={"en": "Union of cubes", "ja": "立方体の和"}, tags=["poop"])
 def example_union_of_cubes() -> CutCSG:
     """
     Two 1x1x1 cubes joined together along X-axis (touching edge-to-edge).
@@ -170,7 +175,7 @@ def example_union_of_cubes() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/hexagon_extrusion", tags=["poop"])
+@pattern("csg_debug/hexagon_extrusion", name={"en": "Hexagon extrusion", "ja": "六角形の押し出し"}, tags=["poop"])
 def example_hexagon_extrusion() -> CutCSG:
     """
     Regular hexagon extruded to 1m height, centered at origin.
@@ -205,7 +210,7 @@ def example_hexagon_extrusion() -> CutCSG:
     return hexagon
 
 
-@pattern("csg_debug/asymmetric_frustum_loft", tags=["poop"])
+@pattern("csg_debug/asymmetric_frustum_loft", name={"en": "Asymmetric frustum loft", "ja": "非対称な錐台のロフト"}, tags=["poop"])
 def example_asymmetric_frustum_loft() -> CutCSG:
     """
     Asymmetric frustum: a 1m x 0.6m rectangle at the bottom tapering to a
@@ -249,7 +254,7 @@ def example_asymmetric_frustum_loft() -> CutCSG:
     )
 
 
-@pattern("csg_debug/lap_cut_timber", tags=["poop"])
+@pattern("csg_debug/lap_cut_timber", name={"en": "Lap cut on a timber", "ja": "材の相欠き加工"}, tags=["poop"])
 def example_lap_cut_on_timber() -> CutCSG:
     """
     4"x4"x4' timber with a 4" lap cut on the top end.
@@ -318,7 +323,7 @@ def example_lap_cut_on_timber() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/gooseneck_profile_cut", tags=["poop"])
+@pattern("csg_debug/gooseneck_profile_cut", name={"en": "Gooseneck profile cut", "ja": "鎌の形の切り抜き"}, tags=["poop"])
 def example_gooseneck_profile_cut() -> CutCSG:
     """
     2"x6"x4' timber with a gooseneck profile cut on the FRONT face at the TOP end.
@@ -395,7 +400,7 @@ def example_gooseneck_profile_cut() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/shoulder_notch_on_timber", tags=["poop"])
+@pattern("csg_debug/shoulder_notch_on_timber", name={"en": "Shoulder notch on a timber", "ja": "材の胴付きの欠き込み"}, tags=["poop"])
 def example_shoulder_notch_on_timber() -> CutCSG:
     """
     4"x4"x4' vertical timber with a 1" deep x 4" wide shoulder notch on the right face.
@@ -458,7 +463,7 @@ def example_shoulder_notch_on_timber() -> CutCSG:
     return result
 
 
-@pattern("csg_debug/chop_shoulder_notch_raw", tags=["poop"])
+@pattern("csg_debug/chop_shoulder_notch_raw", name={"en": "Shoulder notch, raw cut", "ja": "胴付きの欠き込み（加工のみ）"}, tags=["poop"])
 def example_chop_shoulder_notch_on_timber_face_raw() -> CutCSG:
     """
     Test example showing the raw CSG output of chop_shoulder_notch_on_timber_face.
@@ -498,7 +503,7 @@ def example_chop_shoulder_notch_on_timber_face_raw() -> CutCSG:
     return notch_csg
 
 
-@pattern("csg_debug/angled_shoulder_notch", tags=["poop"])
+@pattern("csg_debug/angled_shoulder_notch", name={"en": "Angled shoulder notch", "ja": "斜めの胴付きの欠き込み"}, tags=["poop"])
 def example_angled_shoulder_notch_on_timber() -> CutCSG:
     """
     Test example for shoulder notch with angled walls (notch_wall_relief_cut_angle parameter).

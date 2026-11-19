@@ -3,6 +3,8 @@
 Splined Opposing Double Butt Joint Patterns
 """
 
+__title__ = {"en": "Splined opposing double butt joint", "ja": "雇い枘で向かい合う仕口"}
+
 from typing import Optional
 from kumiki import Frame, Joint, Kiwari, kiwari, create_v3, pattern
 from kumiki.rule import V3, inches, mm, scalar
@@ -10,6 +12,9 @@ from kumiki.timber import Frame, PegShape, TimberEnd
 from kumiki.joints.workshop.butt import cut_splined_opposing_double_butt_joint_on_face_aligned_timbers
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
+from kumiki import KUMIKI_PATTERN_FOLDERS, pattern_folders
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def make_splined_opposing_double_butt_joint_example(position: V3, k: Kiwari) -> Frame:
@@ -52,6 +57,6 @@ SPLINE = kiwari(
 )
 
 
-@pattern('butt/splined_opposing_double_butt_joint', tags=["main"], kiwari=SPLINE)
+@pattern('butt/splined_opposing_double_butt_joint', name={"en": "Splined opposing double butt joint", "ja": "雇い枘で向かい合う仕口"}, tags=["main"], kiwari=SPLINE)
 def splined_opposing_double_butt_joint_pattern(k: Optional[Kiwari] = None) -> Frame:
     return make_splined_opposing_double_butt_joint_example(create_v3(0, 0, 0), SPLINE.resolve(k))

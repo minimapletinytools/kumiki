@@ -185,3 +185,30 @@ class TestPatterns:
     def test_a_path_is_required(self):
         with pytest.raises(TypeError, match="needs a path"):
             pattern("")
+
+    def test_a_name_is_text_or_names_by_language(self):
+        patterns, _ = self._patterns(
+            "@pattern('g/a', name='Corner')\ndef a() -> Frame:\n    return Frame(cut_timbers=[])\n"
+            "@pattern('g/b', name={'en': 'Miter', 'ja': '留め'})\ndef b() -> Frame:\n    return Frame(cut_timbers=[])\n"
+            "@pattern('g/c')\ndef c() -> Frame:\n    return Frame(cut_timbers=[])\n")
+
+        assert [p.names for p in patterns] == [{"en": "Corner"}, {"en": "Miter", "ja": "留め"}, None]
+
+    @pytest.mark.parametrize("name", [{}, {"ja": ""}, {"en": 3}, ["Miter"]])
+    def test_a_name_that_is_not_text_by_language_is_refused(self, name):
+        with pytest.raises(TypeError, match="name"):
+            pattern("g/a", name=name)
+
+    def test_pattern_folders_names_the_calling_modules_folders(self):
+        namespace = dict(vars(__import__("kumiki")))
+        exec("pattern_folders(KUMIKI_PATTERN_FOLDERS)\npattern_folders({'corner/': 'Corners', 'mine': {'ja': '私の'}})\n",
+             namespace)
+        module = types.ModuleType("folders")
+        module.__dict__.update(namespace)
+        from kumiki.names import module_folder_names
+        folders = module_folder_names(module)
+
+        assert folders["corner"] == {"en": "Corners"}
+        assert folders["mine"] == {"ja": "私の"}
+        assert folders["basic_joints"]["ja"] == "基本の継手・仕口"
+        assert module_folder_names(types.ModuleType("other")) == {}

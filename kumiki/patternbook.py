@@ -197,12 +197,14 @@ class Pattern:
           with different parameters, and because a csg pattern returns a
           CutCSG, which has nowhere to carry one back on. A pattern that
           declares one is called with a bound kiwari as its second argument.
+    names: what the sidebar shows, as {language: text} (kumiki.names), if given.
     """
     path: str
     lambda_: PatternLambda
     tags: List[str] = field(default_factory=list)
     pattern_type: Literal['frame', 'csg'] = 'frame'
     kiwari: Optional[Kiwari] = None
+    names: Optional[Dict[str, str]] = None
 
     @property
     def name(self) -> str:

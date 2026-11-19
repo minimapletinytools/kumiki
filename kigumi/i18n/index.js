@@ -84,8 +84,18 @@ function createTranslator(vscodeLanguage) {
     };
 }
 
+// A name from kumiki ({language: text}, or text) in `locale`, else English, else any language; null if it has none.
+function localName(names, locale) {
+    if (typeof names === 'string') return names || null;
+    if (!names || typeof names !== 'object') return null;
+    const usable = (text) => (typeof text === 'string' && text ? text : null);
+    return usable(names[resolveLocale(locale)]) || usable(names[DEFAULT_LOCALE])
+        || Object.values(names).map(usable).find(Boolean) || null;
+}
+
 module.exports = {
     SUPPORTED_LOCALES,
+    localName,
     DEFAULT_LOCALE,
     normalizeLocale,
     resolveLocale,

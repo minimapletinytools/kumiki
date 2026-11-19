@@ -18,6 +18,8 @@ Oscar's Shed - A simple timber frame shed structure
 Built using the Kumiki API
 """
 
+__title__ = {"en": "Oscar's shed", "ja": "Oscar's Shed（小屋）"}
+
 from typing import Optional
 
 from kumiki import *

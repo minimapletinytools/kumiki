@@ -62,6 +62,8 @@ from .measuring import *
 from .patternbook import *
 from .kiwari import *
 from .frame_decorators import *
+from .names import *
+from .pattern_folder_names import *
 from .finishing import *
 
 # Optional heavy mesh/export modules.

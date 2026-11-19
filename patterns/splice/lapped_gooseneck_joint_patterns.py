@@ -3,11 +3,15 @@
 Lapped Gooseneck Joint Patterns (腰掛鎌継ぎ / Koshikake Kama Tsugi)
 """
 
+__title__ = {"en": "Lapped gooseneck splice", "ja": "腰掛鎌継ぎ"}
+
 from typing import Optional
 from dataclasses import replace
 
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_splice_joint_timbers
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 OPTIONS = kiwari(
@@ -20,7 +24,7 @@ OPTIONS = kiwari(
 )
 
 
-@pattern('splice/lapped_gooseneck_splice_joint', kiwari=OPTIONS)
+@pattern('splice/lapped_gooseneck_splice_joint', name={"en": "Lapped gooseneck splice", "ja": "腰掛鎌継ぎ"}, kiwari=OPTIONS)
 def create_simple_gooseneck_example(k: Optional[Kiwari] = None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a gooseneck splice joint example using canonical 4"x5"x4' timbers.

@@ -28,6 +28,8 @@ from each board's LEFT face (the global-bottom face shared by all three boards
 regardless of their plan rotation), split half-and-half at the midpoint.
 """
 
+__title__ = {"en": "Cross-lapped post", "ja": "相欠きで組んだ柱"}
+
 
 from kumiki import *
 from kumiki.ticket import BoardTicket

@@ -3,7 +3,11 @@
 Patternbook example patterns.
 """
 
+__title__ = {"en": "Pattern book examples", "ja": "パターンブックの例"}
+
 from kumiki import *
+
+pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
 
 def _make_short_post(center):
@@ -37,46 +41,46 @@ def _make_large_box(center):
     return RectangularPrism(size=create_v2(size, size), transform=Transform(position=center, orientation=Orientation.identity()), start_distance=-size / 2, end_distance=size / 2)
 
 
-@pattern("patternbook_examples/short_post", tags=["main", "poop"])
+@pattern("patternbook_examples/short_post", name={"en": "Short post", "ja": "短い柱"}, tags=["main", "poop"])
 def short_post_pattern() -> Frame:
     return _make_short_post(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/tall_post", tags=["poop"])
+@pattern("patternbook_examples/tall_post", name={"en": "Tall post", "ja": "長い柱"}, tags=["poop"])
 def tall_post_pattern() -> Frame:
     return _make_tall_post(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/wide_post", tags=["poop"])
+@pattern("patternbook_examples/wide_post", name={"en": "Wide post", "ja": "太い柱"}, tags=["poop"])
 def wide_post_pattern() -> Frame:
     return _make_wide_post(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/small_beam", tags=["poop"])
+@pattern("patternbook_examples/small_beam", name={"en": "Small beam", "ja": "小さい梁"}, tags=["poop"])
 def small_beam_pattern() -> Frame:
     return _make_small_beam(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/medium_beam", tags=["poop"])
+@pattern("patternbook_examples/medium_beam", name={"en": "Medium beam", "ja": "中くらいの梁"}, tags=["poop"])
 def medium_beam_pattern() -> Frame:
     return _make_medium_beam(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/large_beam", tags=["poop"])
+@pattern("patternbook_examples/large_beam", name={"en": "Large beam", "ja": "大きい梁"}, tags=["poop"])
 def large_beam_pattern() -> Frame:
     return _make_large_beam(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/small_box", tags=["poop"])
+@pattern("patternbook_examples/small_box", name={"en": "Small box", "ja": "小さい箱"}, tags=["poop"])
 def small_box_pattern() -> CutCSG:
     return _make_small_box(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/medium_box", tags=["poop"])
+@pattern("patternbook_examples/medium_box", name={"en": "Medium box", "ja": "中くらいの箱"}, tags=["poop"])
 def medium_box_pattern() -> CutCSG:
     return _make_medium_box(create_v3(0, 0, 0))
 
 
-@pattern("patternbook_examples/large_box", tags=["poop"])
+@pattern("patternbook_examples/large_box", name={"en": "Large box", "ja": "大きい箱"}, tags=["poop"])
 def large_box_pattern() -> CutCSG:
     return _make_large_box(create_v3(0, 0, 0))
