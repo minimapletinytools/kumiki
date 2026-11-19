@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { DrawingOverlays, anchoredLineDistances, drawnFacing, roundDotShader } = require('../webview/drawing-overlays');
+const { DrawingOverlays, anchoredLineDistances, drawnFacing, roundDashShader } = require('../webview/drawing-overlays');
 
 const vector = (x, y, z) => ({ x, y, z, dot: (o) => x * o.x + y * o.y + z * o.z });
 
@@ -66,15 +66,15 @@ describe('round dots', () => {
     const fragment = vendored.slice(vendored.indexOf('fragmentShader: `') + 'fragmentShader: `'.length);
     const shader = fragment.slice(0, fragment.indexOf('`'));
 
-    test('the square dash test is replaced by a circle as wide as the line is drawn, spaced in pixels', () => {
-        const round = roundDotShader(shader);
+    test('the square dash test is replaced by round-ended dashes as wide as the line is drawn, measured in pixels', () => {
+        const round = roundDashShader(shader);
         expect(round).not.toContain('> dashSize ) discard');
         expect(round).toContain('dFdx( vUv.x )');
-        expect(round).toContain('dot( dotOffset, dotOffset ) > dotRadius * dotRadius');
-        expect(round).toContain('float dotPeriod = 5.00 * dotRadius;');
+        expect(round).toContain('float dashPeriod = 12.00 * dashRadius;');
+        expect(round).toContain('abs( dashAlong ) - 3.00 * dashRadius');
     });
 
     test('a shader with no dash test to replace is refused, not drawn square', () => {
-        expect(() => roundDotShader('void main() {}')).toThrow(/no dash test/);
+        expect(() => roundDashShader('void main() {}')).toThrow(/no dash test/);
     });
 });

@@ -1,6 +1,6 @@
 // The lines only a drawing's views draw over its timbers.
 //
-// Each perfect face the rough stock has no face for (ptw.*), dotted, and each centerplane, dotted
+// Each perfect face the rough stock has no face for (ptw.*), dashed, and each centerplane, dashed
 // in its own colour -- both planes the runner sends cropped to the cut timber (perfectFaces and
 // centerplanes on a member's mesh), so a perfect face ends at a shoulder and a tenon, being the
 // timber's own, gets none. They lie inside their timber, so each is clipped to it with the member
@@ -9,10 +9,11 @@
 // Hovering or selecting one of those planes lights it through the usual highlight, from the
 // outline the runner sends for it (highlightEdgeSegments); nothing here.
 
-// A dot's diameter, in pixels: the line's width.
+// The line's width, in pixels.
 const LINE_WIDTH_PX = 3;
-// Dot to dot, in dot diameters: on screen, so the dotting looks the same at any zoom.
-const DOT_PERIOD = 2.5;
+// A dash and the gap after it, in line widths: on screen, so the dashing looks the same at any zoom.
+const DASH = 4;
+const GAP = 2;
 const PERFECT_FACE_COLOR = 0x2f6fd0;
 const CENTERPLANE_COLOR = 0xd0582f;
 // How square to the view a plane may be and still be drawn: seen face-on, it is not.
@@ -20,23 +21,24 @@ const FACE_ON_DOT = 1 - 1e-3;
 
 // LineMaterial's dash test, which cuts the line into rectangles.
 const SQUARE_DASH = 'if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX';
-// Round dots instead, as wide as the line is drawn, measured in the pixels drawn both ways: along
-// the line from vLineDistance's change per pixel, across it from vUv.x's (-1 to 1 edge to edge). A
-// width taken from linewidth stretched each dot across the line wherever a drawing's sheet is zoomed.
-const ROUND_DOT = `
-            float dotRadius = 1.0 / max( length( vec2( dFdx( vUv.x ), dFdy( vUv.x ) ) ), 1e-9 );
-            float dotPerPixel = max( length( vec2( dFdx( vLineDistance ), dFdy( vLineDistance ) ) ), 1e-9 );
-            float dotPeriod = ${(2 * DOT_PERIOD).toFixed(2)} * dotRadius;
-            float dotAlong = mod( ( vLineDistance + dashOffset ) / dotPerPixel + 0.5 * dotPeriod, dotPeriod ) - 0.5 * dotPeriod;
-            vec2 dotOffset = vec2( dotAlong, vUv.x * dotRadius );
-            if ( dot( dotOffset, dotOffset ) > dotRadius * dotRadius ) discard;`;
+// Dashes with round ends instead, measured in the pixels drawn both ways: along the line from
+// vLineDistance's change per pixel, across it from vUv.x's (-1 to 1 edge to edge). A width taken
+// from linewidth stretched each dash across the line wherever a drawing's sheet is zoomed.
+const ROUND_DASH = `
+            float dashRadius = 1.0 / max( length( vec2( dFdx( vUv.x ), dFdy( vUv.x ) ) ), 1e-9 );
+            float dashPerPixel = max( length( vec2( dFdx( vLineDistance ), dFdy( vLineDistance ) ) ), 1e-9 );
+            float dashPeriod = ${(2 * (DASH + GAP)).toFixed(2)} * dashRadius;
+            float dashAlong = mod( ( vLineDistance + dashOffset ) / dashPerPixel + 0.5 * dashPeriod, dashPeriod ) - 0.5 * dashPeriod;
+            float dashBeyond = max( abs( dashAlong ) - ${(DASH - 1).toFixed(2)} * dashRadius, 0.0 );
+            vec2 dashOffset2 = vec2( dashBeyond, vUv.x * dashRadius );
+            if ( dot( dashOffset2, dashOffset2 ) > dashRadius * dashRadius ) discard;`;
 
-/** A dashed LineMaterial fragment shader drawing round dots rather than square dashes. */
-function roundDotShader(source) {
+/** A dashed LineMaterial fragment shader drawing round-ended dashes measured on screen. */
+function roundDashShader(source) {
     if (!source.includes(SQUARE_DASH)) {
         throw new Error('drawing-overlays: the line shader has no dash test to replace');
     }
-    return source.replace(SQUARE_DASH, ROUND_DOT);
+    return source.replace(SQUARE_DASH, ROUND_DASH);
 }
 
 /**
@@ -95,7 +97,7 @@ class DrawingOverlays {
     constructor({ THREE, memberIds, resolution }) {
         this.THREE = THREE;
         this.memberIds = memberIds;
-        const dotted = (color) => {
+        const dashed = (color) => {
             const material = new THREE.LineMaterial({
                 color,
                 linewidth: LINE_WIDTH_PX,
@@ -106,13 +108,13 @@ class DrawingOverlays {
             });
             // This LineMaterial dashes only with the define set; `dashed` alone does nothing.
             material.defines.USE_DASH = '';
-            material.fragmentShader = roundDotShader(material.fragmentShader);
+            material.fragmentShader = roundDashShader(material.fragmentShader);
             // dFdx / dFdy: built in on WebGL2, an extension on WebGL1.
             material.extensions.derivatives = true;
             return material;
         };
         // What every member's lines are copied from.
-        this.materials = { perfect: dotted(PERFECT_FACE_COLOR), centerplane: dotted(CENTERPLANE_COLOR) };
+        this.materials = { perfect: dashed(PERFECT_FACE_COLOR), centerplane: dashed(CENTERPLANE_COLOR) };
         this._look = new THREE.Vector3();
     }
 
@@ -179,6 +181,6 @@ class DrawingOverlays {
     }
 }
 
-const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDotShader, FACE_ON_DOT };
+const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, FACE_ON_DOT };
 
-export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDotShader, FACE_ON_DOT };
+export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, FACE_ON_DOT };
