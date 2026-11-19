@@ -15,8 +15,15 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+- Touchscreens: one finger orbits, two fingers pan and pinch to zoom, a tap selects and a long press opens the timber's menu.
+- Trackpads: a pinch zooms smoothly. A view option makes a two-finger scroll orbit (shift pans) instead of zooming.
+- A view option hides the mouse controls hint.
+
 #### Changed
 - The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
+- The mouse controls hint is a little larger.
+- In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
 
 #### Fixed
 - Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.
