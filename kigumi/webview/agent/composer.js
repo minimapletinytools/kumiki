@@ -6,10 +6,10 @@ import { t } from './i18n.js';
 export class Composer {
     /**
      * @param {object} elements  input, sendButton, attachments, mentions, planSelect
-     * @param {{post, isBusy: () => boolean, onSent: (text: string, imageUrls: string[]) => void}} deps
+     * @param {{post, isBusy: () => boolean, canSend: () => boolean, onSent: (text: string, imageUrls: string[]) => void}} deps
      */
-    constructor({ input, sendButton, attachments, mentions, planSelect }, { post, isBusy, onSent }) {
-        Object.assign(this, { input, sendButton, attachmentsEl: attachments, mentionsEl: mentions, planSelect, post, isBusy, onSent });
+    constructor({ input, sendButton, attachments, mentions, planSelect }, { post, isBusy, canSend, onSent }) {
+        Object.assign(this, { input, sendButton, attachmentsEl: attachments, mentionsEl: mentions, planSelect, post, isBusy, canSend, onSent });
         this.attachments = [];
         this.lastSent = '';
         this.projectFiles = null;
@@ -53,8 +53,9 @@ export class Composer {
     /** Send what is in the box (or `text`, from a suggestion); while the agent works it waits its turn. */
     send(text) {
         const prompt = (text !== undefined ? text : this.input.value).trim();
+        if (!prompt && (text !== undefined || !this.attachments.length)) return;
+        if (!this.canSend()) return;
         const images = text !== undefined ? [] : this.attachments.splice(0);
-        if (!prompt && !images.length) return;
         if (!this.isBusy()) this.onSent(prompt, images.map((image) => image.url));
         this.lastSent = prompt;
         this.input.value = '';

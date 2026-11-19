@@ -130,6 +130,11 @@
             <div id="todos" class="todos" hidden></div>
             <div id="mentions" class="mentions" hidden></div>
             <div id="attachments" class="attachments" hidden></div>
+            <div id="prompt-sign-in" hidden>
+                <p role="alert" data-i18n="agent.prompt.signIn">Sign in to use the built-in agent, or connect your own agent through MCP.</p>
+                <button type="button" class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                <button type="button" class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+            </div>
             <div class="input-box">
                 <textarea id="prompt-input" placeholder="Prompt here… (drag and drop images, paste content, or @ to reference a file)" data-i18n-placeholder="agent.placeholder" rows="2"></textarea>
                 <button id="send-btn" class="send-btn" title="Send message" data-i18n-title="agent.send"><span class="codicon codicon-send"></span></button>

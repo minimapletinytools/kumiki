@@ -148,3 +148,16 @@
     height: 44px;
     font-size: 15px;
 }
+
+/* A pinch over a magnified page belongs to the browser until it returns to normal size. */
+#viewport.page-zoomed canvas {
+    pointer-events: none;
+}
+
+#view-layout.is-compact :is(button, input, select) {
+    touch-action: manipulation;
+}
+
+#view-layout.is-compact :is(input, select) {
+    font-size: 16px;
+}

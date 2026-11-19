@@ -421,6 +421,7 @@ button {
 }
 
 .ks-phone-button {
+    touch-action: manipulation;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -445,6 +446,38 @@ button {
     color: var(--vscode-textLink-foreground, #005fb8);
 }
 
-.ks-phone-tree .ks-row {
-    min-height: 40px;
+.ks-phone-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ks-phone-list li {
+    display: flex;
+    align-items: center;
+    padding-inline-start: calc(var(--ks-depth) * var(--ks-indent));
+}
+
+.ks-phone-list button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    touch-action: manipulation;
+}
+
+.ks-phone-list button:has(+ button) {
+    flex: 0 0 44px;
+    justify-content: center;
+}
+
+.ks-phone-list button:active {
+    background: var(--ks-hover);
 }

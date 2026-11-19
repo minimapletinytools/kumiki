@@ -4,6 +4,8 @@
 export const SHELL_UI = Object.freeze({
     /** Shell → panel: { form: 'phone' } once the panel loads in the phone layout. */
     form: 'shell-ui:form',
+    /** Shell → viewer: let the browser handle pinches while the phone page is zoomed. */
+    pageZoom: 'shell-ui:page-zoom',
     /** Shell → agent: { expanded } when its sheet opens or closes. */
     agentSheet: 'shell-ui:agent-sheet',
     /** Agent → shell: open the sheet (the text box was tapped). */

@@ -384,8 +384,10 @@ class AgentSession {
         }
         const route = this.route();
         if (!route) {
-            this.postRaw({ type: 'agent:error', key: 'agent.route.setKey',
-                message: 'Sign in to use the agent, or set agent.openrouterApiKey in settings.' });
+            const canSignIn = this.account?.state().configured;
+            this.postRaw({ type: 'agent:error', key: canSignIn ? 'agent.prompt.signIn' : 'agent.route.setKey',
+                message: canSignIn ? 'Sign in to use the built-in agent, or connect your own agent through MCP.'
+                    : 'Add an OpenRouter key in the agent settings to use the agent.' });
             return;
         }
         const abort = new AbortController();

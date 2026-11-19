@@ -1327,3 +1327,26 @@ body.is-phone:not(.is-sheet-open) #prompt-input {
     min-height: 0;
     height: 44px;
 }
+
+#prompt-sign-in p {
+    margin: 0 0 6px;
+}
+
+#prompt-sign-in .sign-in-chip {
+    display: inline-block;
+    width: auto;
+    margin: 0 6px 6px 0;
+}
+
+.agent-footer:has(#prompt-sign-in:not([hidden])) #route-note,
+body.is-phone:not(.is-sheet-open) #prompt-sign-in {
+    display: none;
+}
+
+body.is-phone :is(button, input, textarea, select) {
+    touch-action: manipulation;
+}
+
+body.is-phone :is(input, select) {
+    font-size: 16px;
+}

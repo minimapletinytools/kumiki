@@ -303,7 +303,15 @@ app.whenReady().then(async () => {
         check('kumiki_source reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('docs/api_cheat_sheet.md\n1\t# API cheat sheet'), sheet.slice(0, 120));
         // The tab signing in opens: noted, not opened.
         await js(`window.open = (url) => { window.__signInUrl = url; return {}; }; true`);
-        await js(`${agent}.querySelector('.web-agent-sign-in .sign-in-chip[data-provider="github"]').click()`);
+        await js(`(() => {
+            const doc = ${agent};
+            doc.getElementById('prompt-input').value = 'Open my frame';
+            ${agent}.getElementById('send-btn').click();
+        })()`);
+        check('the signed-out prompt offers MCP and keeps the draft', await js(
+            `!${agent}.getElementById('prompt-sign-in').hidden && ${agent}.getElementById('prompt-sign-in').textContent.includes('MCP')
+            && ${agent}.getElementById('prompt-input').value === 'Open my frame'`));
+        await js(`${agent}.querySelector('#prompt-sign-in [data-provider="github"]').click()`);
         const signInHref = await wait('window.__signInUrl', 15000);
         const signInUrl = signInHref ? new URL(signInHref) : null;
         check('signing in opens the provider in a tab, coming back to auth.html',

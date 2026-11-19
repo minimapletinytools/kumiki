@@ -483,6 +483,7 @@
   "agent.web.appLink": "スタンドアロンアプリ",
   "agent.web.signIn": "エージェントを使うにはサインイン",
   "agent.welcome.body": "開いている架構や、その中で選択しているものについて質問できます。エージェントはプロジェクトのファイルを読み書きし、ビューを再構築して確認できます。",
+  "agent.prompt.signIn": "内蔵エージェントを使うにはサインインしてください。MCP 経由でお使いのエージェントを接続することもできます。",
   "agent.welcome.signIn": "エージェントを使うにはサインインしてください。",
   "agent.welcome.setKey": "エージェントを使うには、エージェントの設定でOpenRouterのキーを追加してください。",
   "agent.welcome.mcp": "MCPを有効にして自分のエージェントを接続",

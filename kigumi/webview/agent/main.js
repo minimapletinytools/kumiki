@@ -23,7 +23,12 @@ const conversation = new Conversation($('messages'), {
 });
 const composer = new Composer({
     input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planSelect: $('plan-select'),
-}, { post, isBusy: () => busy, onSent: (text, imageUrls) => {
+}, { post, isBusy: () => busy, canSend: () => {
+    if (!document.body.classList.contains('needs-sign-in')) return true;
+    openSheet();
+    $('prompt-sign-in').hidden = false;
+    return false;
+}, onSent: (text, imageUrls) => {
     status.hideFinishedTodos();
     conversation.userBubble(text, imageUrls);
 } });
@@ -59,7 +64,7 @@ $('btn-clear').addEventListener('click', () => {
 // In the browser version the panel says how the agent can be run there (agent.html, .web-agent-notice).
 if (new URLSearchParams(location.search).get('host') === 'web') document.body.classList.add('host-web');
 
-$('messages').addEventListener('click', (event) => {
+document.addEventListener('click', (event) => {
     const chip = event.target.closest('.suggestion-chip');
     if (!chip) return;
     if (chip.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: chip.dataset.provider });
@@ -82,6 +87,7 @@ const HANDLERS = {
         composer.setPlanMode((message.settings || {})['agent.planMode'] === true);
         status.showModels(message.models || [], message.model);
         status.showRoute(message.via, message.account || { configured: false });
+        if (!document.body.classList.contains('needs-sign-in')) $('prompt-sign-in').hidden = true;
         signedIn = Boolean(message.account && message.account.signedIn);
         via = message.via;
         menus.showMcp(mcpState, { signedIn });
@@ -148,11 +154,11 @@ listenForForm((form) => {
         $('prompt-input').placeholder = t('agent.phone.placeholder');
     }
 });
-const openSheet = () => {
+function openSheet() {
     if (document.body.classList.contains('is-phone') && !document.body.classList.contains('is-sheet-open')) {
         post({ type: SHELL_UI.agentExpand });
     }
-};
+}
 $('prompt-input').addEventListener('focus', openSheet);
 $('prompt-input').addEventListener('pointerdown', openSheet);
 $('phone-agent-bar').addEventListener('click', openSheet);

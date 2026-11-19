@@ -43,6 +43,8 @@ export function createPhoneLayout({ core, command, frames }) {
     const backdrop = el('div', 'phone-backdrop');
     const agent = el('div', 'phone-agent');
     const status = el('div', 'phone-status');
+    status.hidden = true;
+    status.setAttribute('role', 'status');
     const controls = el('div', 'phone-controls');
     const back = el('button', 'phone-button phone-back');
     back.type = 'button';
@@ -69,6 +71,8 @@ export function createPhoneLayout({ core, command, frames }) {
     // The last project file shown: where Back goes from an example, pattern or shared frame.
     let lastProjectFile = null;
     let lastActiveId = null;
+    let pageZoomed = false;
+    let statusTimer;
 
     const activePanel = () => state.panels.find((panel) => panel.slot === 'center' && panel.id === state.activeId) || null;
 
@@ -105,9 +109,17 @@ export function createPhoneLayout({ core, command, frames }) {
     // The keyboard takes the bottom of the screen: keep the agent sheet above it.
     if (window.visualViewport) {
         const fit = () => {
-            const covered = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+            const zoomed = window.visualViewport.scale > 1.01;
+            if (zoomed !== pageZoomed) {
+                pageZoomed = zoomed;
+                for (const panel of state.panels.filter((one) => one.slot === 'center')) {
+                    frames.send(panel.id, { type: SHELL_UI.pageZoom, zoomed });
+                }
+            }
+            const covered = zoomed ? 0 : Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
             root.style.setProperty('--phone-keyboard', `${covered}px`);
         };
+        fit();
         window.visualViewport.addEventListener('resize', fit);
         window.visualViewport.addEventListener('scroll', fit);
     }
@@ -132,13 +144,19 @@ export function createPhoneLayout({ core, command, frames }) {
         backdrop.hidden = !(agentExpanded || (menuOpen && hasFile));
         menuButton.hidden = !hasFile;
         closeFile.hidden = !hasFile;
-        back.hidden = !hasFile || inProject(active.filePath, workspace) || !active.filePath;
+        back.hidden = menuOpen || !hasFile || inProject(active.filePath, workspace) || !active.filePath;
         $('welcome').hidden = hasFile || home;
         if (!hasFile && core.renderWelcome) core.renderWelcome(state, { el, command });
 
         const message = state.progress || (state.status && state.status.message) || '';
-        status.textContent = message;
-        status.hidden = !message;
+        const progress = Boolean(state.progress);
+        if (status.textContent !== message || status.classList.contains('is-progress') !== progress) {
+            clearTimeout(statusTimer);
+            status.textContent = message;
+            status.classList.toggle('is-progress', progress);
+            status.hidden = !message;
+            if (message && !progress) statusTimer = setTimeout(() => { status.hidden = true; }, 6000);
+        }
 
         // The agent is always there on a phone: ask for it once a project is open.
         agentId = (state.panels.find((panel) => panel.slot === 'right') || {}).id || null;
@@ -157,6 +175,7 @@ export function createPhoneLayout({ core, command, frames }) {
         },
         loaded(panel) {
             frames.send(panel.id, { type: SHELL_UI.form, form: 'phone' });
+            if (panel.slot === 'center') frames.send(panel.id, { type: SHELL_UI.pageZoom, zoomed: pageZoomed });
             if (panel.slot === 'right') frames.send(panel.id, { type: SHELL_UI.agentSheet, expanded: agentExpanded });
         },
         shown(panel, current) {

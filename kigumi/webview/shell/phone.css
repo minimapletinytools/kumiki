@@ -173,9 +173,9 @@ body[data-layout="phone"] .shell {
     border-radius: 999px;
     background: var(--ka-overlay-bg);
     box-shadow: 0 1px 4px var(--ka-shadow);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: max-content;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
     pointer-events: none;
 }
 
@@ -187,4 +187,12 @@ body[data-layout="phone"] .shell {
     .phone-agent {
         transition: none;
     }
+}
+
+body[data-layout="phone"] :is(button, input, select) {
+    touch-action: manipulation;
+}
+
+body[data-layout="phone"] :is(input, select) {
+    font-size: 16px;
 }

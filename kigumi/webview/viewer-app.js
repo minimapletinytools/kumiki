@@ -34,7 +34,7 @@ import * as KigumiUndoStacks from './undo-stacks.js';
 import * as KigumiUnits from './units.js';
 import { TouchGestures, wheelGesture, LONG_PRESS_MS } from './touch-navigation.js';
 import { CompactChrome } from './viewer-compact.js';
-import { listenForForm } from './shell-ui.js';
+import { SHELL_UI, listenForForm } from './shell-ui.js';
 
 // A touchscreen is the main pointer: the hint describes touch gestures.
 const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
@@ -109,6 +109,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.touchGestures = new TouchGestures();
         // 'phone' once the shell says so (shell-ui.js): no sidebar, and viewer-compact.js's menu instead.
         this.formFactor = 'desktop';
+        this.pageZoomed = false;
+        this.errorDismissed = false;
         this.fileName = INITIAL_PAYLOAD.fileName || null;
         this.compactChrome = new CompactChrome(this, { html, nothing, t });
         // What a right-click is offering. One menu for every kind of menu --
@@ -269,7 +271,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
             <div id="view-layout" class=${layoutClass}>
             ${this.sidebar.render(this.sidebarPages())}
-            <div id="viewport">
+            <div id="viewport" class=${compact && this.pageZoomed ? 'page-zoomed' : ''}>
                 ${compact ? this.compactChrome.render() : nothing}
                 ${this.isInDrawing
                     ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
@@ -584,7 +586,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         });
 
         viewport.addEventListener('wheel', (event) => {
-            if (window.scrollY > 0) {
+            if (window.scrollY > 0 || this.pageZoomed) {
                 return;
             }
             event.preventDefault();
@@ -1443,6 +1445,13 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
     onWindowMessage(event) {
         const message = event.data || {};
+        if (message.type === SHELL_UI.pageZoom && this.formFactor === 'phone') {
+            this.pageZoomed = message.zoomed === true;
+            this.touchGestures.cancel();
+            clearTimeout(this.longPressTimer);
+            this.requestUpdate();
+            return;
+        }
         if (message.type === 'stlPlacementResult') {
             if (message.requestId !== this.stlRequestId) return;
             this.stlRequestId = null;
@@ -2870,6 +2879,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     renderErrorActions() {
         const location = this.viewState.errorLocation;
         return html`<div class="error-actions">
+            ${this.formFactor === 'phone' ? html`<button type="button" aria-label=${t('viewer.compact.close')}
+                @click=${() => { this.errorDismissed = true; this.requestUpdate(); }}>×</button>` : nothing}
             ${location ? html`<button id="go-to-error-btn" type="button"
                 title=${t('viewer.chrome.goToError.title', { file: location.filePath.split(/[\\/]/).pop(), line: location.lineNumber })}
                 @click=${() => vscode && vscode.postMessage({ type: 'openLogLocation', ...location })}>${t('viewer.chrome.goToError')}</button>` : ''}
@@ -2879,7 +2890,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     isOverlayVisible() {
-        return this.viewState.phase !== ViewerPhase.READY;
+        return this.viewState.phase !== ViewerPhase.READY
+            && !(this.formFactor === 'phone' && this.viewState.phase === ViewerPhase.ERROR && this.errorDismissed);
     }
 
     overlayClasses() {
@@ -2890,6 +2902,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     setViewState(nextPartial) {
+        if (nextPartial.phase && (nextPartial.phase !== this.viewState.phase
+                || nextPartial.error !== this.viewState.error || nextPartial.refreshToken !== this.viewState.refreshToken)) {
+            this.errorDismissed = false;
+        }
         this.viewState = {
             ...this.viewState,
             ...nextPartial,

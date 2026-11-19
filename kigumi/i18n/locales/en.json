@@ -483,6 +483,7 @@
   "agent.web.appLink": "standalone app",
   "agent.web.signIn": "Sign in to use the agent",
   "agent.welcome.body": "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.",
+  "agent.prompt.signIn": "Sign in to use the built-in agent, or connect your own agent through MCP.",
   "agent.welcome.signIn": "Please sign in to use the agent.",
   "agent.welcome.setKey": "Please add an OpenRouter key in the agent's settings (the gear above) to use the agent.",
   "agent.welcome.mcp": "Enable the MCP to connect your own agent",

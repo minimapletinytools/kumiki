@@ -437,19 +437,16 @@ class KigumiSidebar extends LitElement {
         const top = (key) => this.tree.find((node) => node.key === key) || null;
         const framesRoot = top('frames-root');
         const frames = framesRoot ? (framesRoot.children || []).filter((node) => node.type === 'frameFile') : [];
-        const newFrame = framesRoot ? (framesRoot.children || []).find((node) => node.type === 'newFrameAction') : null;
         const closeProject = this.statusNodes.find((node) => node.type === 'closeProjectAction');
         return html`
             <div class="ks-phone">
                 ${framesRoot ? html`
                     <div class="ks-phone-heading">${framesRoot.label}</div>
-                    ${frames.slice(0, PHONE_FRAMES_SHOWN).map((node) =>
-                        this.renderPhoneButton(node.label, node.icon, () => this.phoneOpen(node), 'is-frame'))}
+                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN))}
                     ${frames.length > PHONE_FRAMES_SHOWN
                         ? this.renderPhoneButton(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
                             'ellipsis', () => { this.phonePage = 'frames'; }, 'is-quiet')
-                        : nothing}
-                    ${newFrame ? this.renderPhoneButton(newFrame.label, newFrame.icon, () => this.phoneOpen(newFrame), 'is-quiet') : nothing}`
+                        : nothing}`
                 : nothing}
                 <div class="ks-phone-heading">${t('sidebar.phone.browse')}</div>
                 ${top('example-frames-root')
@@ -465,22 +462,36 @@ class KigumiSidebar extends LitElement {
             </div>`;
     }
 
-    /** One of the phone menu's pages: a branch of the tree, rows as on the desktop. */
+    renderPhoneRow({ node, depth, isContainer, isExpanded }) {
+        const toggle = () => {
+            this.overrides = new Map(this.overrides).set(node.key, !isExpanded);
+            this.saveState();
+        };
+        const chevron = icon(isExpanded ? 'chevron-down' : 'chevron-right');
+        const label = html`${icon(node.icon)}<span class="ks-label">${node.label}</span>`;
+        return html`<li .style=${`--ks-depth: ${depth}`}>
+            ${isContainer ? html`
+                <button type="button" aria-label=${node.label} aria-expanded=${String(isExpanded)}
+                    data-key=${node.key} @click=${toggle}>${chevron}${node.action ? nothing : label}</button>` : nothing}
+            ${node.action ? html`<button type="button" data-key=${node.key}
+                @click=${() => this.phoneOpen(node)}>${label}</button>` : nothing}
+            ${!isContainer && !node.action ? html`<span class="ks-description">${node.label}</span>` : nothing}
+        </li>`;
+    }
+
+    renderPhoneList(nodes) {
+        const rows = visibleRows(nodes, { overrides: this.overrides });
+        return html`<ul class="ks-phone-list">${rows.map((row) => this.renderPhoneRow(row))}</ul>`;
+    }
+
     renderPhonePage(page) {
         const root = this.tree.find((node) => node.key === PHONE_PAGES[page]);
-        const rows = root ? visibleRows(root.children || [], { overrides: this.overrides }) : [];
+        const children = (root?.children || []).filter((node) => node.type !== 'newFrameAction');
         return html`
             <div class="ks-phone">
                 ${this.renderPhoneButton(t('sidebar.phone.back'), 'arrow-left', () => { this.phonePage = 'home'; }, 'is-quiet')}
                 <div class="ks-phone-heading">${root ? root.label : ''}</div>
-                <div class="ks-tree ks-phone-tree" role="tree" aria-label=${root ? root.label : ''}
-                    @click=${(event) => {
-                        const row = event.target.closest('.ks-row');
-                        const node = row && rows.find((one) => one.node.key === row.dataset.key);
-                        if (node && !node.isContainer && node.node.action) post({ type: SHELL_UI.closeMenu });
-                    }}>
-                    ${rows.map((row, index) => this.renderRow(row, index))}
-                </div>
+                ${this.renderPhoneList(children)}
             </div>`;
     }
 
