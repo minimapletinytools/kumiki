@@ -194,6 +194,10 @@ async function pushCadqueryStatus(session) {
     } catch (error) {
         session.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`, 'warn');
     }
+    // Closed while asking.
+    if (!session.panel || session.isDisposed) {
+        return;
+    }
 
     session.panel.postMessage({
         type: 'dependencyStatus',

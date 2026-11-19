@@ -139,7 +139,7 @@ the same question first, so it shows what a click would take.
 - **Mesh (STL) timbers**: `stl-placement`; `app:stl-placement`.
 - **Export (STL, 3MF, OBJ, STEP)**: the runner side is `tests/test_blueprint.py`.
   Gap: STEP needs cadquery-ocp, which neither CI nor the dev group installs, so its three tests
-  are skipped everywhere; and no test drives `export-requests.js`.
+  are skipped everywhere. `export-requests` covers where exports go and the view closing mid-request.
 - **Share links**: `publishes`, `shared-tools`; `app:shared`.
 
 ## The app around the views
