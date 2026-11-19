@@ -40,6 +40,11 @@
     outline-offset: 1px;
 }
 
+/* On a phone the agent is along the bottom, not to the right. */
+body[data-layout="phone"] .web-agent-hint {
+    display: none;
+}
+
 .web-hint-arrow {
     color: var(--ka-accent);
     font-size: 18px;

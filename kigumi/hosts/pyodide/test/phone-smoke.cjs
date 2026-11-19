@@ -58,6 +58,7 @@ app.whenReady().then(async () => {
         const projects = await wait(`${shown('.web-new-project')} && !${shown('.shell')}`, 30000);
         await shot('1-projects');
         check('with no project open, the projects page fills the screen', projects === true);
+        check("the projects page doesn't point to an agent on the right", !await js(shown('#web-agent-hint')));
 
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';

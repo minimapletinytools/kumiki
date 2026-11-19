@@ -450,32 +450,63 @@ button {
     margin: 0;
     padding: 0;
     list-style: none;
+    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ks-phone-list:empty {
+    display: none;
 }
 
 .ks-phone-list li {
     display: flex;
     align-items: center;
-    padding-inline-start: calc(var(--ks-depth) * var(--ks-indent));
+    padding-inline-start: calc(var(--ks-depth, 0) * var(--ks-indent));
+}
+
+/* Hairlines between rows, as in a phone's own settings lists. */
+.ks-phone-list li + li {
+    border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
 }
 
 .ks-phone-list button {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    min-height: 44px;
-    padding: 4px;
+    min-height: 48px;
+    padding: 0 12px;
     border: 0;
+    border-radius: 0;
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: start;
     touch-action: manipulation;
+    /* A long press opens nothing: don't select the name instead. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ks-phone-list .ks-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The › at the end says the row opens something. */
+.ks-phone-list .is-open > .codicon:last-child {
+    color: var(--vscode-descriptionForeground, #717171);
 }
 
 .ks-phone-list button:has(+ button) {
     flex: 0 0 44px;
     justify-content: center;
+    padding: 0;
 }
 
 .ks-phone-list button:active {

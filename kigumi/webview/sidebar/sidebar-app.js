@@ -442,19 +442,20 @@ class KigumiSidebar extends LitElement {
             <div class="ks-phone">
                 ${framesRoot ? html`
                     <div class="ks-phone-heading">${framesRoot.label}</div>
-                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN))}
-                    ${frames.length > PHONE_FRAMES_SHOWN
-                        ? this.renderPhoneButton(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
-                            'ellipsis', () => { this.phonePage = 'frames'; }, 'is-quiet')
-                        : nothing}`
+                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN), frames.length > PHONE_FRAMES_SHOWN
+                        ? this.renderPhoneLink(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
+                            'ellipsis', () => { this.phonePage = 'frames'; })
+                        : nothing)}`
                 : nothing}
                 <div class="ks-phone-heading">${t('sidebar.phone.browse')}</div>
-                ${top('example-frames-root')
-                    ? this.renderPhoneButton(t('sidebar.exampleFrames'), 'symbol-folder', () => { this.phonePage = 'examples'; })
-                    : nothing}
-                ${top('patterns-root')
-                    ? this.renderPhoneButton(t('sidebar.patterns'), 'book', () => { this.phonePage = 'patterns'; })
-                    : nothing}
+                <ul class="ks-phone-list">
+                    ${top('example-frames-root')
+                        ? this.renderPhoneLink(t('sidebar.exampleFrames'), 'symbol-folder', () => { this.phonePage = 'examples'; })
+                        : nothing}
+                    ${top('patterns-root')
+                        ? this.renderPhoneLink(t('sidebar.patterns'), 'book', () => { this.phonePage = 'patterns'; })
+                        : nothing}
+                </ul>
                 ${closeProject ? html`
                     <div class="ks-phone-heading"></div>
                     ${this.renderPhoneButton(closeProject.label, closeProject.icon, () => this.phoneOpen(closeProject), 'is-quiet')}`
@@ -473,15 +474,22 @@ class KigumiSidebar extends LitElement {
             ${isContainer ? html`
                 <button type="button" aria-label=${node.label} aria-expanded=${String(isExpanded)}
                     data-key=${node.key} @click=${toggle}>${chevron}${node.action ? nothing : label}</button>` : nothing}
-            ${node.action ? html`<button type="button" data-key=${node.key}
-                @click=${() => this.phoneOpen(node)}>${label}</button>` : nothing}
+            ${node.action ? html`<button type="button" class="is-open" data-key=${node.key}
+                @click=${() => this.phoneOpen(node)}>${label}${icon('chevron-right')}</button>` : nothing}
             ${!isContainer && !node.action ? html`<span class="ks-description">${node.label}</span>` : nothing}
         </li>`;
     }
 
-    renderPhoneList(nodes) {
+    /** A row of the phone menu's list that opens a page of it, with the same › as a frame. */
+    renderPhoneLink(label, iconName, onClick) {
+        return html`<li><button type="button" class="ks-phone-button is-open" data-key="" @click=${onClick}>
+            ${icon(iconName)}<span class="ks-label">${label}</span>${icon('chevron-right')}</button></li>`;
+    }
+
+    /** Rows of the tree as a list; `extra`, a last row after them. */
+    renderPhoneList(nodes, extra = nothing) {
         const rows = visibleRows(nodes, { overrides: this.overrides });
-        return html`<ul class="ks-phone-list">${rows.map((row) => this.renderPhoneRow(row))}</ul>`;
+        return html`<ul class="ks-phone-list">${rows.map((row) => this.renderPhoneRow(row))}${extra}</ul>`;
     }
 
     renderPhonePage(page) {
