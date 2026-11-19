@@ -235,7 +235,9 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
             continue
 
         # example = ... / build_frame = ...
-        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
         for target in targets:
             for name in _record_target_names(target):
                 if name in _LEGACY_NAMES:
