@@ -1453,6 +1453,11 @@ class FrameViewSession {
         if (this.isDisposed) {
             return;
         }
+        // Deleted (or moved) while its view is open: keep what was built rather than fail to build.
+        if (!fs.existsSync(this.filePath)) {
+            this.log(`[watcher] ${path.basename(this.filePath)} is gone; the view keeps its last build.`);
+            return;
+        }
 
         if (!this.autoRefreshOnFileChange) {
             this.log(`[watcher] Detected ${source} change; awaiting manual refresh.`);

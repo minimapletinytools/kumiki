@@ -79,9 +79,10 @@ runner (`runner.py`) builds the frame and sends its geometry.
 - Gap: on the website the view stays blank until its ~77 files load; no test times it.
 
 **Rebuild on save.**
-- Edge cases: rapid saves rebuild once, after they stop; in a kumiki checkout a library change
+- Edge cases: rapid saves rebuild once, after they stop; a deleted file keeps its last build
+  rather than failing to build; in a kumiki checkout a library change
   rebuilds too; with auto refresh off the view is still told and decides.
-- Unit: `file-watcher`, `frame-file-watcher`.
+- Unit: `file-watcher`, `frame-file-watcher`, `view-log-levels` (the deleted file).
 - Integration: `app:log` (a broken save), `web:browser` (a change reaches the browser's copy).
 
 **Move the camera: mouse, trackpad, touch.**
@@ -153,7 +154,8 @@ the same question first, so it shows what a click would take.
   `app:go-to-file`, `app:quick-pick`.
 - **The log**: `electron-host-parts` (log channel), `log-retention`, `boot-diagnostics`; `app:log`.
 - **Updates**: `update-check`, `auto-update`; `app:layout` (the update button).
-- **Crash recovery**: `app:crash-recovery`.
+- **Crash recovery**: `app:crash-recovery`. Gap: skipped on Linux CI, where the forced crash leaves
+  the window hung, so the app is never told and never reloads; not yet checked on a real Linux machine.
 
 ## The agent and MCP
 

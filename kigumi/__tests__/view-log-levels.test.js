@@ -58,3 +58,21 @@ describe('closing a view that owns its runner', () => {
         expect(shared.fake.runnerSession).toBeNull();
     });
 });
+
+describe('a change to the frame file', () => {
+    test('rebuilds the view, unless the file is gone: then the view keeps its last build', async () => {
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-gone-')), 'frame.py');
+        fs.writeFileSync(file, '');
+        const fake = { ...fakeSession(), filePath: file, isDisposed: false, autoRefreshOnFileChange: true, refresh: jest.fn() };
+        await FrameViewSession.prototype.onFileChanged.call(fake, 'example file');
+        expect(fake.refresh).toHaveBeenCalledTimes(1);
+
+        fs.rmSync(file);
+        await FrameViewSession.prototype.onFileChanged.call(fake, 'example file');
+        expect(fake.refresh).toHaveBeenCalledTimes(1);
+        expect(fake.channel.appendLine.mock.calls.at(-1)[0]).toMatch(/is gone; the view keeps its last build/);
+    });
+});
