@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Kigumi standalone app
 
 The same Kigumi as the VS Code extension, in its own window: the explorer on

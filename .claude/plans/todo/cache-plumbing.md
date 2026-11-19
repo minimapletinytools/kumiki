@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Caches with owners: no more global memos
 
 Status (2026-10-21): only face carriers done (they are no longer cached; see "Left to do"). Steps 1-6

@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Measuring: the states, and every transition
 
 What the viewer does while a measurement is being made, after the change

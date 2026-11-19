@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Kigumi's MCP server under VS Code
 
 Status: not started. The standalone app has it (Kigumi > Options > beta features > MCP server);

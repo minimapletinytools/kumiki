@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Where a generated drawing's dimensions go, and what it measures
 
 Proposal, 2026-10-05. Nothing here is built except the probe under `garbage/`.

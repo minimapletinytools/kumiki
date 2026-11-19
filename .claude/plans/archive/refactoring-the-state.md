@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Where the state machine is error-prone, and what to do about it
 
 A review of the viewer with one question in mind: **which state can drift, and

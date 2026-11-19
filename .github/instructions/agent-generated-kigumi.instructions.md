@@ -1,6 +1,7 @@
 ---
 applyTo: "kigumi/**"
 ---
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 
 # Agent-generated Kigumi coding supplement
 

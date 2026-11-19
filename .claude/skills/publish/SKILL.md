@@ -2,6 +2,7 @@
 name: publish
 description: Trigger GitHub Actions publish workflows for kumiki and/or kigumi without changing versions.
 ---
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 
 # Publish Skill
 

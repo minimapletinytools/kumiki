@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # What is lit, and why: timber and feature rendering
 
 **Status: §6 is built.** Overlays are a list now — `highlights.js` says what

@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Kigumi in a browser
 
 Kigumi as a static website: the app's shell, explorer, viewers and code editor in the page, and

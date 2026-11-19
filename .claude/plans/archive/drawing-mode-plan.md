@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Drawing mode — refactor plan
 
 Status: done and merged to main. All seven phases landed, plus the two defects

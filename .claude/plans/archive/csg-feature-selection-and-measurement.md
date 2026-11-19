@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🤖🤖🤖 -->
 # CSG feature selection and measurement: audit + design
 
 ## Status — step 6 parts A-C done (2026-08-23)

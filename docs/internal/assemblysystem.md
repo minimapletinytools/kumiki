@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Introduction
 
 The assembly system allows frames to be "dissaembled" if possible, determining the dissamebly steps for ecah timber in the frame.

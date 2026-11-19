@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Putting the patterns' parameters back
 
 ## Status — proposal, nothing built (2026-09-11)

@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Selection and measuring: every state, and what it does
 
 Companion to `measurement-spec.md`. That says what measurements ARE; this says

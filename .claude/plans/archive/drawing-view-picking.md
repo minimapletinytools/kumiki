@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Picking in a drawing's view: hidden features, fewer faces, equivalent measurements (2026-10-16)
 
 What a pointer in a drawing's orthographic view can select and measure. This follows from:

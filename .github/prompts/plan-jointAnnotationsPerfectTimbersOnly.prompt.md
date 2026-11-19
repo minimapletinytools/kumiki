@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 ## Plan: Joint Annotation Rollout
 
 Add a function-level joint annotation marker for perfect-timber-only support, defined in timber.py, then apply it to all core cut_* joint implementations in workshop modules (excluding cut_basic_* wrappers and alias-only exports). This keeps semantics explicit at the API layer while minimizing noise in wrapper APIs.

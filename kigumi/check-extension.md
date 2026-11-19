@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Verify Extension is Loaded
 
 After reloading Cursor, check if the extension is loaded:

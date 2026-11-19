@@ -29,7 +29,7 @@ describe('kumiki\'s docs, through kumiki_source', () => {
     });
 
     test('searches the docs, and reads nothing outside them', async () => {
-        expect(await text(tool, { search: '^# API cheat sheet' })).toBe('docs/api_cheat_sheet.md:1: # API cheat sheet');
+        expect(await text(tool, { search: '^# API cheat sheet' })).toMatch(/^docs\/api_cheat_sheet.md:\d+: # API cheat sheet$/);
         await expect(tool.run({ path: 'nope' })).rejects.toThrow(/isn't in kumiki's docs/);
         await expect(tool.run({ path: 'docs/../README.md' })).rejects.toThrow(/outside kumiki's docs/);
         await expect(kumikiSourceTool({ source: () => null, examples: () => null }).run({})).rejects.toThrow(/isn't found yet/);

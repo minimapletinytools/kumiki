@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 # Kumiki / Kigumi Website
 
 A static [Astro](https://astro.build) site for Kumiki and the Kigumi VS Code extension.

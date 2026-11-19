@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Oblique mortise-and-tenon: `1/sin` where `1/cos` was meant
 
 Status: **fixed** 2026-11-11 (branch `fix/oblique-mortise-angle`), with the tests from the test plan in

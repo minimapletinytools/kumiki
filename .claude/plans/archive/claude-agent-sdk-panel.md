@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Plan: Claude Agent SDK Panel for Kigumi
 
 > **Context:** Embeds an AI assistant panel powered by the Claude Agent SDK into the right slot of the Kigumi standalone app. The SDK loop and tools execute on the backend (Node.js in Electron / container in Web), while the panel provides a streaming UI.

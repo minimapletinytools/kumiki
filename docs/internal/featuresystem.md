@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🤖🤖 -->
 # Introduction
 This doc describes the kumiki geometry feature system.
 

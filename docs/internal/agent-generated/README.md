@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Agent-generated developer guides
 
 > **AGENT-GENERATED — supplemental, not human-authored policy.** Reviewed 2026-11-13 against `b7fdf0d8`. Existing instructions and user decisions take precedence. Source may have changed since this review.
@@ -10,6 +11,8 @@ These guides describe the implementation and offer additional coding guidance. T
 | --- | --- | --- |
 | Kumiki | [Kumiki architecture](kumiki-architecture.md) | [Kumiki conventions](../../../.github/instructions/agent-generated-kumiki.instructions.md) |
 | Kigumi | [Kigumi architecture](kigumi-architecture.md) | [Kigumi conventions](../../../.github/instructions/agent-generated-kigumi.instructions.md) |
+
+[Kigumi workflows](kigumi-workflows.md) lists each of Kigumi's workflows, its edge cases, and the tests that cover them, with how to run them.
 
 The architecture guides describe current source behavior. The conventions distinguish existing rules, observed patterns, and agent recommendations. Neither observations nor recommendations override the canonical instructions.
 

@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Butt joints built from parts (2026-11-13)
 
 Status: investigated, not started.

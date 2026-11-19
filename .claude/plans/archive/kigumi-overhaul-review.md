@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Review: `feat/agent-panel`, and thoughts on the Kigumi panel overhaul (2026-10-12)
 
 ## What the branch is

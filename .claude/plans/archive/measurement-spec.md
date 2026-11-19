@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Measurements — specification
 
 Status: built. Supersedes the measurement parts of `archive/drawing-mode-plan.md`,

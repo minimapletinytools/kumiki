@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Feature picking
 
 How a hover or a click becomes a picked feature. The features themselves are described in

@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Kigumi web port: prototype findings
 
 Status: a local browser host was prototyped and tested on 2026-10-24. It is

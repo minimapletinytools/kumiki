@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Kigumi on desktop, web and VS Code: one app, three hosts
 
 > **Status: proposal, not started.** Written 2026-09-26 after the standalone

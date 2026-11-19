@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Rewrite the left rail: info pane, unified list with embedded CSG trees, selection model
 
 > **START MARKER — this commit is where the timber list view rewrite begins.**

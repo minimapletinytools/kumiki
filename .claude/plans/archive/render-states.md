@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Render states: one object per member and per feature, then render from it
 
 ## Where rendering stands

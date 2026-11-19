@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Plan: Monaco Editor Panel for Kigumi
 
 > **Context:** Integrates Monaco Editor into Kigumi standalone app as a center-tab panel so users can view and edit `.py` frame and pattern files directly without depending on external editors (VS Code / Cursor).
