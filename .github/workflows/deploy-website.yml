@@ -12,6 +12,11 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
+    inputs:
+      staging_ref:
+        description: 'Branch, tag or commit to put at /try-staging (main if blank)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -77,6 +82,24 @@ jobs:
           (cd "$RUNNER_TEMP/try/kigumi" && npm ci --ignore-scripts)
           (cd "$RUNNER_TEMP/try/kigumi/hosts/pyodide" && npm install && npm run build)
           cp -R "$RUNNER_TEMP/try/kigumi/hosts/pyodide/dist" website/dist/try
+
+      # The same at /try-staging, from a branch to try out (the workflow's staging_ref; main when it
+      # runs on a push). Allowed to fail: the site and /try deploy either way.
+      - name: Build Kigumi in the browser for staging
+        if: vars.KIGUMI_TRY == 'true'
+        continue-on-error: true
+        env:
+          STAGING_REF: ${{ inputs.staging_ref || 'main' }}
+        run: |
+          REF="$STAGING_REF"
+          git rev-parse --verify --quiet "origin/$REF" >/dev/null && REF="origin/$REF"
+          echo "Kigumi in the browser for staging from $REF ($(git rev-parse --short "$REF"))"
+          git worktree add --detach "$RUNNER_TEMP/staging" "$REF"
+          (cd "$RUNNER_TEMP/staging/kigumi" && npm ci --ignore-scripts)
+          (cd "$RUNNER_TEMP/staging/kigumi/hosts/pyodide" && npm install && npm run build)
+          cp -R "$RUNNER_TEMP/staging/kigumi/hosts/pyodide/dist" website/dist/try-staging
+          # Kept out of search results.
+          sed -i 's|<head>|<head>\n    <meta name="robots" content="noindex">|' website/dist/try-staging/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
