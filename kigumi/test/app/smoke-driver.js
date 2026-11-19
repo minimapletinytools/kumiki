@@ -30,14 +30,15 @@ module.exports = async function smoke(app) {
     for (const one of chosen) {
         scenario = one.name;
         try {
-            await ctx.reset();
+            // A window that never came back would hold up every scenario after it.
+            await Promise.race([ctx.reset(), new Promise((_, reject) => setTimeout(() => reject(new Error('reset took over 60 s')), 60000))]);
             await one.run(ctx);
         } catch (error) {
             check('ran to the end', false, error.stack || String(error));
         }
     }
     scenario = 'log';
-    await ctx.reset().catch(() => null);
+    await Promise.race([ctx.reset().catch(() => null), new Promise((resolve) => setTimeout(resolve, 60000))]);
     // Leaving out the frame the log scenario breaks on purpose.
     const errors = app.logEntries()
         .filter((entry) => !/_log_scenario_broken_frame|brace is not defined/.test(`${entry.source} ${entry.text}`))
