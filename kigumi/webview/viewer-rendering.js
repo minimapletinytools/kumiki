@@ -511,6 +511,16 @@ export const RenderingMixin = (Base) => class extends Base {
         this.requestUpdate();
     }
 
+    setShowNavigationHint(enabled) {
+        this.showNavigationHint = Boolean(enabled);
+        this.requestUpdate();
+    }
+
+    setTrackpadScrollOrbits(enabled) {
+        this.trackpadScrollOrbits = Boolean(enabled);
+        this.requestUpdate();
+    }
+
     resolveRenderProfile(profileId) {
         if (profileId && this.renderProfiles[profileId]) {
             return this.renderProfiles[profileId];

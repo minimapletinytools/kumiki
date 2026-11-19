@@ -148,6 +148,14 @@ export class ViewerSettingsPanel {
                     ${t('viewer.options.leftClickRotate')}
                 </label>
                 <label>
+                    <input id="navigation-hint-toggle" type="checkbox" .checked=${this.app.showNavigationHint}>
+                    ${t('viewer.options.navigationHint')}
+                </label>
+                <label>
+                    <input id="trackpad-scroll-orbits-toggle" type="checkbox" .checked=${this.app.trackpadScrollOrbits}>
+                    ${t('viewer.options.trackpadScrollOrbits')}
+                </label>
+                <label>
                     ${t('viewer.options.theme.label')}
                     <select id="theme-select" .value=${this.app.activeTheme}>
                         ${this.app.themeChoices.map(({ id, labelKey }) => html`<option value=${id}>${t(labelKey)}</option>`)}
@@ -351,6 +359,16 @@ export class ViewerSettingsPanel {
                 id: 'left-click-rotate-toggle', on: 'change',
                 apply: (el) => app.setLeftClickDragRotatesCameraEnabled(el.checked),
                 sync: (el) => { el.checked = app.leftClickDragRotatesCamera; },
+            },
+            {
+                id: 'navigation-hint-toggle', on: 'change',
+                apply: (el) => app.setShowNavigationHint(el.checked),
+                sync: (el) => { el.checked = app.showNavigationHint; },
+            },
+            {
+                id: 'trackpad-scroll-orbits-toggle', on: 'change',
+                apply: (el) => app.setTrackpadScrollOrbits(el.checked),
+                sync: (el) => { el.checked = app.trackpadScrollOrbits; },
             },
             {
                 id: 'export-combined-toggle', on: 'change',

@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { STLPlacementEditor } from './stl-placement-editor.js';
 import { STL_PLACEMENT_STYLE } from './viewer-shared.js';
 import { MemberListPanel } from './member-list-panel.js';
@@ -32,6 +32,10 @@ import * as KigumiOverlay from './overlay-header.js';
 import * as KigumiRenderMode from './render-mode.js';
 import * as KigumiUndoStacks from './undo-stacks.js';
 import * as KigumiUnits from './units.js';
+import { TouchGestures, wheelGesture, LONG_PRESS_MS } from './touch-navigation.js';
+
+// A touchscreen is the main pointer: the hint describes touch gestures.
+const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
 // Defines <kigumi-layers-view>, which the tree page draws.
 import './layers-panel.js';
 
@@ -97,6 +101,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.debugEnabled = false;
         this.cameraPanelCollapsed = false;
         this.leftClickDragRotatesCamera = true;
+        this.showNavigationHint = true;
+        // A trackpad's two-finger scroll orbits (shift pans) instead of zooming; a pinch always zooms.
+        this.trackpadScrollOrbits = false;
+        this.touchGestures = new TouchGestures();
         // What a right-click is offering. One menu for every kind of menu --
         // dismissing, choosing and where it sits are solved once.
         this.contextMenu = new KigumiContextMenu.ContextMenu();
@@ -244,9 +252,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     render() {
         const cameraMode = this.cameraController.getCameraMode();
         const hasPendingChanges = this.viewState.sourceHasPendingChanges;
-        const navigationHint = this.leftClickDragRotatesCamera
-            ? t('viewer.chrome.navHint.leftClick')
-            : t('viewer.chrome.navHint.rightClick');
+        const navigationHint = COARSE_POINTER ? t('viewer.chrome.navHint.touch')
+            : this.trackpadScrollOrbits ? t('viewer.chrome.navHint.trackpad')
+                : this.leftClickDragRotatesCamera ? t('viewer.chrome.navHint.leftClick')
+                    : t('viewer.chrome.navHint.rightClick');
         return html`
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
             <div id="view-layout">
@@ -302,7 +311,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                     <span class="scale-ruler-label"></span>
                     <div class="scale-ruler-bar"></div>
                 </div>
-                <div id="hint">${navigationHint}</div>
+                ${this.showNavigationHint ? html`<div id="hint">${navigationHint}</div>` : nothing}
                 ${this.renderAssemblyTimeline()}
                 ${this.renderMemberContextMenu()}
             </div>
@@ -511,7 +520,19 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         });
 
         canvas.addEventListener('pointermove', (event) => {
+            if (event.pointerType === 'touch') {
+                this.onTouchMove(event);
+                return;
+            }
             this.handleCanvasHover(event);
+        });
+        canvas.addEventListener('pointerdown', (event) => this.onTouchDown(event, canvas));
+        canvas.addEventListener('pointerup', (event) => this.onTouchUp(event));
+        canvas.addEventListener('pointercancel', (event) => {
+            if (event.pointerType === 'touch') {
+                this.touchGestures.cancel();
+                clearTimeout(this.longPressTimer);
+            }
         });
         canvas.addEventListener('pointerleave', () => {
             // clearHover refuses while the feature menu holds the hover pinned:
@@ -550,9 +571,14 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 return;
             }
             event.preventDefault();
+            const gesture = wheelGesture(event, { scrollOrbits: this.trackpadScrollOrbits });
+            if (gesture.kind !== 'zoomStep') {
+                this.applyCameraGesture(gesture, event.clientX, event.clientY);
+                return;
+            }
             // Calculate adaptive zoom factor based on current distance
             // This makes zoom speed feel consistent across all scales
-            const adaptiveZoomFactor = this.getAdaptiveZoomFactor(event.deltaY > 0);
+            const adaptiveZoomFactor = this.getAdaptiveZoomFactor(gesture.out);
             // On a sheet the wheel moves the page, and only the page. No
             // viewport zooms: a drawing's cameras are what python declared, and
             // a view that has been zoomed is no longer at the scale the drawing
@@ -1155,6 +1181,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 disassemblyMultiplier: Number(this.disassemblyMultiplier),
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
+                showNavigationHint: Boolean(this.showNavigationHint),
+                trackpadScrollOrbits: Boolean(this.trackpadScrollOrbits),
                 exportFormatStlEnabled: Boolean(this.exportFormatStlEnabled),
                 exportFormat3mfEnabled: Boolean(this.exportFormat3mfEnabled),
                 exportFormatObjEnabled: Boolean(this.exportFormatObjEnabled),
@@ -1236,6 +1264,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
         if (typeof ui.leftClickDragRotatesCamera === 'boolean') {
             this.setLeftClickDragRotatesCameraEnabled(ui.leftClickDragRotatesCamera);
+        }
+        if (typeof ui.showNavigationHint === 'boolean') {
+            this.setShowNavigationHint(ui.showNavigationHint);
+        }
+        if (typeof ui.trackpadScrollOrbits === 'boolean') {
+            this.setTrackpadScrollOrbits(ui.trackpadScrollOrbits);
         }
         if (Number.isFinite(ui.unselectedTransparencyPercent)) {
             this.setUnselectedTransparencyPercent(Number(ui.unselectedTransparencyPercent));
@@ -1917,6 +1951,99 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY, { features: true });
             }
         }
+    }
+
+    /** A finger on the view: the first one makes its viewport active and may become a long press. */
+    onTouchDown(event, canvas) {
+        if (event.pointerType !== 'touch') {
+            return;
+        }
+        // No mouse events follow: a tap is handled in onTouchUp.
+        event.preventDefault();
+        try {
+            canvas.setPointerCapture(event.pointerId);
+        } catch (_error) {
+            // A pointer the browser no longer tracks; the gesture still works without capture.
+        }
+        const first = !this.touchGestures.active;
+        this.touchGestures.down(event.pointerId, event.clientX, event.clientY);
+        clearTimeout(this.longPressTimer);
+        if (!first) {
+            return;
+        }
+        this.focusViewportAt(event.clientX, event.clientY);
+        this.cameraController.captureOrbitDragFrame();
+        this.cameraController.cancelAnimation();
+        const { clientX, clientY } = event;
+        this.longPressTimer = setTimeout(() => {
+            if (!this.touchGestures.stillHeld()) {
+                return;
+            }
+            this.touchGestures.cancel();
+            const found = this._findMemberAtClientPoint(clientX, clientY);
+            if (found) {
+                this.showMemberContextMenu(found.memberKey, clientX, clientY, { features: true });
+            }
+        }, LONG_PRESS_MS);
+    }
+
+    onTouchMove(event) {
+        const gesture = this.touchGestures.move(event.pointerId, event.clientX, event.clientY);
+        if (!gesture) {
+            return;
+        }
+        clearTimeout(this.longPressTimer);
+        this.applyCameraGesture(gesture, event.clientX, event.clientY);
+    }
+
+    onTouchUp(event) {
+        if (event.pointerType !== 'touch') {
+            return;
+        }
+        clearTimeout(this.longPressTimer);
+        const orbited = this.touchGestures.moved;
+        if (this.touchGestures.up(event.pointerId)) {
+            this.handleCanvasClick(event);
+        } else if (!this.touchGestures.active && orbited) {
+            this.releaseTilt();
+        }
+    }
+
+    /**
+     * Move the camera by a touch or trackpad gesture (touch-navigation.js): orbit, pan by (dx, dy)
+     * pixels, zoom toward (clientX, clientY), or pinch from one midpoint to another.
+     */
+    applyCameraGesture(gesture, clientX, clientY) {
+        if (gesture.kind === 'orbit') {
+            if (this.activePage) {
+                this.panPageBy(gesture.dx, gesture.dy);
+            } else {
+                this.orbitActiveViewport(gesture.dx, gesture.dy);
+            }
+        } else if (gesture.kind === 'pan') {
+            if (this.activePage) {
+                this.panPageBy(gesture.dx, gesture.dy);
+            } else {
+                this.panCameraInViewPlane(clientX, clientY, clientX + gesture.dx, clientY + gesture.dy);
+            }
+        } else if (gesture.kind === 'zoom') {
+            if (this.activePage) {
+                this.zoomPageToward(clientX, clientY, 1 / gesture.factor);
+            } else {
+                this.zoomTowardPointer(clientX, clientY, gesture.factor, { immediate: true });
+            }
+        } else if (gesture.kind === 'pinch') {
+            const { from, to, factor } = gesture;
+            if (this.activePage) {
+                this.zoomPageToward(to.x, to.y, 1 / factor);
+                this.panPageBy(to.x - from.x, to.y - from.y);
+            } else {
+                this.zoomTowardPointer(to.x, to.y, factor, { immediate: true });
+                this.panCameraInViewPlane(from.x, from.y, to.x, to.y);
+            }
+        }
+        this.cameraController.cancelAnimation();
+        this.updateCamera();
     }
 
     onWindowMouseMove(event) {

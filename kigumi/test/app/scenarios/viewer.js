@@ -27,6 +27,52 @@ module.exports = {
                 && described.selection && Array.isArray(described.selection.members),
             described && JSON.stringify({ view: described.view, frame: described.frameName }));
 
+        // The mouse controls hint can be turned off, and back on.
+        const hint = () => inShell(`(() => {
+            const el = ${viewDoc}.getElementById('hint');
+            return el ? getComputedStyle(el).fontSize : null;
+        })()`);
+        const hintShown = await hint();
+        await inShell(`${viewDoc}.querySelector('kigumi-app').setShowNavigationHint(false)`);
+        await sleep(200);
+        const hintHidden = await hint();
+        await inShell(`${viewDoc}.querySelector('kigumi-app').setShowNavigationHint(true)`);
+        await sleep(200);
+        check('the mouse controls hint shows at 13px and can be turned off', hintShown === '13px' && hintHidden === null && (await hint()) === '13px',
+            `${hintShown} -> ${hintHidden}`);
+
+        // Touch: one finger orbits, two fingers spreading zoom in.
+        const touched = await inShell(`(async () => {
+            const doc = ${viewDoc};
+            const app = doc.querySelector('kigumi-app');
+            const canvas = doc.getElementById('c');
+            const box = canvas.getBoundingClientRect();
+            const cx = box.left + box.width / 2;
+            const cy = box.top + box.height / 2;
+            const touch = (type, id, x, y) => canvas.dispatchEvent(new PointerEvent(type, {
+                pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+            const camera = () => ({ dir: app.cameraController.cameraOffsetDir.toArray().map((n) => n.toFixed(4)).join(), dist: app.cameraController.orbitDist });
+            const start = camera();
+            const c = app.cameraController;
+            const saved = { dir: c.cameraOffsetDir.clone(), up: c.cameraUpVector.clone(), dist: c.orbitDist, cx: c.cx, cy: c.cy, cz: c.cz };
+            touch('pointerdown', 1, cx, cy);
+            for (let step = 1; step <= 8; step++) touch('pointermove', 1, cx + step * 15, cy);
+            touch('pointerup', 1, cx + 120, cy);
+            const orbited = camera();
+            touch('pointerdown', 1, cx - 40, cy);
+            touch('pointerdown', 2, cx + 40, cy);
+            for (let step = 1; step <= 8; step++) touch('pointermove', 2, cx + 40 + step * 15, cy);
+            touch('pointerup', 2, cx + 160, cy);
+            touch('pointerup', 1, cx - 40, cy);
+            const pinched = camera();
+            c.cameraOffsetDir.copy(saved.dir);
+            c.cameraUpVector.copy(saved.up);
+            Object.assign(c, { orbitDist: saved.dist, cx: saved.cx, cy: saved.cy, cz: saved.cz });
+            app.updateCamera();
+            return { turned: orbited.dir !== start.dir, closer: pinched.dist < orbited.dist };
+        })()`);
+        check('one finger orbits the view and two fingers spreading zoom in', touched && touched.turned && touched.closer, JSON.stringify(touched));
+
         // Every panel over the view collapses from its header, and comes back.
         const overlayState = () => inShell(`(() => {
             const doc = ${viewDoc};
