@@ -15,6 +15,7 @@ from typing_extensions import deprecated
 from kumiki.timber import *
 from kumiki.rule import *
 from .corner import (
+    cut_practice_simplified_rice_dumping_joint,
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
@@ -50,6 +51,7 @@ from kumiki.construction import (
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CornerJointTimberArrangement,
+    TriCornerArrangement,
     CrossJointTimberArrangement,
     DoubleButtJointTimberArrangement,
 )
@@ -60,6 +62,25 @@ from kumiki.construction import ButtJointBoardArrangement
 # ============================================================================
 # Plain Joint Wrappers
 # ============================================================================
+
+def cut_basic_practice_simplified_rice_dumping_joint(arrangement: TriCornerArrangement) -> Joint:
+    """Size cheeks and tenon widths from the narrowest timber across the rail plane.
+
+    The shallower rail limits the rail inset and tenon thickness.
+    """
+    post, rail, receiver = arrangement.timber1, arrangement.timber2, arrangement.timber3
+    width = min(*post.size,
+                rail.get_size_in_direction_3d(receiver.get_length_direction_global()),
+                receiver.get_size_in_direction_3d(rail.get_length_direction_global()))
+    post_axis = post.get_length_direction_global()
+    depth = min(width, rail.get_size_in_direction_3d(post_axis), receiver.get_size_in_direction_3d(post_axis))
+    return cut_practice_simplified_rice_dumping_joint(
+        arrangement, timber1_miter_thickness=width / 8,
+        timber_1_tenon_distance_from_outer_faces=width / 4,
+        timber_2_tenon_distance_from_outer_face=depth * 5 / 16,
+        tenon_size=create_v2(width / 4, depth * 3 / 16),
+    )
+
 
 def cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     """
