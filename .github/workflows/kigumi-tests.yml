@@ -134,6 +134,7 @@ jobs:
         run: xvfb-run -a npm run test:int -- ${{ matrix.host }}
         env:
           KIGUMI_SOFTWARE_GL: '1'
+          KIGUMI_TEST_ARTIFACTS: ${{ github.workspace }}/kigumi/.artifacts/app
 
       - name: Keep the test screenshots
         if: failure()

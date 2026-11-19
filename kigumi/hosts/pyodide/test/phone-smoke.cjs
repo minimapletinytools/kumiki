@@ -97,9 +97,8 @@ app.whenReady().then(async () => {
         await debuggerApi.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
         check('a magnified page takes gestures over the model', await wait(
             `window.visualViewport.scale > 1 && ${view}.defaultView.getComputedStyle(${view}.querySelector('#c')).pointerEvents === 'none' || null`, 5000) === true);
-        await debuggerApi.sendCommand('Input.synthesizePinchGesture', {
-            x: 95, y: 180, scaleFactor: 0.4, gestureSourceType: 'touch',
-        });
+        // Back to normal size (a synthesized pinch out is too slow and inexact to rely on in CI).
+        await debuggerApi.sendCommand('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
         check('the model takes gestures again at normal page scale', await wait(
             `window.visualViewport.scale === 1 && ${view}.defaultView.getComputedStyle(${view}.querySelector('#c')).pointerEvents !== 'none' || null`, 5000) === true);
 

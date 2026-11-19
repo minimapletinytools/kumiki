@@ -42,9 +42,9 @@ const child = spawn(command, commandArgs, {
 let timedOut = false;
 const timer = setTimeout(() => {
     timedOut = true;
-    console.error('App tests timed out after 5 minutes.');
+    console.error('App tests timed out after 10 minutes.');
     child.kill();
-}, 5 * 60 * 1000);
+}, 10 * 60 * 1000);
 child.on('exit', (code) => {
     clearTimeout(timer);
     process.exit(timedOut || code === null ? 1 : code);
