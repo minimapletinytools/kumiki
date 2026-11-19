@@ -29,7 +29,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_tongue_and_groove_joint,
     cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards,
     cut_basic_plain_miter_joint,
-    cut_basic_zongjiao_joint,
+    cut_basic_practice_simplified_rice_dumping_joint,
     cut_basic_plain_miter_joint_on_face_aligned_timbers,
     cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
     cut_basic_plain_butt_joint_on_face_aligned_timbers,
@@ -84,9 +84,9 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("basic_joints/zongjiao_joint", name={"en": "Rice dumpling joint", "ja": "粽角榫"})
-def example_basic_zongjiao_joint() -> Joint:
-    return cut_basic_zongjiao_joint(create_canonical_example_tri_corner_timbers())
+@pattern("basic_joints/practice_simplified_rice_dumping_joint", name={"en": "Simplified rice dumpling joint (practice)", "ja": "粽角榫（簡易練習版）"})
+def example_basic_practice_simplified_rice_dumping_joint() -> Joint:
+    return cut_basic_practice_simplified_rice_dumping_joint(create_canonical_example_tri_corner_timbers())
 
 
 @pattern("basic_joints/miter_joint/angled", name={"en": "Angled miter", "ja": "斜めの留め"}, tags=["main"])

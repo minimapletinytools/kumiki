@@ -7,7 +7,8 @@ from manifold3d import Manifold, Mesh64
 
 from kumiki import (
     CutTimber, Frame, Orientation, TimberEnd, Transform, TriCornerArrangement,
-    create_timber, create_v2, create_v3, cut_basic_zongjiao_joint, cut_rice_dumping_joint,
+    create_timber, create_v2, create_v3, cut_basic_practice_simplified_rice_dumping_joint,
+    cut_practice_simplified_rice_dumping_joint, cut_简化粽角榫,
     degrees, inches, solve_frame_assembly,
 )
 from kumiki.example_shavings import create_canonical_example_tri_corner_timbers
@@ -30,7 +31,8 @@ def test_zongjiao_layout_on_unequal_rotated_timbers(hand):
         timbers.append(replace(timber, transform=placement * timber.transform))
 
     arrangement = TriCornerArrangement(*timbers, *ends)
-    joint = cut_rice_dumping_joint(arrangement, 0.4, 0.7, 0.8, create_v2(1, 0.5))
+    assert cut_简化粽角榫 is cut_practice_simplified_rice_dumping_joint
+    joint = cut_简化粽角榫(arrangement, 0.4, 0.7, 0.8, create_v2(1, 0.5))
     assert set(joint.cuttings) == {"timber1", "timber2", "timber3"}
     solids = []
     for i, timber in enumerate(timbers):
@@ -58,9 +60,31 @@ def test_zongjiao_layout_on_unequal_rotated_timbers(hand):
             timbers[i].transform.global_to_local(point))] == [owner]
 
 
+@pytest.mark.parametrize("rail_depth", [inches(1), inches(2)])
+def test_basic_recipe_uses_timber_widths_and_fits_a_shallow_rail(rail_depth):
+    arrangement = create_canonical_example_tri_corner_timbers()
+    rail = arrangement.timber2
+    position = rail.transform.position + create_v3(0, 0, (rail.size[1] - rail_depth) / 2)
+    rail = replace(rail, size=create_v2(rail.size[0], rail_depth), transform=replace(rail.transform, position=position))
+    joint = cut_basic_practice_simplified_rice_dumping_joint(replace(arrangement, timber2=rail))
+    post = arrangement.timber1
+    post_solid = CutTimber(post, cuts=[joint.cuttings["timber1"]]).render_timber_with_cuts_csg_local()
+    rail_solid = CutTimber(rail, cuts=[joint.cuttings["timber2"]]).render_timber_with_cuts_csg_local()
+
+    # The four-inch post carries a one-inch-wide long tenon at the top of the rail.
+    top = create_v3(inches(1) + rail_depth / 16, inches(3.1), -rail_depth / 16)
+    assert post_solid.contains_point(post.transform.global_to_local(top))
+    assert rail_solid.contains_point(rail.transform.global_to_local(top - create_v3(0, inches(0.2), 0)))
+
+    # The horizontal tenon occupies the depth interval [5/16, 1/2] of the shallower rail.
+    for fraction, inside in [(0.30, False), (0.32, True), (0.49, True), (0.51, False)]:
+        point = create_v3(inches(3.5), inches(0.1), -rail_depth * fraction)
+        assert rail_solid.contains_point(rail.transform.global_to_local(point)) == inside
+
+
 def test_post_withdraws_before_rail_and_both_paths_clear():
     arrangement = create_canonical_example_tri_corner_timbers()
-    frame = Frame.from_joints([cut_basic_zongjiao_joint(arrangement)])
+    frame = Frame.from_joints([cut_basic_practice_simplified_rice_dumping_joint(arrangement)])
     solution = solve_frame_assembly(frame)
     assert solution is not None and solution.failure is None
     post_step, rail_step = solution.steps
@@ -87,13 +111,13 @@ def test_post_withdraws_before_rail_and_both_paths_clear():
 def test_rejects_misaligned_or_displaced_outside_edges():
     arrangement = create_canonical_example_tri_corner_timbers()
     with pytest.raises(AssertionError, match="perpendicular"):
-        cut_basic_zongjiao_joint(replace(arrangement, timber3=arrangement.timber2))
+        cut_basic_practice_simplified_rice_dumping_joint(replace(arrangement, timber3=arrangement.timber2))
 
     timber = arrangement.timber2
     roll = Transform(create_v3(0, 0, 0), Orientation.from_axis_angle(create_v3(0, 0, 1), degrees(15)))
     with pytest.raises(AssertionError, match="face-aligned"):
-        cut_basic_zongjiao_joint(replace(arrangement, timber2=replace(timber, transform=timber.transform * roll)))
+        cut_basic_practice_simplified_rice_dumping_joint(replace(arrangement, timber2=replace(timber, transform=timber.transform * roll)))
 
     shifted = replace(timber.transform, position=timber.transform.position + create_v3(inches(1), 0, 0))
     with pytest.raises(AssertionError, match="Outside long edges"):
-        cut_basic_zongjiao_joint(replace(arrangement, timber2=replace(timber, transform=shifted)))
+        cut_basic_practice_simplified_rice_dumping_joint(replace(arrangement, timber2=replace(timber, transform=shifted)))

@@ -85,7 +85,7 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 
 | Basic joint signature | When to use |
 |---|---|
-| `cut_basic_zongjiao_joint(arrangement: TriCornerArrangement) -> Joint` | A three-way miter with a locking post (timber 1). Join the tenoned rail (2) to the receiving rail (3), then insert the post. [Joint preview](assets/zongjiao-joint.png) |
+| `cut_basic_practice_simplified_rice_dumping_joint(arrangement: TriCornerArrangement) -> Joint` | Stock-sized practice version of the rice dumpling joint. For explicit dimensions, use `cut_practice_simplified_rice_dumping_joint` (alias `cut_简化粽角榫`). Join the tenoned rail (2) to the receiving rail (3), then insert the post. [Joint preview](assets/zongjiao-joint.png) |
 | `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
 | `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |

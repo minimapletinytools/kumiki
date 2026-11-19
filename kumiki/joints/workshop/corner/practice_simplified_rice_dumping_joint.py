@@ -15,7 +15,7 @@ from kumiki.timber import Cutting, Joint, TimberEnd, compute_timber_orientation
 from ..shavings.relief import warn_if_arrangement_timbers_imperfect
 
 
-def cut_rice_dumping_joint(
+def cut_practice_simplified_rice_dumping_joint(
     arrangement: TriCornerArrangement,
     timber1_miter_thickness: Numeric,
     timber_1_tenon_distance_from_outer_faces: Numeric,
@@ -108,8 +108,7 @@ def cut_rice_dumping_joint(
         "timber1": cut(0, post_waste, "post_shoulders", AssemblyFreedom.translation(z, depth), -1),
         "timber2": cut(1, rail_waste, "tenoned_rail", AssemblyFreedom.translation(x, rail_y)),
         "timber3": cut(2, receiver_waste, "mortised_rail", None),
-    }, ticket=JointTicket(joint_type="zongjiao"))
+    }, ticket=JointTicket(joint_type="practice_simplified_rice_dumping"))
 
 
-cut_rice_dumpling_joint = cut_rice_dumping_joint
-cut_zongjiao_joint = cut_rice_dumping_joint
+cut_简化粽角榫 = cut_practice_simplified_rice_dumping_joint

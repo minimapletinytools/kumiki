@@ -2,7 +2,10 @@
 Kumiki - Corner joint construction functions
 """
 
-from .rice_dumpling_joint import cut_rice_dumping_joint, cut_rice_dumpling_joint, cut_zongjiao_joint
+from .practice_simplified_rice_dumping_joint import (
+    cut_practice_simplified_rice_dumping_joint,
+    cut_简化粽角榫,
+)
 from .plain_miter_joint import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
@@ -25,9 +28,8 @@ from .dovetail_corner_joint import (
 )
 
 __all__ = [
-    "cut_rice_dumping_joint",
-    "cut_rice_dumpling_joint",
-    "cut_zongjiao_joint",
+    "cut_practice_simplified_rice_dumping_joint",
+    "cut_简化粽角榫",
     "cut_plain_miter_joint",
     "cut_plain_miter_joint_on_face_aligned_timbers",
     "cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers",
