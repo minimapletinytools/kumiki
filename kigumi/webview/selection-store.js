@@ -274,6 +274,23 @@ class SelectionStore {
         this.focus.nodeId = nodeId || null;
     }
 
+    /** The focus, when it is a whole drawing view. */
+    get viewportFocus() {
+        return this.focus && this.focus.kind === 'viewport' ? this.focus : null;
+    }
+
+    /** Pick out a whole drawing view: what is selected moves to it, and its outline shows. */
+    setViewportFocus(viewportId) {
+        this.enterScope(viewportId);
+        this.focus = { kind: 'viewport', viewportId };
+        this.markedMeasures.clear();
+        this.emit({ type: 'viewport-focus', viewportId });
+    }
+
+    isViewportFocused(viewportId) {
+        return Boolean(this.viewportFocus) && this.focus.viewportId === viewportId;
+    }
+
     /**
      * Look at a measurement.
      *

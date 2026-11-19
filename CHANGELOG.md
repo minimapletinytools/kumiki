@@ -24,6 +24,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
 - The mouse controls hint is a little larger.
 - In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
+- A drawing's panel is headed "📏 measurements", its viewports and members lists start closed, and clicking a viewport in it selects that view.
 
 #### Fixed
 - A drawing's centerlines and perfect faces are dashed lines that look the same at any zoom, instead of bars across the line when the sheet is zoomed.

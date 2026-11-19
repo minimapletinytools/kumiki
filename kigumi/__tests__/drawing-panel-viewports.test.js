@@ -80,6 +80,11 @@ const KigumiMeasurements = require('../webview/measurements.js');
 global.KigumiMeasurements = KigumiMeasurements;
 const { DrawingPanel } = require('../webview/drawing-panel.js');
 
+/** Open the viewports list, which starts closed. */
+function openViewports(panel) {
+    panel._toggle('section:viewports');
+}
+
 function createSampleDrawing(viewports) {
     return {
         drawing: { id: 'sheet-1', name: 'Sheet 1', origin: 'file' },
@@ -107,10 +112,46 @@ function createSampleDrawing(viewports) {
 }
 
 describe('DrawingPanel collapsible viewports', () => {
-    test('viewports and their measurements are expanded by default', () => {
+    test('the header says measurements, and both lists start closed', () => {
         const panel = new DrawingPanel(null);
         panel.mount(fakeElement());
         panel.setDrawing(createSampleDrawing());
+
+        expect(panel.el.children[0].textContent).toContain('measurements');
+        expect(panel.el.children[0].textContent).not.toContain('Sheet 1');
+        const sections = panel.el.children.filter((child) => child.className === 'dp-section');
+        expect(sections.map((section) => section.children.length)).toEqual([1, 1]);
+    });
+
+    test('clicking a viewport row selects that view, and the selected one is marked', () => {
+        const selectionManager = {
+            selected: null,
+            isViewportFocused(viewportId) { return viewportId === this.selected; },
+            isMeasurementFocused() { return false; },
+        };
+        const panel = new DrawingPanel(selectionManager);
+        panel.mount(fakeElement());
+        panel.setDrawing(createSampleDrawing());
+        openViewports(panel);
+        const emitted = [];
+        panel._emit = (type, detail) => emitted.push([type, detail]);
+        const section = () => panel.el.children.find((child) =>
+            child.className === 'dp-section' && child.children[0].textContent.includes('viewports'));
+
+        section().children[6].dispatch('click', {});
+        expect(emitted).toEqual([['kigumi-select-viewport', { viewportId: 'top' }]]);
+
+        selectionManager.selected = 'top';
+        panel._render();
+        expect(section().children[6].className).toContain('dp-focused');
+        expect(section().children[1].className).not.toContain('dp-focused');
+    });
+
+    test('viewports and their measurements are expanded once the list is opened', () => {
+        const panel = new DrawingPanel(null);
+        panel.mount(fakeElement());
+        panel.setDrawing(createSampleDrawing());
+        openViewports(panel);
 
         const viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
@@ -123,7 +164,7 @@ describe('DrawingPanel collapsible viewports', () => {
         expect(frontHead.children[0].className).toContain('dp-chev');
         expect(frontHead.children[0].textContent).toBe('▾');
         expect(frontHead.children[1].textContent).toBe('front');
-        expect(frontHead.ariaExpanded).toBe('true');
+        expect(frontHead.children[0].ariaExpanded).toBe('true');
 
         // Measurement rows under front viewport
         const frontM1 = viewportSection.children[2];
@@ -135,7 +176,7 @@ describe('DrawingPanel collapsible viewports', () => {
         const sideHead = viewportSection.children[4];
         expect(sideHead.children[0].textContent).toBe('▾');
         expect(sideHead.children[1].textContent).toBe('side');
-        expect(sideHead.ariaExpanded).toBe('true');
+        expect(sideHead.children[0].ariaExpanded).toBe('true');
 
         // Measurement row under side viewport
         const sideM1 = viewportSection.children[5];
@@ -143,16 +184,16 @@ describe('DrawingPanel collapsible viewports', () => {
 
         // Check empty viewport (children[6])
         const topHead = viewportSection.children[6];
-        expect(topHead.className).toContain('dp-viewport-empty');
         expect(topHead.children[0].className).toContain('dp-leaf');
         expect(topHead.children[0].textContent).toBe('');
-        expect(topHead.handles('click')).toBe(false);
+        expect(topHead.children[0].handles('click')).toBe(false);
     });
 
     test('clicking a viewport header collapses its measurements', () => {
         const panel = new DrawingPanel(null);
         panel.mount(fakeElement());
         panel.setDrawing(createSampleDrawing());
+        openViewports(panel);
 
         let viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
@@ -160,7 +201,7 @@ describe('DrawingPanel collapsible viewports', () => {
         const frontHead = viewportSection.children[1];
 
         // Click front header to collapse
-        frontHead.dispatch('click', {});
+        frontHead.children[0].dispatch('click', { stopPropagation() {} });
 
         viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
@@ -169,7 +210,7 @@ describe('DrawingPanel collapsible viewports', () => {
         // Front viewport is now collapsed
         const collapsedFront = viewportSection.children[1];
         expect(collapsedFront.children[0].textContent).toBe('▸');
-        expect(collapsedFront.ariaExpanded).toBe('false');
+        expect(collapsedFront.children[0].ariaExpanded).toBe('false');
 
         // Next item is side viewport, because front's measurements are omitted
         const nextItem = viewportSection.children[2];
@@ -183,25 +224,26 @@ describe('DrawingPanel collapsible viewports', () => {
         const panel = new DrawingPanel(null);
         panel.mount(fakeElement());
         panel.setDrawing(createSampleDrawing());
+        openViewports(panel);
 
         // Collapse front
         let viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
         );
-        viewportSection.children[1].dispatch('click', {});
+        viewportSection.children[1].children[0].dispatch('click', { stopPropagation() {} });
 
         // Re-expand front
         viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
         );
-        viewportSection.children[1].dispatch('click', {});
+        viewportSection.children[1].children[0].dispatch('click', { stopPropagation() {} });
 
         viewportSection = panel.el.children.find((child) =>
             child.className === 'dp-section' && child.children[0].textContent.includes('viewports')
         );
         const expandedFront = viewportSection.children[1];
         expect(expandedFront.children[0].textContent).toBe('▾');
-        expect(expandedFront.ariaExpanded).toBe('true');
+        expect(expandedFront.children[0].ariaExpanded).toBe('true');
         expect(viewportSection.children[2].className).toContain('dp-measurement');
         expect(viewportSection.children[3].className).toContain('dp-measurement');
     });
@@ -226,6 +268,9 @@ describe('DrawingPanel collapsible viewports', () => {
     test('auto-expands collapsed viewport when a measurement in it is focused', () => {
         const selectionManager = {
             focused: { viewportId: 'front', measureKey: 'm1' },
+            isViewportFocused() {
+                return false;
+            },
             isMeasurementFocused(viewportId, key) {
                 return this.focused && this.focused.viewportId === viewportId && this.focused.measureKey === key;
             },
@@ -235,6 +280,7 @@ describe('DrawingPanel collapsible viewports', () => {
         panel.mount(fakeElement());
         selectionManager.focused = null;
         panel.setDrawing(createSampleDrawing());
+        openViewports(panel);
 
         // Explicitly collapse front
         panel.toggleViewport('front');

@@ -312,6 +312,9 @@ export const DrawingsMixin = (Base) => class extends Base {
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
             });
+            host.addEventListener('kigumi-select-viewport', (event) => {
+                this.selectDrawingViewport(event.detail.viewportId);
+            });
             host.addEventListener('kigumi-measurement-contextmenu', (event) => {
                 this.showMeasurementContextMenu(event.detail || {});
             });

@@ -164,6 +164,25 @@ module.exports = {
             outline.focus?.kind === 'measurement' && outline.clicked.join() === outline.focus.viewportId);
         await waitFor(() => inShell(`${viewerApp}.querySelectorAll('.drawing-view-outline').length === 1`), { timeoutMs: 5000 });
         await capture('03d-drawing-selected-view');
+        const viewportPicked = await inShell(`(async () => {
+            const app = ${viewerApp};
+            const panel = app.querySelector('#drawing-panel');
+            const header = panel.querySelector('.dp-header');
+            const closed = panel.querySelectorAll('.dp-viewport').length === 0;
+            [...panel.querySelectorAll('.dp-section-header')].find((one) => one.textContent.includes('viewports')).click();
+            const rows = [...panel.querySelectorAll('.dp-viewport')];
+            const last = rows[rows.length - 1];
+            const id = last.querySelector('.dp-viewport-label').textContent;
+            last.click();
+            await app.updateComplete;
+            const outline = app.querySelector('.drawing-view-outline');
+            return { header: header.textContent, closed, id, outlined: outline && outline.getAttribute('data-viewport-id'),
+                marked: [...panel.querySelectorAll('.dp-viewport.dp-focused .dp-viewport-label')].map((one) => one.textContent) };
+        })()`);
+        check('the measurements panel starts closed, and clicking a view in it selects that view',
+            viewportPicked.header.includes('measurements') && viewportPicked.closed
+                && viewportPicked.outlined === viewportPicked.id && viewportPicked.marked.join() === viewportPicked.id,
+            JSON.stringify(viewportPicked));
         const modelOutlined = await inShell(`(async () => {
             const app = ${viewerApp};
             const button = app.querySelector('#back-to-3d-btn');

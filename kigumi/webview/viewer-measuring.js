@@ -786,6 +786,18 @@ export const MeasuringMixin = (Base) => class extends Base {
         this.renderMeasurements();
     }
 
+    /** Select a whole view of the drawing, and make it the one the camera and keys act on. */
+    selectDrawingViewport(viewportId) {
+        if (!this.viewports.some((one) => one.id === viewportId)) {
+            return;
+        }
+        this.activeViewportId = viewportId;
+        this.selectionManager.setViewportFocus(viewportId);
+        this._syncDrawingPanel();
+        this.selectionPanel.updateInfo(this.currentFrameData);
+        this.renderMeasurements();
+    }
+
     /** The measurements held against the model rather than against a drawing. */
     _threeDMeasurements() {
         const drawing = this.sceneStore.drawings()
@@ -921,7 +933,9 @@ export const MeasuringMixin = (Base) => class extends Base {
             || !(selection.focus || selection.markedMeasures.size || this.measureDraft.isActive)) {
             return;
         }
-        const viewport = this.viewports.find((one) => one.id === selection.scope && one.isOrthographic);
+        // Measuring happens only in flat views; a view picked out from the list is outlined whatever it is.
+        const viewport = this.viewports.find((one) => one.id === selection.scope
+            && (one.isOrthographic || selection.isViewportFocused(one.id)));
         if (!viewport) {
             return;
         }

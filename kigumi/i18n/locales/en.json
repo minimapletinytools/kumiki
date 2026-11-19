@@ -201,7 +201,7 @@
   "viewer.layers.drawing.exportPng": "export png",
   "viewer.layers.drawing.exportPng.title": "Save this drawing as a PNG in the frame's kigumi_exports folder",
   "viewer.drawing.viewports": "viewports",
-  "viewer.drawing.measurements": "📏 {name}",
+  "viewer.drawing.measurements": "📏 measurements",
   "viewer.drawing.members": "members",
   "viewer.drawing.members.everything": "everything",
   "viewer.drawing.refused.unresolved": "anchors not found",

@@ -35,7 +35,8 @@ class DrawingPanel {
         this.drawing = null;
         this.viewports = [];
         this.members = [];
-        this.expanded = new Set(['section:viewports', 'section:members']);
+        // Both lists start closed: the header is what most people need.
+        this.expanded = new Set();
         this.collapsedViewports = new Set();
         this.collapsed = false;
     }
@@ -154,7 +155,7 @@ class DrawingPanel {
     }
 
     _header() {
-        const header = overlayHeader(t('viewer.drawing.measurements', { name: this.drawing.name || this.drawing.id }), {
+        const header = overlayHeader(t('viewer.drawing.measurements'), {
             collapsed: this.collapsed,
             onToggle: () => {
                 this.collapsed = !this.collapsed;
@@ -237,12 +238,22 @@ class DrawingPanel {
             const hasChildren = measurements.length > 0;
             const open = this._isViewportExpanded(viewport.id);
 
+            const focused = this.selectionManager && this.selectionManager.isViewportFocused(viewport.id);
             const head = document.createElement('div');
-            head.className = 'dp-row dp-viewport' + (hasChildren ? '' : ' dp-viewport-empty');
+            head.className = 'dp-row dp-viewport' + (focused ? ' dp-focused' : '');
 
+            // The arrow opens the viewport's measurements; the rest of the row selects the view.
             const chevron = document.createElement('span');
             chevron.className = 'dp-chev' + (hasChildren ? '' : ' dp-leaf');
             chevron.textContent = hasChildren ? (open ? '▾' : '▸') : '';
+            if (hasChildren) {
+                chevron.role = 'button';
+                chevron.ariaExpanded = open ? 'true' : 'false';
+                chevron.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    this._toggle(nodeId);
+                });
+            }
             head.appendChild(chevron);
 
             const label = document.createElement('span');
@@ -250,11 +261,7 @@ class DrawingPanel {
             label.textContent = viewport.id;
             head.appendChild(label);
 
-            if (hasChildren) {
-                head.role = 'button';
-                head.ariaExpanded = open ? 'true' : 'false';
-                head.addEventListener('click', () => this._toggle(nodeId));
-            }
+            head.addEventListener('click', () => this._emit('kigumi-select-viewport', { viewportId: viewport.id }));
             rows.push(head);
 
             if (open) {

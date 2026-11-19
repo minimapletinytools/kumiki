@@ -874,3 +874,17 @@ describe('the view the selection is in', () => {
         expect(store.scope).toBe('side');
     });
 });
+
+describe('a whole drawing view', () => {
+    test('selecting a view moves the selection to it and drops the measurements picked out elsewhere', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus({ viewportId: 'front', measureKey: 'm1' });
+        store.setViewportFocus('side');
+
+        expect(store.scope).toBe('side');
+        expect(store.isViewportFocused('side')).toBe(true);
+        expect(store.isViewportFocused('front')).toBe(false);
+        expect(store.measurementFocus).toBeNull();
+        expect(store.markedMeasures.size).toBe(0);
+    });
+});

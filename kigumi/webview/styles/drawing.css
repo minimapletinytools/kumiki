@@ -77,13 +77,6 @@
     user-select: none;
 }
 
-.dp-viewport.dp-viewport-empty {
-    cursor: default;
-}
-
-.dp-viewport.dp-viewport-empty:hover {
-    background: transparent;
-}
 
 .dp-measurement {
     padding-left: 28px;
