@@ -2799,7 +2799,7 @@
         ]
       },
       "relative_path": "corner/mitsudomoe_joint_patterns.py",
-      "sha256": "93db79cdc0b2a65d44d358398ddc5a79b3b070468909e24600c02302b5b72d2a",
+      "sha256": "4260b36767f56fde1df468ac79978f576f1e958df845303fff8c353ab66dbaa4",
       "title": {
         "en": "Mitsudomoe joint",
         "ja": "\u4e09\u3064\u5df4\u306e\u4ed5\u53e3"
@@ -5738,7 +5738,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-19T04:26:02.579120+00:00",
+  "generated_at": "2026-11-19T04:39:52.377231+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }

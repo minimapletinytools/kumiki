@@ -85,7 +85,7 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 
 | Basic joint signature | When to use |
 |---|---|
-| `cut_basic_mitsudomoe_joint(arrangement: TriCornerArrangement) -> Joint` | Three perpendicular members with a common outside corner. Each tenon fits the next member. Use `cut_mitsudomoe_joint` to set the tenon dimensions and mortise clearance. [Joint preview](assets/mitsudomoe-joint.png) |
+| `cut_basic_mitsudomoe_joint(arrangement: TriCornerArrangement) -> Joint` | Three perpendicular members with a common outside corner. Each tenon fits the next member. In `cut_mitsudomoe_joint`, `tenon_position_from_outer_face` sets the inset from the shared outside face. `tenon_position_from_outer_edge=None` uses the smallest cross-section dimension of the three timbers. [Joint preview](assets/mitsudomoe-joint.png) |
 | `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
 | `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |

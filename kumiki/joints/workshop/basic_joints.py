@@ -67,7 +67,7 @@ def cut_basic_mitsudomoe_joint(arrangement: TriCornerArrangement) -> Joint:
     """Size the three tenons from the smallest cross-section dimension at the corner."""
     side = min(min(timber.size) for timber, _ in arrangement.members)
     return cut_mitsudomoe_joint(
-        arrangement, tenon_position_from_outside=side / 2, tenon_width=side / 4,
+        arrangement, tenon_position_from_outer_face=side / 4, tenon_width=side / 4,
         tenon_height=side / 4, tenon_length=side / 4, mortise_extra_depth=side / 32,
     )
 
