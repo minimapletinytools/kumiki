@@ -164,13 +164,19 @@ module.exports = {
             outline.focus?.kind === 'measurement' && outline.clicked.join() === outline.focus.viewportId);
         await waitFor(() => inShell(`${viewerApp}.querySelectorAll('.drawing-view-outline').length === 1`), { timeoutMs: 5000 });
         await capture('03d-drawing-selected-view');
-        const modelOutlined = await inShell(`(() => {
+        const modelOutlined = await inShell(`(async () => {
             const app = ${viewerApp};
-            app.leaveDrawing();
+            const button = app.querySelector('#back-to-3d-btn');
+            if (!button) return { button: false };
+            button.click();
+            await app.updateComplete;
             app.renderMeasurements();
-            return !!app.querySelector('.drawing-view-outline');
+            return { button: true, inDrawing: app.isInDrawing, gone: !app.querySelector('#back-to-3d-btn'),
+                outlined: !!app.querySelector('.drawing-view-outline') };
         })()`);
-        check('leaving the drawing removes its view outline', !modelOutlined);
+        check('the Back to 3D button over the drawing leaves it, and goes with it',
+            modelOutlined.button && !modelOutlined.inDrawing && modelOutlined.gone, JSON.stringify(modelOutlined));
+        check('leaving the drawing removes its view outline', !modelOutlined.outlined);
 
         // A refresh measures the drawings again: the sawhorse's generated dimensions move with leg_distance.
         await openFrame(PARAMETER_FRAME);

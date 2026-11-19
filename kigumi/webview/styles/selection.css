@@ -34,6 +34,17 @@
     background: var(--hv-panel-border);
 }
 
+/* Leaving a drawing: filled, so it reads as the way out. */
+.ip-action.ip-leave-drawing {
+    background: var(--hv-accent);
+    border-color: var(--hv-accent);
+    color: white;
+    font-weight: 700;
+}
+.ip-action.ip-leave-drawing:hover {
+    filter: brightness(1.08);
+}
+
 /* Measuring from the focus: the button, and while an end is held, what to do next. Centred. */
 .ip-measure-line {
     justify-content: center;

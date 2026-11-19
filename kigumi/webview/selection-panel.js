@@ -33,8 +33,8 @@ export class SelectionPanel {
     _drawingButton() {
         const action = document.createElement('button');
         action.type = 'button';
-        action.className = 'ip-action';
         const inDrawing = this.app.isInDrawing;
+        action.className = inDrawing ? 'ip-action ip-leave-drawing' : 'ip-action';
         // Drawing nothing means drawing the whole frame, which is a reasonable
         // thing to ask for -- so rather than disabling the button with nothing
         // selected, it says which of the two it is about to do.

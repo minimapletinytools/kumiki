@@ -245,6 +245,7 @@
   "viewer.selection.drawTimbers.title": "Draw the selected timbers on a sheet",
   "viewer.selection.leaveDrawing": "back to 3d",
   "viewer.selection.leaveDrawing.title": "Leave the drawing and go back to the model",
+  "viewer.drawing.backTo3d": "Back to 3D",
   "viewer.selection.tags": "tags",
   "viewer.selection.timberKind": "type",
   "viewer.selection.timberKind.Timber": "rectangular",

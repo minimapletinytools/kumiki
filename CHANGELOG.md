@@ -23,6 +23,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Changed
 - The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
 - The mouse controls hint is a little larger.
+- In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
 
 #### Fixed
 - Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.

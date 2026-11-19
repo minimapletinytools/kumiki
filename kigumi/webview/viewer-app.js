@@ -261,6 +261,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             <div id="view-layout">
             ${this.sidebar.render(this.sidebarPages())}
             <div id="viewport">
+                ${this.isInDrawing
+                    ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
+                        @click=${() => this.leaveDrawing()}>← ${t('viewer.drawing.backTo3d')}</button>`
+                    : nothing}
                 ${hasPendingChanges
                     ? html`<button
                         id="top-center-refresh-btn"
