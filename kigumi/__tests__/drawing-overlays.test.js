@@ -66,11 +66,12 @@ describe('round dots', () => {
     const fragment = vendored.slice(vendored.indexOf('fragmentShader: `') + 'fragmentShader: `'.length);
     const shader = fragment.slice(0, fragment.indexOf('`'));
 
-    test('the square dash test is replaced by a circle as wide as the line', () => {
+    test('the square dash test is replaced by a circle as wide as the line is drawn, spaced in pixels', () => {
         const round = roundDotShader(shader);
         expect(round).not.toContain('> dashSize ) discard');
-        expect(round).toContain('uniform float linewidth;');
-        expect(round).toContain('dot( dotOffset, dotOffset ) > 0.25 * linewidth * linewidth');
+        expect(round).toContain('dFdx( vUv.x )');
+        expect(round).toContain('dot( dotOffset, dotOffset ) > dotRadius * dotRadius');
+        expect(round).toContain('float dotPeriod = 5.00 * dotRadius;');
     });
 
     test('a shader with no dash test to replace is refused, not drawn square', () => {

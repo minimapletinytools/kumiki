@@ -26,6 +26,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
 
 #### Fixed
+- A drawing's dotted centerlines and perfect faces are round dots, evenly spaced at any zoom, instead of bars across the line when the sheet is zoomed.
+- A viewer in a hidden tab no longer redraws into a 0×0 canvas, which flooded the app's output with GL_INVALID_FRAMEBUFFER_OPERATION errors.
 - Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.
 
 ## [kumiki 0.9.7 / kigumi 0.9.10] - 2026-11-17

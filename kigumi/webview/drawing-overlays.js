@@ -11,9 +11,8 @@
 
 // A dot's diameter, in pixels: the line's width.
 const LINE_WIDTH_PX = 3;
-// Dot to dot, in world units (metres), as LineMaterial dashes are.
-const DOT = 0.0008;
-const DOT_GAP = 0.004;
+// Dot to dot, in dot diameters: on screen, so the dotting looks the same at any zoom.
+const DOT_PERIOD = 2.5;
 const PERFECT_FACE_COLOR = 0x2f6fd0;
 const CENTERPLANE_COLOR = 0xd0582f;
 // How square to the view a plane may be and still be drawn: seen face-on, it is not.
@@ -21,23 +20,23 @@ const FACE_ON_DOT = 1 - 1e-3;
 
 // LineMaterial's dash test, which cuts the line into rectangles.
 const SQUARE_DASH = 'if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX';
-// A round dot instead, centred on each dash, as wide as the line: the distance to the nearest
-// centre along the line, in pixels (vLineDistance's change per pixel), and across it.
+// Round dots instead, as wide as the line is drawn, measured in the pixels drawn both ways: along
+// the line from vLineDistance's change per pixel, across it from vUv.x's (-1 to 1 edge to edge). A
+// width taken from linewidth stretched each dot across the line wherever a drawing's sheet is zoomed.
 const ROUND_DOT = `
-            float dotPeriod = dashSize + gapSize;
-            float dotAlong = mod( vLineDistance + dashOffset + 0.5 * dotPeriod, dotPeriod ) - 0.5 * dotPeriod;
+            float dotRadius = 1.0 / max( length( vec2( dFdx( vUv.x ), dFdy( vUv.x ) ) ), 1e-9 );
             float dotPerPixel = max( length( vec2( dFdx( vLineDistance ), dFdy( vLineDistance ) ) ), 1e-9 );
-            vec2 dotOffset = vec2( dotAlong / dotPerPixel, vUv.x * 0.5 * linewidth );
-            if ( dot( dotOffset, dotOffset ) > 0.25 * linewidth * linewidth ) discard;`;
+            float dotPeriod = ${(2 * DOT_PERIOD).toFixed(2)} * dotRadius;
+            float dotAlong = mod( ( vLineDistance + dashOffset ) / dotPerPixel + 0.5 * dotPeriod, dotPeriod ) - 0.5 * dotPeriod;
+            vec2 dotOffset = vec2( dotAlong, vUv.x * dotRadius );
+            if ( dot( dotOffset, dotOffset ) > dotRadius * dotRadius ) discard;`;
 
 /** A dashed LineMaterial fragment shader drawing round dots rather than square dashes. */
 function roundDotShader(source) {
     if (!source.includes(SQUARE_DASH)) {
         throw new Error('drawing-overlays: the line shader has no dash test to replace');
     }
-    return source
-        .replace('uniform float opacity;', 'uniform float opacity;\n\t\tuniform float linewidth;')
-        .replace(SQUARE_DASH, ROUND_DOT);
+    return source.replace(SQUARE_DASH, ROUND_DOT);
 }
 
 /**
@@ -102,8 +101,6 @@ class DrawingOverlays {
                 linewidth: LINE_WIDTH_PX,
                 resolution,
                 dashed: true,
-                dashSize: DOT,
-                gapSize: DOT_GAP,
                 // Inside the rough stock, so drawn through it; the id pass hides what should be.
                 depthTest: false,
             });

@@ -177,6 +177,9 @@ class CameraCubeGizmo {
         this.camera.position.set((dx / length) * 2.8, (dy / length) * 2.8, (dz / length) * 2.8);
         this.camera.up.set(0, 0, 1);
         this.camera.lookAt(0, 0, 0);
+        if (!this.canvas.width || !this.canvas.height) {
+            return;
+        }
         this.renderer.render(this.scene, this.camera);
     }
 

@@ -32,6 +32,20 @@ module.exports = {
         })()`), { timeoutMs: 15000 });
         check('Monaco editor initializes and renders inside iframe', editorReady);
 
+        // The viewer behind it is hidden: it keeps its size and draws nothing, rather than into 0 x 0.
+        const hiddenViewer = await inShell(`(() => {
+            const frame = [...document.querySelectorAll('#slot-center iframe[hidden]')]
+                .find((one) => one.contentDocument && one.contentDocument.querySelector('kigumi-app'));
+            if (!frame) return null;
+            const app = frame.contentDocument.querySelector('kigumi-app');
+            app.onWindowResize();
+            app.renderViewports();
+            const canvas = app.renderer.domElement;
+            return { width: canvas.width, height: canvas.height };
+        })()`).catch((error) => ({ error: String(error) }));
+        check('a viewer in a hidden tab keeps its size', hiddenViewer && hiddenViewer.width > 0 && hiddenViewer.height > 0,
+            JSON.stringify(hiddenViewer));
+
         const editorDescribed = await panels().describe(`tab:${connection().activePanel.id}`);
         check('an agent can ask an editor tab what it shows',
             editorDescribed && editorDescribed.kind === 'editor' && editorDescribed.filePath === FRAME && editorDescribed.lineCount > 10,

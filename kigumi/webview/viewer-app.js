@@ -911,6 +911,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
         const size = this.renderer.getSize(new THREE.Vector2());
+        // Nothing to draw into (a tab opened hidden): every draw call would be a GL error.
+        if (size.x === 0 || size.y === 0) {
+            return;
+        }
         const pageRect = this.pageScreenRect(size.x, size.y);
         // Before anything is drawn, and before onPaper is read: the mode is the
         // one answer to "sheet or model", so nothing below asks it again.
@@ -2203,6 +2207,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         const viewport = this.renderRoot.querySelector('#viewport');
         const width = viewport.offsetWidth;
         const height = viewport.offsetHeight;
+        // A hidden tab measures 0 x 0: keep the last size, which it gets back when shown.
+        if (width === 0 || height === 0) {
+            return;
+        }
         this.syncCameraProjection();
         this.renderer.setSize(width, height, false);
         if (this.cameraCube) {
