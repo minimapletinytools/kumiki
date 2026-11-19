@@ -1,4 +1,5 @@
-// Serve dist/ on http://127.0.0.1:8123/ (or $PORT), as a static site would: for trying the build.
+// Serve dist/ on http://127.0.0.1:8123/ (or $HOST, $PORT), as a static site would: for trying the build.
+// HOST=0.0.0.0 serves it to the local network too, to try it on a phone.
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +12,7 @@ const TYPES = {
     '.whl': 'application/octet-stream', '.png': 'image/png', '.svg': 'image/svg+xml', '.ttf': 'font/ttf', '.woff2': 'font/woff2',
 };
 const port = Number(process.env.PORT || 8123);
+const host = process.env.HOST || '127.0.0.1';
 
 http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://x').pathname);
@@ -28,4 +30,4 @@ http.createServer((request, response) => {
         response.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
         response.end(body);
     });
-}).listen(port, '127.0.0.1', () => console.log(`Kigumi in a browser: http://127.0.0.1:${port}/`));
+}).listen(port, host, () => console.log(`Kigumi in a browser: http://${host}:${port}/`));
