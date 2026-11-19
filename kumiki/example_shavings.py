@@ -26,6 +26,7 @@ from kumiki.construction import (
     DoubleButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CornerJointTimberArrangement,
+    TriCornerArrangement,
     CrossJointTimberArrangement,
     BraceJointTimberArrangement,
 )
@@ -228,6 +229,23 @@ def create_canonical_example_splice_joint_timbers(
         timber2_end=TimberEnd.BOTTOM,
         front_face_on_timber1=TimberLongFace.RIGHT
     )
+
+
+def create_canonical_example_tri_corner_timbers() -> TriCornerArrangement:
+    """Place a post below two horizontal rails with their common outside corner at the origin."""
+    side = inches(4)
+    axes = (create_v3(0, 0, -1), create_v3(0, 1, 0), create_v3(1, 0, 0))
+
+    def member(axis: int) -> Timber:
+        width = axes[(axis + 1) % 3]
+        height = axes[(axis + 2) % 3]
+        return create_timber(length=inches(12), size=create_v2(side, side),
+                             bottom_position=(width + height) * (side / 2),
+                             length_direction=axes[axis], width_direction=width,
+                             ticket=f"timber{axis + 1}")
+
+    return TriCornerArrangement(member(0), member(1), member(2),
+                                TimberEnd.BOTTOM, TimberEnd.BOTTOM, TimberEnd.BOTTOM)
 
 
 def create_canonical_example_corner_joint_timbers(

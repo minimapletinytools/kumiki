@@ -69,6 +69,7 @@ ButtJointTimberArrangement(butt_timber, receiving_timber, butt_timber_end,
 DoubleButtJointTimberArrangement(butt_timber_1, butt_timber_2, receiving_timber,
                                  butt_timber_1_end, butt_timber_2_end, front_face_on_butt_timber_1=None)
 CornerJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
+TriCornerArrangement(timber1, timber2, timber3, timber1_end, timber2_end, timber3_end)
 CrossJointTimberArrangement(timber1, timber2, front_face_on_timber1=None)
 SpliceJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
 # ends: TimberEnd.BOTTOM/TOP
@@ -84,6 +85,7 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 
 | Basic joint signature | When to use |
 |---|---|
+| `cut_basic_practice_simplified_rice_dumping_joint(arrangement: TriCornerArrangement) -> Joint` | Stock-sized practice version of the rice dumpling joint. For explicit dimensions, use `cut_practice_simplified_rice_dumping_joint` (alias `cut_简化粽角榫`). Join the tenoned rail (2) to the receiving rail (3), then insert the post. [Joint preview](assets/zongjiao-joint.png) |
 | `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
 | `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |
