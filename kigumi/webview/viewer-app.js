@@ -38,6 +38,8 @@ import { CompactChrome } from './viewer-compact.js';
 import { SHELL_UI, listenForForm } from './shell-ui.js';
 
 // A touchscreen is the main pointer: the hint describes touch gestures.
+// How long a scroll must stop before a tilted drawing view springs back.
+const WHEEL_TILT_RELEASE_MS = 250;
 const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
 // Defines <kigumi-layers-view>, which the tree page draws.
 import './layers-panel.js';
@@ -436,6 +438,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     disconnectedCallback() {
+        clearTimeout(this._wheelTiltTimer);
         this.closeSTLPlacement();
         super.disconnectedCallback();
         window.removeEventListener('message', this.onWindowMessage);
@@ -594,6 +597,11 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             const gesture = wheelGesture(event, { scrollOrbits: this.trackpadScrollOrbits });
             if (gesture.kind !== 'zoomStep') {
                 this.applyCameraGesture(gesture, event.clientX, event.clientY);
+                if (gesture.kind === 'orbit') {
+                    // A scroll has no release: spring a tilt back once it stops.
+                    clearTimeout(this._wheelTiltTimer);
+                    this._wheelTiltTimer = setTimeout(() => this.releaseTilt(), WHEEL_TILT_RELEASE_MS);
+                }
                 return;
             }
             // Calculate adaptive zoom factor based on current distance
@@ -2128,6 +2136,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     /** A key released while the window is away is never heard, so let go of shift here. */
     onWindowBlur() {
         this._setShiftHeld(false);
+        // Nor is a mouse button: a tilt held when the window lost focus springs back now.
+        if (this.pointerDrag.end().action === 'orbit') {
+            this.releaseTilt();
+        }
     }
 
     onWindowKeyDown(event) {

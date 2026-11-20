@@ -29,6 +29,7 @@ export const CameraMixin = (Base) => class extends Base {
         }
         this.gizmoDragging = false;
         if (this.gizmoMoved) {
+            this.releaseTilt();
             return;
         }
         const canvas = this.renderRoot.querySelector('#gizmo-cube-c');

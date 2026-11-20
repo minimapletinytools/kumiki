@@ -98,7 +98,9 @@ the same question first, so it shows what a click would take.
 - Assumes: the click and the hover send the same request (`pickQuery`).
 - Edge cases: `candidateIndex` 0 is a choice, null is "choose for me"; a selected timber wins the
   ray even when another hides it; Tab steps through the features at a point; a stale hover answer
-  is dropped; a drawing has no timber selection; a locked member's row doesn't select it.
+  is dropped; a drawing has no timber selection; a locked member's row doesn't select it; a point
+  within `eps` of one cut's edge, on a face another cut shares, is still surface (`close_around_it`
+  tries each face of each solid -- the brokenbench dovetail tongue was unpickable without it).
 - Unit: `pick-query`, `selection-store`, `hover-state`, `highlights`, `csg-tree-view`,
   `selection-visuals`, `feature-states`, `member-states`, `viewer-keys`, `context-menu`.
   Python: `test_kigumi_csg_navigation.py`, `test_kigumi_whole_ray.py`.
@@ -119,11 +121,14 @@ the same question first, so it shows what a click would take.
 - Assumes: the runner settles what a measurement comes to; the view only draws it.
 - Edge cases: undo and redo work though VS Code claims ctrl-Z first; they are refused while a
   measurement is half made; a deleted code measurement can be put back; an edge written either way
-  round is one measurement; a plane square to the view is refused; a refresh measures again.
+  round is one measurement; a plane square to the view is refused; a refresh measures again; a
+  locked view tilted by a drag, the gizmo or a trackpad scroll springs back (a scroll has no
+  release, so it waits for the scroll to stop).
 - Unit: `measure-draft`, `measurements`, `measurement-*`, `undo-stacks`, `viewer-keys`,
   `key-match`, `drawing-panel-viewports`, `drawing-overlays`, `member-id-buffer`, `render-mode`,
   `dimension-text`, `units`, `scale-ruler`. Python: `test_measurement_*`, `test_kigumi_*drawings*`.
-- Integration: `app:drawings` (dotted lines, export, outlines, undo and redo from the keyboard).
+- Integration: `app:drawings` (dotted lines, export, outlines, tilt spring-back, undo and redo from
+  the keyboard).
 
 ## Parameters (kiwari)
 

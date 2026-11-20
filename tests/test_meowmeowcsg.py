@@ -5202,6 +5202,26 @@ class TestSolidsThatCloseAroundAPoint:
 
         assert not at.close_around_it()
 
+    def test_near_a_solids_edge_any_of_its_faces_is_a_way_out(self):
+        """A plate with a hole, capped by a block: a point in the hole on the cap is surface.
+
+        Within `eps` of the hole's edge the plate reports its top (+z) and the hole's side; its
+        top alone cancels the cap's -z. The brokenbench dovetail tongue's front face, which no
+        click on it could select.
+        """
+        plate = Difference(self._box(40, 50, 0), [RectangularPrism(
+            size=Matrix([scalar(1), scalar(1)]), transform=Transform.identity(),
+            start_distance=scalar(40), end_distance=scalar(50))])
+        cap = self._box(50, 60)
+        point = create_v3(scalar("0.4999"), scalar(0), scalar(50))  # in the hole, 0.1 eps from its side
+        eps = scalar("0.001")
+
+        at = SolidsAtPoint([plate, cap], point, eps=eps)
+
+        assert len(at.on_surface) == 2
+        assert not at.close_around_it()
+        assert SolidUnion([plate, cap]).is_point_on_boundary(point, eps=eps)
+
 
 class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
     """The same trap, through the two nodes that used to fall into it."""

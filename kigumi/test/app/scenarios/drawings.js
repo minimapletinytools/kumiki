@@ -163,6 +163,32 @@ module.exports = {
         check('clicking a drawn measurement outlines its view',
             outline.focus?.kind === 'measurement' && outline.clicked.join() === outline.focus.viewportId);
         await waitFor(() => inShell(`${viewerApp}.querySelectorAll('.drawing-view-outline').length === 1`), { timeoutMs: 5000 });
+
+        // A trackpad scroll that orbits has no release, so a locked view springs back once it stops.
+        const tiltStart = await inShell(`(() => {
+            const app = ${viewerApp};
+            const view = app.viewports.find((one) => one.spec.locked && one.declaredOffsetDir);
+            if (!view) return { error: 'no locked view' };
+            app.activeViewportId = view.id;
+            const page = app.sceneStore.activeScene().page;
+            app.sceneStore.activeScene().page = null;  // on a sheet a scroll pans the page instead
+            app._tiltPage = page;
+            app.trackpadScrollOrbits = true;
+            const element = app.querySelector('#viewport');
+            for (let step = 0; step < 5; step++) {
+                element.dispatchEvent(new WheelEvent('wheel', { deltaX: 20, deltaY: 10, bubbles: true, cancelable: true }));
+            }
+            return { tilted: !view.cameraController.cameraOffsetDir.equals(view.declaredOffsetDir) };
+        })()`);
+        const sprungBack = await waitFor(() => inShell(`(() => {
+            const app = ${viewerApp};
+            const view = app.activeViewport;
+            return view.cameraController.cameraOffsetDir.distanceTo(view.declaredOffsetDir) < 1e-9 || null;
+        })()`), { timeoutMs: 3000 }).catch(() => false);
+        await inShell(`(() => { const app = ${viewerApp}; app.sceneStore.activeScene().page = app._tiltPage;
+            delete app._tiltPage; app.trackpadScrollOrbits = false; })()`);
+        check('a drawing view tilted by a trackpad scroll springs back to its angle once the scroll stops',
+            tiltStart.tilted && sprungBack === true, JSON.stringify({ ...tiltStart, sprungBack }));
         await capture('03d-drawing-selected-view');
         const viewportPicked = await inShell(`(async () => {
             const app = ${viewerApp};

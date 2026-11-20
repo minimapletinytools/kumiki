@@ -11,6 +11,7 @@ Values are plain floats compared through the safe_* helpers (see rule.py).
 from contextlib import contextmanager
 from contextvars import ContextVar
 import functools
+import itertools
 import math
 import re
 from typing import TYPE_CHECKING, Callable, ClassVar, Dict, Generic, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
@@ -3040,27 +3041,32 @@ class SolidsAtPoint:
         """Return whether the surfaces at the point enclose it, so it is inside their union.
 
         E.g. a point on the shared face of two touching prisms. True when no direction leaves every
-        surface. Exact for one or two surfaces; False if any normal is unknown.
+        surface. At a solid's edge or corner any of its faces is a way out, so each pick of one
+        normal per solid is tried. False if any normal is unknown.
         """
-        normals = [normal for normal in self.outward_normals() if normal is not None]
-        if len(normals) < 2 or len(normals) != len(self.on_surface):
+        per_solid = [solid.get_outward_normals(self.point, eps=self.eps) for solid in self.on_surface]
+        if len(per_solid) < 2 or any(not normals for normals in per_solid):
             return False
+        return not any(_some_direction_leaves([safe_normalize_vector(normal) for normal in pick])
+                       for pick in itertools.product(*per_solid))
 
-        units = [safe_normalize_vector(normal) for normal in normals]
-        candidates = [sum(units[1:], units[0])]
-        candidates.extend(units)
-        candidates.extend(one + other
-                          for index, one in enumerate(units)
-                          for other in units[index + 1:])
-        for candidate in candidates:
-            size = safe_norm(candidate)
-            if safe_zero_test(size):
-                continue
-            direction = candidate / size
-            if all(safe_compare(safe_dot_product(direction, unit), 0, Comparison.GT)
-                   for unit in units):
-                return False
-        return True
+
+def _some_direction_leaves(units: List[Direction3D]) -> bool:
+    """Return whether some direction d has d . n > 0 for every unit normal n. Exact for one or two."""
+    candidates = [sum(units[1:], units[0])]
+    candidates.extend(units)
+    candidates.extend(one + other
+                      for index, one in enumerate(units)
+                      for other in units[index + 1:])
+    for candidate in candidates:
+        size = safe_norm(candidate)
+        if safe_zero_test(size):
+            continue
+        direction = candidate / size
+        if all(safe_compare(safe_dot_product(direction, unit), 0, Comparison.GT)
+               for unit in units):
+            return True
+    return False
 
 
 def assert_distinct_children(kind: str, children: Sequence[CutCSG]) -> None:
