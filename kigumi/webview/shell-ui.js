@@ -12,6 +12,8 @@ export const SHELL_UI = Object.freeze({
     agentExpand: 'shell-ui:agent-expand',
     /** Agent → shell: close the sheet. */
     agentCollapse: 'shell-ui:agent-collapse',
+    /** Explorer → shell → agent: { text } to start a prompt with; the shell opens the agent's sheet. */
+    agentDraft: 'shell-ui:agent-draft',
     /** Explorer → shell: close the project menu (a row was chosen). */
     closeMenu: 'shell-ui:close-menu',
 });

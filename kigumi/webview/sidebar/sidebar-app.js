@@ -442,10 +442,13 @@ class KigumiSidebar extends LitElement {
             <div class="ks-phone">
                 ${framesRoot ? html`
                     <div class="ks-phone-heading">${framesRoot.label}</div>
-                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN), frames.length > PHONE_FRAMES_SHOWN
-                        ? this.renderPhoneLink(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
-                            'ellipsis', () => { this.phonePage = 'frames'; })
-                        : nothing)}`
+                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN), html`
+                        ${frames.length > PHONE_FRAMES_SHOWN
+                            ? this.renderPhoneLink(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
+                                'ellipsis', () => { this.phonePage = 'frames'; })
+                            : nothing}
+                        ${this.renderPhoneLink(t('sidebar.phone.newFrame'), 'sparkle',
+                            () => post({ type: SHELL_UI.agentDraft, text: t('sidebar.phone.newFramePrompt') }), 'new-frame')}`)}`
                 : nothing}
                 <div class="ks-phone-heading">${t('sidebar.phone.browse')}</div>
                 <ul class="ks-phone-list">
@@ -481,8 +484,8 @@ class KigumiSidebar extends LitElement {
     }
 
     /** A row of the phone menu's list that opens a page of it, with the same › as a frame. */
-    renderPhoneLink(label, iconName, onClick) {
-        return html`<li><button type="button" class="ks-phone-button is-open" data-key="" @click=${onClick}>
+    renderPhoneLink(label, iconName, onClick, key = '') {
+        return html`<li><button type="button" class="ks-phone-button is-open" data-key=${key} @click=${onClick}>
             ${icon(iconName)}<span class="ks-label">${label}</span>${icon('chevron-right')}</button></li>`;
     }
 

@@ -72,6 +72,15 @@ app.whenReady().then(async () => {
         check('the agent is a sheet along the bottom, folded to its text box',
             await wait(`${agent}?.body.classList.contains('is-phone') && !${agent}.body.classList.contains('is-sheet-open') || null`, 30000) === true);
 
+        // New frame starts a prompt to the agent, in its opened sheet, for the user to finish.
+        await js(`${menu}.querySelector('.ks-phone-list [data-key="new-frame"]').click()`);
+        const drafted = await wait(`document.querySelector('.phone').classList.contains('is-agent-expanded')
+            && ${agent}.getElementById('prompt-input').value || null`, 5000);
+        await shot('2b-new-frame');
+        check('New frame opens the agent with a prompt to finish', drafted === 'Please make a new design: ', drafted);
+        await js(`(() => { const doc = ${agent}; doc.getElementById('prompt-input').value = ''; document.querySelector('.phone-backdrop').click(); })()`);
+        await wait(`!document.querySelector('.phone').classList.contains('is-agent-expanded') || null`, 5000);
+
         await js(`[...${menu}.querySelectorAll('.ks-phone-list button')].find((one) => one.textContent.includes('cute')).click()`);
         const drawn = await wait(`${view}?.querySelector('canvas')?.width > 100 && ${view}.querySelector('#compact-menu-btn')?.textContent.trim() || null`, 240000);
         await sleep(1500);

@@ -195,6 +195,12 @@ export function createPhoneLayout({ core, command, frames }) {
                 setMenuOpen(false);
                 return true;
             }
+            if (type === SHELL_UI.agentDraft) {
+                setMenuOpen(false);
+                if (!agentExpanded) setAgentExpanded(true);
+                if (agentId) frames.send(agentId, { type: SHELL_UI.agentDraft, text: String(message.text || '') });
+                return true;
+            }
             return false;
         },
         render,

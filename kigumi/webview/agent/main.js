@@ -139,6 +139,12 @@ window.addEventListener('message', (event) => {
     const message = event.data;
     if (message && message.type === SHELL_UI.agentSheet) {
         document.body.classList.toggle('is-sheet-open', message.expanded === true);
+    } else if (message && message.type === SHELL_UI.agentDraft) {
+        // A prompt to finish: put in an empty box, leaving a draft the user already has.
+        const input = $('prompt-input');
+        if (!input.value.trim()) input.value = message.text;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
     } else if (message && typeof message.type === 'string') {
         handle(message);
     }

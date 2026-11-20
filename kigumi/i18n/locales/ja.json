@@ -309,6 +309,8 @@
   "sidebar.patternsScanning": "パターン(スキャン中...)",
   "sidebar.patterns": "パターン",
   "sidebar.phone.moreFrames": "さらに表示（あと {count} 件）",
+  "sidebar.phone.newFrame": "新しいフレーム",
+  "sidebar.phone.newFramePrompt": "新しいデザインを作ってください：",
   "sidebar.phone.browse": "見る",
   "sidebar.phone.back": "戻る",
   "sidebar.allFiles": "すべてのファイル",

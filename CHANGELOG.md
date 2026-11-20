@@ -21,12 +21,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - Touchscreens: one finger orbits, two fingers pan and pinch to zoom, a tap selects and a long press opens the timber's menu.
 - Trackpads: a pinch zooms smoothly. A view option makes a two-finger scroll orbit (shift pans) instead of zooming.
 - A view option hides the mouse controls hint.
+- On a phone, New frame at the end of the frames list opens the agent with a prompt to finish: "Please make a new design: ".
 
 #### Changed
 - The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
 - The mouse controls hint is a little larger.
 - In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
 - A drawing's panel is headed "📏 measurements", its viewports and members lists start closed, and clicking a viewport in it selects that view.
+- Clicking a pattern book's folder in the sidebar opens or closes it; it no longer opens every pattern in it.
 
 #### Fixed
 - Closing a frame's view while a pattern from it is open no longer stops the pattern's view.

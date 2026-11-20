@@ -306,12 +306,12 @@ describe('tree', () => {
     expect(workspace.children.map((child) => child.label)).toEqual(['a', 'z']);
   });
 
-  test('a library patternbook group opens the whole book', () => {
+  test('a library patternbook group only opens and closes: it does not open every pattern in it', () => {
     const model = new SidebarModel();
     model._state.shippedPatterns = [{ sourceFile: '/deps/book.py', name: 'a', patternbookName: 'book' }];
     const group = findNode(model.getTree(), (node) => node.type === 'patternbookGroup');
 
-    expect(group.action.command).toBe('kigumi.openPatternbookGroup');
+    expect(group.action).toBeUndefined();
     expect(group.children.map((child) => child.label)).toEqual(['a']);
   });
 

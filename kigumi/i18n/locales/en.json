@@ -309,6 +309,8 @@
   "sidebar.patternsScanning": "Patterns (scanning...)",
   "sidebar.patterns": "Patterns",
   "sidebar.phone.moreFrames": "More… ({count} more)",
+  "sidebar.phone.newFrame": "New frame",
+  "sidebar.phone.newFramePrompt": "Please make a new design: ",
   "sidebar.phone.browse": "Browse",
   "sidebar.phone.back": "Back",
   "sidebar.allFiles": "All Files",

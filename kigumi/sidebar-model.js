@@ -1024,7 +1024,8 @@ class SidebarModel {
                     : t('sidebar.patternCount.plural', { count: items.length }),
                 icon: 'folder',
                 expanded: false,
-                action: open('kigumi.openPatternbookGroup', groupData),
+                // A click opens or closes the folder; opening every pattern in it
+                // (kigumi.openPatternbookGroup) is off for now.
                 rowActions: ['viewSource', 'duplicate'],
                 children: items.map((item) => itemNode(
                     item,
