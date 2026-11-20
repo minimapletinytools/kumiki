@@ -1703,6 +1703,53 @@ class ConvexProfileEdgeFeature(EdgeFeature):
         return None if start is None or end is None else (start, end)
 
 
+@dataclass(frozen=True)
+class ConvexProfileCornerFeature(PointFeature):
+    """A corner of a ConvexPolygonExtrusion or ConvexPolygonSimpleLoft: profile vertex `vertex` on one cap.
+
+    Vertex n is where side n-1 meets side n.
+    """
+    key: FeatureKey = (FeatureCategory.CORNER, 0)
+    vertex: int = 0
+    end: bool = False
+
+    def _sides(self, owner: 'CutCSG') -> int:
+        return len(owner.points) if isinstance(owner, ConvexPolygonExtrusion) else len(owner.bottom_points)  # type: ignore[attr-defined]
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        return self.key
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        if not isinstance(owner, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
+            return None
+        face_type = (SimpleConvexPolygonExtrusionFeature if isinstance(owner, ConvexPolygonExtrusion)
+                     else SimpleLoftFeature)
+        sides = self._sides(owner)
+        faces = ((self.vertex - 1) % sides, self.vertex, ExtrusionCap.TOP if self.end else ExtrusionCap.BOTTOM)
+        keys = [face_type(name=self.name, key=face).feature_key() for face in faces]
+        if not all(key is not None and owner.has_carrier(key) for key in keys):
+            return None
+        return tuple(CarrierRef(owner, key) for key in keys if key is not None)
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Point]:
+        at = _profile_corner(owner, self.vertex, self.end)
+        return None if at is None else Point(position=at)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3,
+                             test_tolerance: Optional[Numeric] = None) -> bool:
+        at = _profile_corner(owner, self.vertex, self.end)
+        return False if at is None else _point_is_near(point, at, test_tolerance)
+
+
+def convex_profile_corner_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
+    """Return the default corners of a convex extrusion or loft with `sides` sides: the start profile's, then the end's."""
+    return {corner_on_cap(vertex, sides, end): ConvexProfileCornerFeature(
+                name=default_feature_name(corner_on_cap(vertex, sides, end)), key=corner_on_cap(vertex, sides, end),
+                vertex=vertex, end=end,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+            for end in (False, True) for vertex in range(sides)}
+
+
 def convex_profile_edge_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
     """Return the default edges of a convex extrusion or loft with `sides` sides, in key order:
     side n against side n+1, then each side against the start cap, then the end cap.
@@ -3112,12 +3159,50 @@ class SolidUnion(CutCSG):
         return at.any_on_surface() and not at.close_around_it()
     
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """Return the average outward normal of the children `point` is on the boundary of, or None."""
-        return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
+        """Return the average outward normal of the children `point` is on the boundary of, or None.
+
+        If those cancel (two children sharing a face), the average of get_outward_normals.
+        """
+        average = SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
+        if average is not None:
+            return average
+        normals = self._surface_normals(SolidsAtPoint(self.children, point, eps=eps))
+        if not normals:
+            return None
+        total = sum(normals[1:], normals[0])
+        size = safe_norm(total)
+        return None if safe_zero_test(size, eps=eps) else total / size
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        own = SolidsAtPoint(self.children, point, eps=eps).every_outward_normal()
+        at = SolidsAtPoint(self.children, point, eps=eps)
+        own = at.every_outward_normal()
+        if own is None:
+            own = self._surface_normals(at) or None
         return own if own is not None else super().get_outward_normals(point, eps=eps)
+
+    @staticmethod
+    def _surface_normals(at: 'SolidsAtPoint') -> List[Direction3D]:
+        """Return every face normal of the children at the point, less faces two children share (opposite normals).
+
+        E.g. a cut's waste and the clearance abutting it: their shared face is inside the union.
+        """
+        per_solid = [[safe_normalize_vector(normal) for normal in solid.get_outward_normals(at.point, eps=at.eps)]
+                     for solid in at.on_surface]
+
+        def opposite(one: Direction3D, other: Direction3D) -> bool:
+            return safe_equality_test(safe_dot_product(one, other), -1, eps=at.eps)
+
+        def same(one: Direction3D, other: Direction3D) -> bool:
+            return safe_equality_test(safe_dot_product(one, other), 1, eps=at.eps)
+
+        kept: List[Direction3D] = []
+        for index, normals in enumerate(per_solid):
+            others = [normal for at_other, other in enumerate(per_solid) if at_other != index for normal in other]
+            for normal in normals:
+                if any(opposite(normal, other) for other in others) or any(same(normal, one) for one in kept):
+                    continue
+                kept.append(normal)
+        return kept
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
@@ -3367,7 +3452,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Return its two caps, a side per profile edge, and their edges."""
+        """Return its two caps, a side per profile edge, their edges and corners."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleConvexPolygonExtrusionFeature(
@@ -3379,6 +3464,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                 name=default_feature_name(key), key=index,
                 properties=_DEFAULT_FEATURE_PROPERTIES)
         features.update(convex_profile_edge_features(len(self.points)))
+        features.update(convex_profile_corner_features(len(self.points)))
         return features
 
     @classmethod
@@ -3671,7 +3757,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Return its two caps, a side per profile edge, and their edges."""
+        """Return its two caps, a side per profile edge, their edges and corners."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleLoftFeature(
@@ -3683,6 +3769,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
                 name=default_feature_name(key), key=index,
                 properties=_DEFAULT_FEATURE_PROPERTIES)
         features.update(convex_profile_edge_features(len(self.bottom_points)))
+        features.update(convex_profile_corner_features(len(self.bottom_points)))
         return features
 
     @classmethod

@@ -1697,6 +1697,59 @@ class TestConvexProfileEdges:
         assert self._edges(box)[(FeatureCategory.ARRIS, 0)].name == "corner_post"
 
 
+class TestConvexProfileCorners:
+    """A convex extrusion's and a loft's corners: every profile vertex at each finite end.
+
+    Declared, as a prism's are: a cut's features pair with nothing, so no corner of one is derived.
+    """
+
+    SQUARE = TestConvexProfileEdges.SQUARE
+
+    def _corners(self, shape):
+        from kumiki.csg.cutcsg import CSGFeatureType
+        return {feature.feature_key(): feature for feature in shape.get_declared_features()
+                if feature.feature_type() is CSGFeatureType.POINT}
+
+    def test_an_extrusion_has_a_corner_per_vertex_at_each_end(self):
+        from kumiki.csg.cutcsg import corner_on_cap
+        box = ConvexPolygonExtrusion(points=self.SQUARE, start_distance=scalar(0), end_distance=scalar(10))
+        corners = self._corners(box)
+
+        assert len(corners) == 8
+        assert [float(v) for v in corners[corner_on_cap(1, 4, end=True)].locate_simple_unbounded(box).position] == [4, 0, 10]
+        assert corners[corner_on_cap(1, 4, end=True)].test_point_unbounded(box, create_v3(4, 0, 10))
+        assert not corners[corner_on_cap(1, 4, end=False)].test_point_unbounded(box, create_v3(4, 0, 10))
+        # Measured from the two sides and the cap that meet there.
+        assert corners[corner_on_cap(1, 4, end=True)].solve_recipe(box) is not None
+
+    def test_an_open_end_has_no_corners(self):
+        from kumiki.csg.cutcsg import corner_on_cap
+        open_box = ConvexPolygonExtrusion(points=self.SQUARE, start_distance=scalar(0), end_distance=None)
+
+        assert self._corners(open_box)[corner_on_cap(0, 4, end=True)].locate_simple_unbounded(open_box) is None
+
+    def test_a_loft_s_corners_are_its_two_profiles(self):
+        from kumiki.csg.cutcsg import corner_on_cap
+        top = [Matrix([1, 1]), Matrix([3, 1]), Matrix([3, 3]), Matrix([1, 3])]
+        loft = ConvexPolygonSimpleLoft(bottom_points=self.SQUARE, top_points=top,
+                                       bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(10))
+        corner = self._corners(loft)[corner_on_cap(2, 4, end=True)]
+
+        assert [float(v) for v in corner.locate_simple_unbounded(loft).position] == [3, 3, 10]
+
+    def test_a_cut_extrusion_s_corner_is_found_on_the_timber(self):
+        """A dovetail tongue's corners: an extrusion subtracted from a block, picked where it leaves a corner."""
+        block = RectangularPrism(size=Matrix([scalar(10), scalar(10)]), transform=Transform.identity(),
+                                 start_distance=scalar(0), end_distance=scalar(10))
+        notch = ConvexPolygonExtrusion(points=[Matrix([-1, -6]), Matrix([1, -6]), Matrix([2, -4]), Matrix([-2, -4])],
+                                       start_distance=scalar(5), end_distance=scalar(11))
+        cut = Difference(block, [notch])
+
+        names = [hit.feature.name for hit in cut.find_all_features(create_v3(2, -4, 5))]
+
+        assert "corner.2" in names
+
+
 class TestConvexPolygonSimpleLoft:
     """Test ConvexPolygonSimpleLoft class."""
 
@@ -5221,6 +5274,15 @@ class TestSolidsThatCloseAroundAPoint:
         assert len(at.on_surface) == 2
         assert not at.close_around_it()
         assert SolidUnion([plate, cap]).is_point_on_boundary(point, eps=eps)
+
+    def test_a_union_s_normals_leave_out_the_face_its_children_share(self):
+        """Two blocks side by side: at a top corner of their shared face, the union faces up and to the side."""
+        left, right = self._box(40, 50, -2), self._box(40, 50, 0)  # x in [-3, -1] and [-1, 1]
+        point = create_v3(scalar(-1), scalar(1), scalar(50))
+
+        normals = SolidUnion([left, right]).get_outward_normals(point)
+
+        assert sorted(tuple(int(round(float(v))) for v in normal) for normal in normals) == [(0, 0, 1), (0, 1, 0)]
 
 
 class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
