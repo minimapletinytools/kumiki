@@ -2,6 +2,7 @@
 name: bump-version
 description: Bump version for kumiki and/or kigumi, commit to main, create release tags, and push.
 ---
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 
 # Bump Version Skill
 

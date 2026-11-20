@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Project workspaces on the web
 
 Status: intent only, not started. Written down while building the standalone app's project page

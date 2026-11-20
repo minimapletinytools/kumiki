@@ -1,6 +1,7 @@
 ---
 applyTo: "kumiki/**,tests/**"
 ---
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 
 # Kumiki Library Authoring Rules
 

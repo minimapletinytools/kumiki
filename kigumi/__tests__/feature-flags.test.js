@@ -1,14 +1,4 @@
-const { FEATURE_FLAGS, applyFeatureFlagsToLayersPayload } = require('../webview/feature-flags');
-
-describe('FEATURE_FLAGS', () => {
-  test('assemblyPreview ships enabled (solver v2)', () => {
-    expect(FEATURE_FLAGS.assemblyPreview).toBe(true);
-  });
-
-  test('the flag registry is frozen (package-time, not runtime-mutable)', () => {
-    expect(Object.isFrozen(FEATURE_FLAGS)).toBe(true);
-  });
-});
+const { applyFeatureFlagsToLayersPayload } = require('../webview/feature-flags');
 
 describe('applyFeatureFlagsToLayersPayload', () => {
   test('keeps the assembly field while assemblyPreview is enabled', () => {

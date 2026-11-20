@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Finding duplicate, rotated and mirrored timbers
 
 Status: the functions are built (`kumiki/csg/symmetry.py`: `match_timbers`, `timber_symmetries`,

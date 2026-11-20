@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # runner.py review (2026-10-12)
 
 `kigumi/runner.py` is 7,732 lines. Roughly where they go:

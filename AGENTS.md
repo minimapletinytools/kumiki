@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🤖🤖🤖 -->
 # Agent Instructions Hub
 
 This is the canonical instruction entry point for AI coding agents in this repository.
@@ -17,6 +18,16 @@ Always update the local `main` branch from `origin/main` after merging a PR.
 Preserve local commits and uncommitted changes, including work by other agents;
 never reset or discard them to update the branch. If `main` is checked out in
 another worktree, update it there.
+
+## Who wrote a doc
+
+Every Markdown file starts with a comment of six marks saying how much of it a person wrote:
+`<!-- 🧑🧑🧑🧑🧑🤖 -->` is mostly human-written, `<!-- 🤖🤖🤖🤖🤖🤖 -->` is agent-written.
+
+- A doc with any 🧑 is the user's. Don't change it unless the user asks for that change, and
+  show them the change for review.
+- A doc you write gets `<!-- 🤖🤖🤖🤖🤖🤖 -->` on its first line (after any front matter).
+- When the user rewrites part of an agent doc, they may add 🧑 marks; keep what they set.
 
 ## Skills
 

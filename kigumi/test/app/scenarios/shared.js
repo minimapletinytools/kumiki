@@ -13,7 +13,7 @@ const SHA = 'f'.repeat(64);
 
 module.exports = {
     name: 'shared',
-    async run({ check, inShell, waitFor, runAppCommand, connection, capture, clipboard, FRAME, REPO }) {
+    async run({ check, inShell, waitFor, runAppCommand, connection, capture, clipboard, reset, FRAME, REPO }) {
         const text = fs.readFileSync(FRAME, 'utf8');
         const manifest = { id: ID, title: 'Little shared frame', entry: 'little_shared_frame.py', kumikiVersion: '0.9.6',
             kigumiVersion: '0.9.6', createdAt: '2026-11-15T00:00:00.000Z', role: 'view',
@@ -43,6 +43,7 @@ module.exports = {
             return row ? row.textContent.replace(/\\s+/g, ' ').trim() : null;
         })()`);
         let copied = null;
+        let made = null;
         const sharing = path.join(REPO, '.kigumi', `share-smoke-${process.pid}`);
         try {
             await runAppCommand('kigumi.testSetPublishBackend', `http://127.0.0.1:${server.address().port}`);
@@ -125,9 +126,8 @@ module.exports = {
             const copies = () => fs.readdirSync(REPO).filter((name) => /^little_shared_frame.*\.py$/.test(name));
             const before = copies();
             await inShell(`document.querySelector('#slot-center iframe:not([hidden])').contentWindow.document.getElementById('read-only-copy').click()`);
-            const made = await waitFor(() => copies().find((name) => !before.includes(name)) || null, { timeoutMs: 15000 }).catch(() => null);
+            made = await waitFor(() => copies().find((name) => !before.includes(name)) || null, { timeoutMs: 15000 }).catch(() => null);
             check('Make a Copy copies it into the project', Boolean(made) && fs.readFileSync(path.join(REPO, made), 'utf8') === text, String(made));
-            if (made) fs.rmSync(path.join(REPO, made), { force: true });
 
             await runAppCommand('kigumi.openPublish', ID);
             check('opening it again uses the copy already downloaded', requests.length === 2, JSON.stringify(requests));
@@ -140,10 +140,13 @@ module.exports = {
             const gone = await waitFor(async () => (await sidebarRow(`shared:${ID}`)) === null, { timeoutMs: 5000 }).then(() => true, () => false);
             check('removing it takes it off Shared and deletes the download', gone && !fs.existsSync(entryPath));
         } finally {
+            // Close the views first: a copy opens in one, and deleting its file under it fails its build.
+            await reset().catch(() => null);
             await runAppCommand('kigumi.testSetPublishBackend', null);
             server.close();
             fs.rmSync(sharing, { recursive: true, force: true });
             if (copied && copied.startsWith(REPO)) fs.rmSync(copied, { force: true });
+            if (made) fs.rmSync(path.join(REPO, made), { force: true });
         }
     },
 };

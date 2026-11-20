@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Review: features, picking, measuring and solving
 
 An end-to-end read, 2026-10-18, of the code behind selecting features, measuring them and solving

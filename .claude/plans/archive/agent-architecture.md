@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Agent architecture review and proposal (2026-10-29)
 
 Covers `kigumi/agent/`, `kigumi/webview/agent/`, the Electron wiring in `hosts/electron/main.js`,

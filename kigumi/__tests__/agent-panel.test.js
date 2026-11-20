@@ -87,6 +87,17 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
         expect(result.scrolling).toEqual({ shown: true, atEnd: true, hiddenAfter: true });
     });
 
+    test("a reply's Markdown is drawn, and any HTML in it stays text", () => {
+        const { tags, text, pwned, anchors, link } = result.markdown;
+        expect(tags).not.toContain('img');
+        expect(tags).not.toContain('script');
+        expect(tags).toEqual(expect.arrayContaining(['h4', 'li', 'strong', 'code', 'pre']));
+        expect(text).toContain('<img src=x onerror="window.pwned=1">');
+        expect(pwned).toBeNull();
+        expect(anchors).toBe(0);
+        expect(link).toBe('https://kumiki.build');
+    });
+
     test('a replayed conversation is drawn', () => {
         expect(result.drawn).toContain('a sawhorse please');
         expect(result.drawn).toContain('Here is a sawhorse.');

@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # kigumi architecture: runner and app core (2026-10-29)
 
 The agent got this treatment already (`../archive/agent-architecture.md`). This is the same for the rest of

@@ -1,6 +1,7 @@
 ---
 applyTo: "kumiki/**,tests/**,patterns/**,hidden_structures/**"
 ---
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 
 # Agent-generated Kumiki coding supplement
 

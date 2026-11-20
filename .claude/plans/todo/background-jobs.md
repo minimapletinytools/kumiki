@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🤖🤖🤖 -->
 # Background jobs in the runner: drawings in parallel, and one mechanism for slow work (2026-10-29)
 
 ## What is there

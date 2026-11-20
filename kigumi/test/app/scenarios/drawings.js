@@ -183,6 +183,50 @@ module.exports = {
             viewportPicked.header.includes('measurements') && viewportPicked.closed
                 && viewportPicked.outlined === viewportPicked.id && viewportPicked.marked.join() === viewportPicked.id,
             JSON.stringify(viewportPicked));
+        // Undo and redo in a drawing, from the keyboard: a deleted measurement comes back, though the
+        // host has already claimed the key (VS Code marks ctrl-Z handled on its way to the view).
+        const drawingsFile = path.join(path.dirname(DRAWING_FRAME), '.kigumi', 'drawings', `${path.basename(DRAWING_FRAME, '.py')}.json`);
+        const savedDrawings = fs.existsSync(drawingsFile) ? fs.readFileSync(drawingsFile) : null;
+        try {
+            const measureState = (where) => inShell(`(() => {
+                const app = ${viewerApp};
+                const found = app.focusedMeasurement(${JSON.stringify(where?.viewportId)}, ${JSON.stringify(where?.measureKey)});
+                return found ? found.measure.origin || 'code' : 'missing';
+            })()`);
+            const target = await inShell(`(() => {
+                const app = ${viewerApp};
+                for (const view of app.viewports) {
+                    const row = app._measurementRows(view).measurements.find((one) => one.origin !== 'deleted');
+                    if (row) return { viewportId: view.id, measureKey: row.key };
+                }
+                return null;
+            })()`);
+            const press = (key, shift = false) => inShell(`(() => {
+                const doc = ${viewDoc};
+                const claim = (event) => event.preventDefault();
+                doc.addEventListener('keydown', claim, true);
+                const mac = navigator.platform.startsWith('Mac');
+                doc.body.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, shiftKey: ${shift},
+                    metaKey: mac, ctrlKey: !mac, bubbles: true, cancelable: true }));
+                doc.removeEventListener('keydown', claim, true);
+            })()`);
+            const until = (state) => waitFor(() => measureState(target).then((now) => (now === state ? now : null)), { timeoutMs: 20000 })
+                .catch(() => null);
+            await inShell(`${viewerApp}.deleteMeasurement(${JSON.stringify(target?.viewportId)}, ${JSON.stringify(target?.measureKey)})`);
+            const deleted = await until('deleted');
+            await press('z');
+            const undone = await until('code');
+            await press('z', true);
+            const redone = await until('deleted');
+            await press('z');
+            const back = await until('code');
+            check('in a drawing, the undo key puts a deleted measurement back and redo deletes it again, though the host claimed the key',
+                Boolean(target) && deleted && undone && redone && back, JSON.stringify({ target, deleted, undone, redone, back }));
+        } finally {
+            if (savedDrawings) fs.writeFileSync(drawingsFile, savedDrawings);
+            else fs.rmSync(drawingsFile, { force: true });
+        }
+
         const modelOutlined = await inShell(`(async () => {
             const app = ${viewerApp};
             const button = app.querySelector('#back-to-3d-btn');

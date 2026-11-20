@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Moving `drawing.py` onto `rule.py`
 
 `kumiki/drawing.py` defines its own 3-vector math -- `_unit`, `_dot`, `_cross`,

@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Frame parameters: kill reflection, declare a kiwari
 
 ## Status — step 1 done, kiwari not started (2026-09-11)

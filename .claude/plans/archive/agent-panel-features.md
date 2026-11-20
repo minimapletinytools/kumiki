@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Agent panel: features (2026-10-24)
 
 What the built-in agent's panel should do, from what Cursor's agent and Claude Code offer, cut to

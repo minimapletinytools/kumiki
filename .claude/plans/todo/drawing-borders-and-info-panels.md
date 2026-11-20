@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Borders and info panels on a drawing
 
 ## Status — notes only, nothing built (2026-09-11)

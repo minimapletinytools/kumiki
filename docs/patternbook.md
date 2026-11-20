@@ -1,3 +1,4 @@
+<!-- 🧑🧑🤖🤖🤖🤖 -->
 # Writing pattern files
 
 ## Overview

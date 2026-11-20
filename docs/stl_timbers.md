@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # STL timbers
 
 Agent-generated supplement to the concepts and authoring instructions.

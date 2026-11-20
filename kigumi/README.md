@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 # Kigumi
 
 Kigumi is the 3D viewer and CAD environment for [Kumiki](https://kumiki.build), an open-source programmatic CAD library for designing timber-framed structures and woodworking joinery in Python.

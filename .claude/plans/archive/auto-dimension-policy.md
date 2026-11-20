@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Auto dimensioning: a policy for picking the next measurement
 
 **Status:** built, simplified, in `kumiki/drawings/auto_dimensioning.py`: `auto_dimension`, `Policy`

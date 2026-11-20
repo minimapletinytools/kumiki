@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 <!--
 The built-in agent's instructions, sent as its system prompt (agent/system-prompt.js reads this
 file). Comments like this one are left out. The part after the line of three dashes is added when

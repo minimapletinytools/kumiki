@@ -28,9 +28,12 @@ if (args[0]) {
 // Set by some tools that embed Electron; it would start Electron as plain Node.
 delete env.ELECTRON_RUN_AS_NODE;
 
+// No GPU (CI): draw with SwiftShader, as the extension tests do.
+const glFlags = process.env.KIGUMI_SOFTWARE_GL === '1'
+    ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : [];
 const [command, commandArgs] = packagedApp
-    ? [packagedApp, [REPO]]
-    : [require('electron'), [path.join(KIGUMI, 'hosts', 'electron', 'main.js'), REPO]];
+    ? [packagedApp, [REPO, ...glFlags]]
+    : [require('electron'), [path.join(KIGUMI, 'hosts', 'electron', 'main.js'), REPO, ...glFlags]];
 const child = spawn(command, commandArgs, {
     cwd: KIGUMI,
     env,
@@ -39,9 +42,9 @@ const child = spawn(command, commandArgs, {
 let timedOut = false;
 const timer = setTimeout(() => {
     timedOut = true;
-    console.error('App tests timed out after 5 minutes.');
+    console.error('App tests timed out after 10 minutes.');
     child.kill();
-}, 5 * 60 * 1000);
+}, 10 * 60 * 1000);
 child.on('exit', (code) => {
     clearTimeout(timer);
     process.exit(timedOut || code === null ? 1 : code);

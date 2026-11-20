@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Multi mortise and tenon: several tenons in one joint (2026-11-11)
 
 Status: agreed, not started.

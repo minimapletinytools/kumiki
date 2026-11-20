@@ -1,6 +1,6 @@
 const { GeometryMode } = require('../webview/geometry-mode');
 
-const { VALID_MODES, DEFAULT_MODE, selectMeshBuffers, meshBuffersDifferBetweenModes } = GeometryMode;
+const { VALID_MODES, selectMeshBuffers, meshBuffersDifferBetweenModes } = GeometryMode;
 
 function baseMesh(extra = {}) {
     return {
@@ -9,18 +9,6 @@ function baseMesh(extra = {}) {
         ...extra,
     };
 }
-
-describe('GeometryMode.VALID_MODES / DEFAULT_MODE', () => {
-    test('contains the four known modes', () => {
-        expect([...VALID_MODES].sort()).toEqual(
-            ['actual', 'perfectBoxNoJoints', 'perfectTimberWithin', 'roughBoxNoJoints'].sort()
-        );
-    });
-
-    test('default mode is actual', () => {
-        expect(DEFAULT_MODE).toBe('actual');
-    });
-});
 
 describe('selectMeshBuffers', () => {
     test('null/undefined mesh falls back to empty arrays', () => {

@@ -59,7 +59,7 @@ function realPath(file) {
  * @param {() => string[]} [options.readOnly]  folders outside the project that may be read, e.g. the
  *     kumiki library's source
  */
-function createProjectFiles({ root, readOnly = () => [] }) {
+function createProjectFiles({ root, readOnly = () => [], searchTimeoutMs = SEARCH_TIMEOUT_MS }) {
     function base() {
         const folder = root();
         if (!folder) throw new Error('No project is open, so there is nowhere to write or read project files. Tell the user they need to open or create a project to make or edit frames (open_project, new_project).');
@@ -169,8 +169,8 @@ function createProjectFiles({ root, readOnly = () => [] }) {
                 });
                 const timer = setTimeout(() => {
                     void worker.terminate();
-                    rejectSearch(new Error(`The search took over ${SEARCH_TIMEOUT_MS / 1000} s and was stopped; try a simpler pattern or a smaller folder.`));
-                }, SEARCH_TIMEOUT_MS);
+                    rejectSearch(new Error(`The search took over ${searchTimeoutMs / 1000} s and was stopped; try a simpler pattern or a smaller folder.`));
+                }, searchTimeoutMs);
                 worker.once('message', (result) => {
                     clearTimeout(timer);
                     void worker.terminate();

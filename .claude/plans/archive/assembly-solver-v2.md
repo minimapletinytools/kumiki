@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 # Assembly Solver v2: moving-group closure, solver-generated substeps, centering
 
 ## Context

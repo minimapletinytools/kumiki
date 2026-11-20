@@ -84,6 +84,22 @@ function sanitizeLogPathSegment(value, fallback) {
     return normalized || fallback || 'session';
 }
 
+/**
+ * What a click or a hover asks the runner about the point under the pointer: the viewer's request
+ * whole, so the two ask the same thing and nothing the viewer adds is dropped on the way (it was,
+ * four times, when this was rebuilt field by field). candidateIndex stays null, never 0: null is
+ * "choose for me" and zero is a choice.
+ */
+function pickQuery(message) {
+    const { type: _type, request: _request, ...query } = message;
+    return {
+        ...query,
+        currentPath: query.currentPath || [],
+        ctrlClick: Boolean(query.ctrlClick),
+        candidateIndex: query.candidateIndex ?? null,
+    };
+}
+
 class FrameViewSession {
     /**
      * @param {string} filePath
@@ -922,6 +938,8 @@ class FrameViewSession {
                     { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
                 );
             } catch (err) {
+                // Closed while the tree was being built: there is nothing to report to.
+                if (this.isDisposed) return;
                 // An error, so read_view_log filtered to errors finds it; the frame still draws.
                 const details = extractRunnerErrorDetails(err);
                 const where = details.traceback ? describeTracebackLocation(details.traceback, { prefer: this.filePath }) : null;
@@ -1151,45 +1169,7 @@ class FrameViewSession {
         if (!this.runnerSession) {
             return;
         }
-        const payload = {
-            memberKey: message.memberKey,
-            point: message.point,
-            currentPath: message.currentPath || [],
-            ctrlClick: !!message.ctrlClick,
-            // How close counts, in world units, worked out by the viewer from
-            // what a pixel is worth where the click landed. Rebuilt field by
-            // field rather than forwarded, so anything added to the message
-            // has to be added here too -- which is how this arrived empty and
-            // edges stopped being selectable while still highlighting.
-            tolerances: message.tolerances || null,
-            // The line the pointer went along. A hit point is on a surface; a
-            // feature in a void -- a bore's axis -- is nowhere near one, so
-            // without the ray it cannot be found at all.
-            ray: message.ray || null,
-            // Which feature at the point is wanted, and what would be measured
-            // to it. With these the runner offers one that can finish the
-            // measurement rather than the most specific one, says whether it
-            // can, and works out the plane -- all in the request that was being
-            // made anyway.
-            // `?? null`, NOT `|| 0`: null means "choose for me" and zero is a
-            // choice. Collapsing them made _best_matching_candidate unreachable
-            // from the viewer -- every hover was forced to the first feature at
-            // the point, so while an end was held the runner could not offer
-            // the one that finishes the measurement, which is what it is for.
-            candidateIndex: message.candidateIndex ?? null,
-            heldGeometry: message.heldGeometry || null,
-            heldAt: message.heldAt || null,
-            heldReference: message.heldReference || null,
-            look: message.look || null,
-            right: message.right || null,
-            up: message.up || null,
-            // Which space to judge the pair in. Without it the runner projects,
-            // and in the 3D view -- where the camera is oblique and no face is
-            // ever seen exactly edge-on -- that makes every face unmeasurable.
-            space: message.space || null,
-            // In a drawing, the members it draws: what can hide something under the pointer.
-            drawnMembers: message.drawnMembers || null,
-        };
+        const payload = pickQuery(message);
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
     }
@@ -1198,45 +1178,7 @@ class FrameViewSession {
         if (!this.runnerSession) {
             return;
         }
-        const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
-            memberKey: message.memberKey,
-            point: message.point,
-            // From wherever the selection already is, exactly as the click
-            // does. Dropped here, the hover asked from the top of the tree
-            // while a click asked from the focus -- so once you had drilled in,
-            // the hover lit the outer node and the click took something deeper.
-            currentPath: message.currentPath || [],
-            // The same tolerances the click will use. Hover that answers by a
-            // different rule lights things a click then refuses.
-            tolerances: message.tolerances || null,
-            // The line the pointer went along. A hit point is on a surface; a
-            // feature in a void -- a bore's axis -- is nowhere near one, so
-            // without the ray it cannot be found at all.
-            ray: message.ray || null,
-            // Which feature at the point is wanted, and what would be measured
-            // to it. With these the runner offers one that can finish the
-            // measurement rather than the most specific one, says whether it
-            // can, and works out the plane -- all in the request that was being
-            // made anyway.
-            // `?? null`, NOT `|| 0`: null means "choose for me" and zero is a
-            // choice. Collapsing them made _best_matching_candidate unreachable
-            // from the viewer -- every hover was forced to the first feature at
-            // the point, so while an end was held the runner could not offer
-            // the one that finishes the measurement, which is what it is for.
-            candidateIndex: message.candidateIndex ?? null,
-            heldGeometry: message.heldGeometry || null,
-            heldAt: message.heldAt || null,
-            heldReference: message.heldReference || null,
-            look: message.look || null,
-            right: message.right || null,
-            up: message.up || null,
-            // Which space to judge the pair in. Without it the runner projects,
-            // and in the 3D view -- where the camera is oblique and no face is
-            // ever seen exactly edge-on -- that makes every face unmeasurable.
-            space: message.space || null,
-            // In a drawing, the members it draws: what can hide something under the pointer.
-            drawnMembers: message.drawnMembers || null,
-        });
+        const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, pickQuery(message));
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about
         // where it was two moves ago.
@@ -1513,6 +1455,11 @@ class FrameViewSession {
         if (this.isDisposed) {
             return;
         }
+        // Deleted (or moved) while its view is open: keep what was built rather than fail to build.
+        if (!fs.existsSync(this.filePath)) {
+            this.log(`[watcher] ${path.basename(this.filePath)} is gone; the view keeps its last build.`);
+            return;
+        }
 
         if (!this.autoRefreshOnFileChange) {
             this.log(`[watcher] Detected ${source} change; awaiting manual refresh.`);
@@ -1767,4 +1714,4 @@ class FrameViewSession {
     }
 }
 
-module.exports = { FrameViewSession, pythonLineLevel, refreshSummary };
+module.exports = { FrameViewSession, pickQuery, pythonLineLevel, refreshSummary };

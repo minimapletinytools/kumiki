@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🤖 -->
 # Claude Rules
 
 Primary instructions for this repository are in AGENTS.md.

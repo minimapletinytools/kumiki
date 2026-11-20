@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🤖🤖🤖 -->
 # API cheat sheet
 
 The signatures of what a frame most often uses, and one complete small frame. The usage instructions

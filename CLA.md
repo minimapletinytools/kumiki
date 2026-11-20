@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Contributor License Agreement
 
 Thank you for contributing to kigumi (the "Project"), the viewer in the

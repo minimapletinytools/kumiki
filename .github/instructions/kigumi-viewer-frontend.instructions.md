@@ -1,6 +1,7 @@
 ---
 applyTo: "kigumi/**"
 ---
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 
 # Kigumi Frontend Agent Rules
 

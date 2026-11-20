@@ -1,6 +1,6 @@
 name: Kigumi Tests
 
-# The same unit tests the release build runs, and the extension tests in VS Code, on every
+# The unit tests, and every integration suite on each host (kigumi/test/integration.js), on every
 # change, so a failure shows up on the PR rather than when a tag is pushed.
 on:
   push:
@@ -63,10 +63,14 @@ jobs:
       - name: Run unit tests
         run: xvfb-run -a npm run test:unit
 
-  # The extension in a real VS Code: the viewer and the explorer open, render and answer the
-  # automation commands. VS Code needs a display, so it runs under xvfb.
-  extension:
+  # Each host's integration suites: the extension in a real VS Code, the standalone app, and Kigumi
+  # in a browser. Each needs a display, so they run under xvfb.
+  integration:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [vscode, app, web]
 
     defaults:
       run:
@@ -92,7 +96,7 @@ jobs:
           restore-keys: |
             uv-${{ runner.os }}-py3.13-
 
-      # The runner tests start runner.py against the repo's .venv.
+      # The views start runner.py against the repo's .venv.
       - name: Install dependencies
         run: |
           if [ ! -f ../kumiki/_pattern_index.json ]; then
@@ -111,23 +115,33 @@ jobs:
         run: npm install
 
       - name: Cache the VS Code the tests download
+        if: matrix.host == 'vscode'
         uses: actions/cache@v4
         with:
-          path: .vscode-test
+          path: kigumi/.vscode-test
           key: vscode-test-${{ runner.os }}-${{ hashFiles('kigumi/package.json') }}
           restore-keys: |
             vscode-test-${{ runner.os }}-
 
+      # Ubuntu's AppArmor stops Electron's sandbox from starting.
       - name: Install a virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
-      # No GPU here: the view draws with SwiftShader (run-extension-tests.js).
-      - name: Run extension tests
-        run: xvfb-run -a npm run test:ext
+      # No GPU here: the views draw with SwiftShader.
+      - name: Run the ${{ matrix.host }} integration suites
+        run: xvfb-run -a npm run test:int -- ${{ matrix.host }}
         env:
           KIGUMI_SOFTWARE_GL: '1'
+          KIGUMI_TEST_ARTIFACTS: ${{ github.workspace }}/kigumi/.artifacts/app
 
-      - name: Run the complex extension tests
-        run: xvfb-run -a npm run test:ext:complex
-        env:
-          KIGUMI_SOFTWARE_GL: '1'
+      - name: Keep the test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kigumi-${{ matrix.host }}-artifacts
+          path: |
+            kigumi/.artifacts
+            kigumi/hosts/pyodide/test-artifacts
+          if-no-files-found: ignore

@@ -6,6 +6,16 @@ module.exports = {
     async run({ check, inShell, waitFor, sleep, capture, panels, openFrame, viewDoc, showTab, shownPage, FRAME }) {
         await openFrame(FRAME);
         check('the view\'s sidebar opens on its tree', await shownPage() === 'tree', await shownPage());
+        // With nothing selected the selection pane is small and the layers tree has the rail: the
+        // pane once filled it and hid the tree.
+        const panes = await waitFor(() => inShell(`(() => {
+            const doc = ${viewDoc};
+            const height = (selector) => { const el = doc.querySelector(selector); return el ? Math.round(el.getBoundingClientRect().height) : null; };
+            const sizes = { rail: height('#view-sidebar'), info: height('.ip-panel'), tree: height('kigumi-layers-view') };
+            return sizes.rail && sizes.tree ? sizes : null;
+        })()`), { timeoutMs: 15000 }).catch(() => null);
+        check('with nothing selected, the layers tree fills most of the sidebar, under a small selection pane',
+            Boolean(panes) && panes.tree > panes.rail * 0.7 && (panes.info || 0) < panes.rail * 0.25, JSON.stringify(panes));
         await showTab('members');
         const memberRows = await waitFor(() => inShell(`${viewDoc}?.querySelectorAll("#timber-rows tr").length || 0`), { timeoutMs: 15000 })
             .catch(() => 0);

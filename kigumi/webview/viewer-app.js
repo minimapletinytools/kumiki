@@ -8,12 +8,13 @@ import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPa
 import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { isKey } from './key-match.js';
+import { viewerKeyAction } from './viewer-keys.js';
 
 // The viewer's keys where the page brings none (kigumi/keybindings.js has the same).
 const DEFAULT_VIEWER_KEYS = Object.freeze({
     measure: ['m'],
     undo: /Mac/i.test(navigator.platform || '') ? ['cmd+z'] : ['ctrl+z'],
-    redo: /Mac/i.test(navigator.platform || '') ? ['cmd+shift+z', 'cmd+y'] : ['ctrl+shift+z', 'ctrl+y'],
+    redo: /Mac/i.test(navigator.platform || '') ? ['shift+cmd+z', 'cmd+y'] : ['ctrl+shift+z', 'ctrl+y'],
     focusSelection: ['f'],
 });
 import { MeasuringMixin } from './viewer-measuring.js';
@@ -2134,12 +2135,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         if (event.key === 'Shift') {
             this._setShiftHeld(true);
         }
-        // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
-        // so something else may well have claimed it, and this only acts while
-        // the pointer is over a feature -- which is not a moment anyone is
-        // tabbing between controls. The comment said this while the code did
-        // the opposite, which disabled cycling wherever anything took Tab.
-        if (event.key === 'Tab' && this._hover && this._hover.feature) {
+        const action = viewerKeyAction(event, {
+            hovering: Boolean(this._hover && this._hover.feature),
+            typing: _isTypingTarget(event.target),
+            pressed: (name) => this._pressed(event, name),
+        });
+        if (action === 'cycleFeature') {
             // A face seen edge-on is never the best answer where it lies -- the
             // edge formed with it wins, being the more specific one -- so
             // without this it cannot be reached at all. In an elevation it is
@@ -2154,49 +2155,19 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // The place did not change, the question did: ask the same point
             // again so the hover shows what the next click would now take.
             this._hover.askAgain();
-            return;
-        }
-        // Nothing below belongs to whatever has the caret. Delete in a search
-        // box deletes text, and ctrl-Z there undoes typing -- taking those
-        // would be the viewer reaching into a control it does not own.
-        if (_isTypingTarget(event.target)) {
-            return;
-        }
-        // Undo and redo are settled BEFORE the defaultPrevented guard, for the
-        // same reason Tab is: the host claims them. VS Code forwards key events
-        // from a webview to its own keybindings and marks ctrl-Z handled on the
-        // way through, so by the time this listener runs the event is already
-        // prevented -- and the guard below turned undo away every time, which
-        // is exactly what "ctrl-Z does nothing" was. While the viewer has focus
-        // and the caret is not in a control, these are the viewer's keys.
-        //
-        // They act on the drawing in front of you, which is what they are keyed
-        // by. Refused while a measurement is half-made: there is nothing on the
-        // stack for it, so undo would reach past the thing you are looking at
-        // to something you are not.
-        // The keys are the keyboard shortcuts' (kigumi/keybindings.js, viewer.*), from the page's payload.
-        if (this._pressed(event, 'undo')) {
+        } else if (action === 'undo' || action === 'redo') {
+            // They act on the drawing in front of you, and are refused while a measurement is
+            // half-made: there is nothing on the stack for it.
             event.preventDefault();
-            this.undoMeasurementChange();
-            return;
-        }
-        if (this._pressed(event, 'redo')) {
-            event.preventDefault();
-            this.redoMeasurementChange();
-            return;
-        }
-        if (event.defaultPrevented) {
-            return;
-        }
-        if (event.key === 'Delete' || event.key === 'Backspace') {
+            if (action === 'undo') this.undoMeasurementChange();
+            else this.redoMeasurementChange();
+        } else if (action === 'delete') {
             // Nothing to delete is not an error: a measurement the code asks
             // for is passed over, and the key simply does nothing.
             if (this.deleteMarkedMeasurements()) {
                 event.preventDefault();
             }
-            return;
-        }
-        if (event.key === 'Escape') {
+        } else if (action === 'escape') {
             event.preventDefault();
             if (this.contextMenu.isOpen) {
                 this.closeMemberContextMenu();
@@ -2208,19 +2179,18 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             } else {
                 this.selectionManager.clearTimberSelection();
             }
-            return;
-        }
-        if (this._pressed(event, 'measure')) {
+        } else if (action === 'measure') {
             // Measure from this: the same as the button, when it would be offered.
             if (!this.measureDraft.isActive && this.canStartMeasurement) {
                 event.preventDefault();
                 this.startMeasurementFromFocus();
             }
-            return;
+        } else if (action === 'focusSelection') {
+            this._focusSelectionKey(event);
         }
-        if (!this._pressed(event, 'focusSelection')) {
-            return;
-        }
+    }
+
+    _focusSelectionKey(event) {
         const activeTag = document.activeElement && document.activeElement.tagName;
         if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') {
             return;

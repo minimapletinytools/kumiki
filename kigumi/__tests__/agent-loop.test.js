@@ -635,15 +635,16 @@ describe('the file tools', () => {
         const started = Date.now();
         let ticks = 0;
         const timer = setInterval(() => { ticks += 1; }, 50);
-        const search = named('search_files').run({ pattern: '^(a+)+$' }).catch((error) => error);
+        const slow = createFileTools({ files: createProjectFiles({ root: () => root, searchTimeoutMs: 1000 }) });
+        const search = slow.find((tool) => tool.name === 'search_files').run({ pattern: '^(a+)+$' }).catch((error) => error);
         await new Promise((resolve) => setTimeout(resolve, 300));
         clearInterval(timer);
         // The main thread kept running while it searched.
         expect(ticks).toBeGreaterThan(2);
         const result = await search;
         expect(result.message || result[0].text).toMatch(/stopped|No matches/);
-        expect(Date.now() - started).toBeLessThan(20000);
-    }, 25000);
+        expect(Date.now() - started).toBeLessThan(5000);
+    });
 
         test('reads with line numbers', async () => {
         const [read] = await named('read_file').run({ file_path: 'frame.py', offset: 2, limit: 1 });

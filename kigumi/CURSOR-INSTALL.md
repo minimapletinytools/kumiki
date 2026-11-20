@@ -1,3 +1,4 @@
+<!-- 🧑🧑🧑🧑🧑🧑 -->
 # Installing Kigumi in Cursor
 
 Cursor supports VSCode extensions since it's built on VSCode, but there are a few ways to use the extension:

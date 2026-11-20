@@ -1,3 +1,4 @@
+<!-- 🤖🤖🤖🤖🤖🤖 -->
 # Visibility check performance (drawing generator)
 
 Notes from profiling, 2026-10-18, to revisit. `visible_by_view` (kumiki/drawings/visibility.py)
