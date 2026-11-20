@@ -9,10 +9,13 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kumiki 0.9.8 / kigumi 0.9.11] - 2026-11-19
+
 ### kumiki
 
 #### Added
 - Names in several languages for the sidebar: `@pattern(..., name={"en": ..., "ja": ...})`, `pattern_folders(...)` for pattern folders (kumiki's own in `KUMIKI_PATTERN_FOLDERS`), and a file's `__title__`. Every shipped pattern, folder and example has English and Japanese names.
+- `cut_basic_practice_simplified_rice_dumping_joint(arrangement)`: the practice rice dumpling (zongjiao) corner, a three-way miter locked by a post, sized from the stock.
 
 ### kigumi
 
@@ -22,6 +25,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - Trackpads: a pinch zooms smoothly. A view option makes a two-finger scroll orbit (shift pans) instead of zooming.
 - A view option hides the mouse controls hint.
 - On a phone, New frame at the end of the frames list opens the agent with a prompt to finish: "Please make a new design: ".
+- Sending a prompt while signed out keeps what you typed and offers GitHub and Google sign-in, or connecting your own agent over MCP.
 
 #### Changed
 - The sidebar shows patterns, pattern folders, pattern books and example frames by their names, in Kigumi's language.
@@ -29,6 +33,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - In a drawing, a Back to 3D button sits over its top-left corner, and the one in the selection panel stands out.
 - A drawing's panel is headed "📏 measurements", its viewports and members lists start closed, and clicking a viewport in it selects that view.
 - Clicking a pattern book's folder in the sidebar opens or closes it; it no longer opens every pattern in it.
+- The agent's longest step is 32k by default, with 64k and no limit offered; 8k is gone.
+- Only the installed app takes kigumi:// links, so a run from source no longer catches share and sign-in links.
 
 #### Fixed
 - Closing a frame's view while a pattern from it is open no longer stops the pattern's view.
@@ -36,6 +42,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - A drawing's centerlines and perfect faces are dashed lines that look the same at any zoom, instead of bars across the line when the sheet is zoomed.
 - A viewer in a hidden tab no longer redraws into a 0×0 canvas, which flooded the app's output with GL_INVALID_FRAMEBUFFER_OPERATION errors.
 - Shipped patterns that share a last path segment within one book (such as the three `face_aligned` patterns in basic joints) each get their own row.
+- A view whose frame file is deleted keeps its last build instead of failing to build it.
+- Closing a view while it opens no longer logs an error.
 
 ## [kumiki 0.9.7 / kigumi 0.9.10] - 2026-11-17
 
