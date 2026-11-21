@@ -133,10 +133,10 @@ This is not the complete list of joints. Search patterns to find joints not list
 
 | Finger joint example | Parameters |
 |---|---|
-| [Box corner](../patterns/corner/finger_corner_joint_patterns.py) | `cut_finger_corner_joint(arrangement, finger_count=5)` (alias `cut_box_corner_joint`). Depth follows the mating piece. |
-| [Finger splice](../patterns/splice/finger_splice_joint_patterns.py) | `cut_finger_splice_joint(arrangement, finger_length, finger_count=5, *, taper_angle=atan(1/8), splice_point=None)`. The point locates the middle of the overlap in world space. Use a zero angle for straight fingers. |
+| [Box corner](../patterns/corner/finger_corner_joint_patterns.py) | `cut_uniform_finger_corner_joint(arrangement, finger_count=None, *, finger_width=None)` (alias `cut_box_corner_joint`). Depth follows the mating piece. |
+| [Finger splice](../patterns/splice/finger_splice_joint_patterns.py) | `cut_uniform_finger_splice_joint(arrangement, finger_length, finger_count=None, *, finger_width=None, taper_angle=atan(1/8), splice_point=None)`. The point locates the middle of the overlap in world space. Use a zero angle for straight fingers. |
 
-Both cutters count the total alternating fingers starting at timber 1’s layout face. Timber 1 keeps the first finger.
+Pass either `finger_count` or `finger_width`. Omitting both gives five equal fingers across the two members. Fixed widths start at the arrangement’s front face, where timber 1 keeps the first finger. Any remainder forms the last finger at the opposite face. For a tapered splice, the specified width is measured halfway along the overlap.
 
 ## Creating the frame
 

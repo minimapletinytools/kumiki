@@ -2624,7 +2624,7 @@
         ]
       },
       "relative_path": "corner/finger_corner_joint_patterns.py",
-      "sha256": "673b7375e13cc4f4cd7e334f9883797d0d9acb5dae3ad7cd8c01136f13be44a1",
+      "sha256": "a377f80e2e79338a078b7dae93c591fad63002e089de4b07856e9beb169a7a7c",
       "title": {
         "en": "Box corner",
         "ja": "\u3042\u3089\u308c\u7d44\u307f"
@@ -5124,7 +5124,7 @@
         ]
       },
       "relative_path": "splice/finger_splice_joint_patterns.py",
-      "sha256": "e6d7c13fa626ab244fa49221bcfbbd2516355ae2b9f97aff40a1e611056c4268",
+      "sha256": "b43609ab3f930a08a06be82e25cad34f85f18c1048189a25fec0aa4313a2c748",
       "title": {
         "en": "Finger splice",
         "ja": "\u30d5\u30a3\u30f3\u30ac\u30fc\u30b8\u30e7\u30a4\u30f3\u30c8"
@@ -6078,7 +6078,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T17:54:41.406900+00:00",
+  "generated_at": "2026-11-21T18:21:57.924168+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }

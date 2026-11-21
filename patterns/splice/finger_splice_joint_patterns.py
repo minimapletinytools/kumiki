@@ -4,14 +4,18 @@
 from dataclasses import replace
 from typing import Optional
 
-from kumiki import (Joint, Kiwari, KUMIKI_PATTERN_FOLDERS, TimberLongFace, atan, create_v2, cut_finger_splice_joint,
+from kumiki import (Joint, Kiwari, KUMIKI_PATTERN_FOLDERS, TimberLongFace, atan, create_v2, cut_uniform_finger_splice_joint,
                     kiwari, mm, pattern, pattern_folders, scalar)
 from kumiki.example_shavings import create_canonical_example_splice_joint_timbers
 
 __title__ = {"en": "Finger splice", "ja": "フィンガージョイント"}
 pattern_folders(KUMIKI_PATTERN_FOLDERS)
-SPLICE = kiwari(finger_count=kiwari.count(7, minimum=2), finger_length=kiwari.length(mm(36), minimum=mm(1)),
-                taper_angle=kiwari.angle(atan(scalar(1, 8))))
+SPLICE = kiwari(
+    finger_count=kiwari.count(7, optional=True, minimum=2, about="Clear to use finger width"),
+    finger_width=kiwari.length(optional=True, about="Measure inward from the front face"),
+    finger_length=kiwari.length(mm(36), minimum=mm(1)),
+    taper_angle=kiwari.angle(atan(scalar(1, 8))),
+)
 
 
 @pattern("splice/finger_splice_joint", name=__title__, kiwari=SPLICE)
@@ -20,6 +24,6 @@ def finger_splice(k: Optional[Kiwari] = None) -> Joint:
     k = SPLICE.resolve(k)
     arrangement = create_canonical_example_splice_joint_timbers(timber_size=create_v2(mm(18), mm(84)),
                                                                timber_length=mm(100))
-    return cut_finger_splice_joint(replace(arrangement, front_face_on_timber1=TimberLongFace.FRONT),
-                                   finger_length=k.length("finger_length"), finger_count=k.count("finger_count"),
-                                   taper_angle=k.angle("taper_angle"))
+    return cut_uniform_finger_splice_joint(replace(arrangement, front_face_on_timber1=TimberLongFace.FRONT),
+                                           finger_length=k.length("finger_length"), finger_count=k.count("finger_count"),
+                                           finger_width=k.length("finger_width"), taper_angle=k.angle("taper_angle"))

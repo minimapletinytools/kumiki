@@ -1,6 +1,6 @@
 """Shared marking and end cuts for complementary rows of fingers."""
 
-from math import isfinite
+from math import ceil, isfinite
 
 from kumiki.construction import CornerJointTimberArrangement, SpliceJointTimberArrangement, arrangement_error
 from kumiki.csg.cutcsg import ConvexPolygonExtrusion, CutCSG, CutCSGLabel, SolidUnion, adopt_csg
@@ -28,19 +28,34 @@ def matched_span(arrangement: CornerJointTimberArrangement | SpliceJointTimberAr
 
 
 def finger_slots(shoulder_global: V3, front_global: V3, along_global: V3, width: Numeric,
-                 depth: Numeric, thickness: Numeric, count: int, taper_angle: Numeric) -> tuple[CutCSG, CutCSG]:
+                 depth: Numeric, thickness: Numeric, finger_count: int | None, finger_width: Numeric | None,
+                 taper_angle: Numeric) -> tuple[CutCSG, CutCSG]:
     """Return each member's slot waste in world space, starting with a finger on timber1.
 
     The profile runs inward from the front face and along timber1 from its shoulder to its tip.
     Thickness spans the third axis, centered on the shoulder point.
     """
-    if isinstance(count, bool) or not isinstance(count, int) or count < 2:
-        raise ValueError("finger_count must be an integer of at least 2")
+    if finger_width is None:
+        count = 5 if finger_count is None else finger_count
+        if isinstance(count, bool) or not isinstance(count, int) or count < 2:
+            raise ValueError("finger_count must be an integer of at least 2")
+        pitch = width / count
+    else:
+        if finger_count is not None:
+            raise ValueError("finger_count and finger_width are mutually exclusive")
+        if isinstance(finger_width, bool) or not isfinite(finger_width) or safe_compare(finger_width, 0, Comparison.LE):
+            raise ValueError("finger_width must be positive and finite")
+        if safe_compare(finger_width, width, Comparison.GE):
+            raise ValueError("finger_width must be smaller than the shared width")
+        pitch = finger_width
+        count = ceil(width / pitch)
+        # A rounded exact multiple can otherwise leave a zero-width last finger.
+        if safe_equality_test((count - 1) * pitch, width):
+            count -= 1
     if not isfinite(depth) or depth <= 0:
         raise ValueError("finger_length must be positive and finite")
     if not 0 <= taper_angle < pi / 2:
         raise ValueError("taper_angle must satisfy 0 <= angle < pi/2")
-    pitch = width / count
     shift = depth * tan(taper_angle) / 2
     transform = Transform(position=shoulder_global + front_global * (width / 2),
                           orientation=Orientation.from_x_and_y(-front_global, along_global))
@@ -54,7 +69,7 @@ def finger_slots(shoulder_global: V3, front_global: V3, along_global: V3, width:
     waste: tuple[list[CutCSG], list[CutCSG]] = ([], [])
     for i, ((root_left, tip_left), (root_right, tip_right)) in enumerate(zip(stations, stations[1:])):
         if safe_compare(root_right, root_left, Comparison.LE) or safe_compare(tip_right, tip_left, Comparison.LE):
-            raise ValueError("The taper leaves no finger tip. Reduce taper_angle, finger_length or finger_count.")
+            raise ValueError("The taper leaves no finger tip. Reduce the taper or change the finger spacing.")
         profile = [create_v2(root_left, 0), create_v2(root_right, 0),
                    create_v2(tip_right, depth), create_v2(tip_left, depth)]
         waste[(i + 1) % 2].append(ConvexPolygonExtrusion(

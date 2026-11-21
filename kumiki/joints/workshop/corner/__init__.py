@@ -2,7 +2,7 @@
 Kumiki - Corner joint construction functions
 """
 
-from .finger_corner_joint import cut_finger_corner_joint, cut_box_corner_joint
+from .finger_corner_joint import cut_uniform_finger_corner_joint, cut_box_corner_joint
 from .practice_simplified_rice_dumping_joint import (
     cut_practice_simplified_rice_dumping_joint,
     cut_简化粽角榫,
@@ -29,7 +29,7 @@ from .dovetail_corner_joint import (
 )
 
 __all__ = [
-    "cut_finger_corner_joint",
+    "cut_uniform_finger_corner_joint",
     "cut_box_corner_joint",
     "cut_practice_simplified_rice_dumping_joint",
     "cut_简化粽角榫",

@@ -9,14 +9,16 @@ from kumiki.timber import AssemblyFreedom, Joint, JointTicket, TimberLongFace
 from ..shavings.fingers import finger_cutting, finger_slots, matched_span
 
 
-def cut_finger_splice_joint(
-    arrangement: SpliceJointTimberArrangement, finger_length: Numeric, finger_count: int = 5, *,
-    taper_angle: Numeric = atan(scalar(1, 8)), splice_point: Optional[V3] = None,
+def cut_uniform_finger_splice_joint(
+    arrangement: SpliceJointTimberArrangement, finger_length: Numeric, finger_count: int | None = None, *,
+    finger_width: Numeric | None = None, taper_angle: Numeric = atan(scalar(1, 8)), splice_point: Optional[V3] = None,
 ) -> Joint:
     """Splice opposed ends of matching rectangular stock with fingers of axial length finger_length.
 
-    finger_count counts both members' fingers across the common section. Timber1 keeps the
-    first at front_face_on_timber1 (default FRONT). taper_angle is the angle of each flank
+    Set finger_count to divide the section evenly (default five), or finger_width to mark
+    fixed widths at mid-overlap starting at front_face_on_timber1 (default FRONT).
+    Timber1 keeps the first finger. Any remainder at the far face must accommodate
+    the taper. taper_angle is the angle of each flank
     to the grain, in radians. Zero gives straight fingers. The center of the overlap is the
     projected world-space splice_point, or the midpoint of the selected ends when omitted.
     """
@@ -35,7 +37,7 @@ def cut_finger_splice_joint(
         center_global = end_global + along * safe_dot_product(splice_point - end_global, along)
     shoulder_global = center_global - along * (finger_length / 2)
     first_slots, second_slots = finger_slots(shoulder_global, first.get_face_direction_global(front), along,
-                                            width, finger_length, thickness, finger_count, taper_angle)
+                                            width, finger_length, thickness, finger_count, finger_width, taper_angle)
     through = first.get_face_direction_global(front.rotate_right())
     sideways = AssemblyFreedom.bidirectional_translation(through, thickness)
     first_freedom = AssemblyFreedom.combine(AssemblyFreedom.translation(-along, finger_length), sideways)

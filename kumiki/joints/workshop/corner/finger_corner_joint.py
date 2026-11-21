@@ -2,17 +2,20 @@
 
 from kumiki.construction import CornerJointTimberArrangement, arrangement_check
 from kumiki.measuring import get_center_point_on_face_global
-from kumiki.rule import safe_dot_product
+from kumiki.rule import Numeric, safe_dot_product
 from kumiki.timber import AssemblyFreedom, Joint, JointTicket
 from ..shavings.fingers import finger_cutting, finger_slots, matched_span
 
 
-def cut_finger_corner_joint(arrangement: CornerJointTimberArrangement, finger_count: int = 5) -> Joint:
+def cut_uniform_finger_corner_joint(
+    arrangement: CornerJointTimberArrangement, finger_count: int | None = None, *, finger_width: Numeric | None = None,
+) -> Joint:
     """Cut alternating square through fingers in two orthogonal rectangular ends.
 
-    finger_count counts both members' fingers across their shared width. Timber1 keeps the
-    first finger at front_face_on_timber1. If omitted, that face follows the cross product
-    of the two outward end directions. Each end finishes flush with the other's outside face.
+    Set finger_count to divide the shared width evenly (default five), or finger_width
+    to mark fixed widths inward from front_face_on_timber1, leaving any remainder at
+    the far face. Timber1 keeps the first finger. The default front face follows the
+    cross product of the two outward end directions.
     """
     arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
     arrangement_check(arrangement.check_plane_aligned(), arrangement)
@@ -30,7 +33,7 @@ def cut_finger_corner_joint(arrangement: CornerJointTimberArrangement, finger_co
     origin = first.get_bottom_position_global()
     shoulder_global = origin + along * safe_dot_product(entry_global - origin, along)
     first_slots, second_slots = finger_slots(shoulder_global, first.get_face_direction_global(front), along,
-                                            width, depth, thickness, finger_count, 0)
+                                            width, depth, thickness, finger_count, finger_width, 0)
 
     def freedom(sign: int) -> AssemblyFreedom:
         return AssemblyFreedom.combine(AssemblyFreedom.translation(-along * sign, depth),
@@ -44,4 +47,4 @@ def cut_finger_corner_joint(arrangement: CornerJointTimberArrangement, finger_co
     }, ticket=JointTicket(joint_type="finger_corner"))
 
 
-cut_box_corner_joint = cut_finger_corner_joint
+cut_box_corner_joint = cut_uniform_finger_corner_joint

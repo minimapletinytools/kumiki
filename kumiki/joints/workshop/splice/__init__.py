@@ -2,7 +2,7 @@
 Kumiki - Splice joint construction functions
 """
 
-from .finger_splice_joint import cut_finger_splice_joint
+from .finger_splice_joint import cut_uniform_finger_splice_joint
 from .plain_butt_splice_joint import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
 )
@@ -26,7 +26,7 @@ from .half_blind_tenoned_dadoed_rabbeted_scarf_joint import (
 )
 
 __all__ = [
-    "cut_finger_splice_joint",
+    "cut_uniform_finger_splice_joint",
     "cut_plain_butt_splice_joint_on_aligned_timbers",
     "cut_plain_splice_lap_joint_on_aligned_timbers",
     "cut_lapped_gooseneck_joint_on_aligned_timbers",
