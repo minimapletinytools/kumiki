@@ -125,6 +125,24 @@ module.exports = {
                 `${width}x${height}, page aspect ${pageAspect.toFixed(3)}, ${marked} marked samples`);
             fs.rmSync(path.join(REPO, 'kigumi_exports', path.basename(DRAWING_FRAME, '.py')), { recursive: true, force: true });
         }
+        const dimensionCount = await inShell(`(() => {
+            const app = ${viewerApp};
+            const count = app.querySelectorAll('#measurement-overlay .dim-label').length;
+            app.setDrawingOption('tintSvgReferenceFaces', true);
+            const button = Array.from(app.querySelectorAll('#drawing-panel button')).find(b => b.textContent === 'export svg');
+            button.click();
+            return count;
+        })()`);
+        const svgFile = await waitFor(() => (fs.existsSync(exportsDir) && fs.readdirSync(exportsDir)
+            .find(name => name.endsWith('.svg'))) || null, { timeoutMs: 90000 }).catch(() => null);
+        const exported = svgFile ? fs.readFileSync(path.join(exportsDir, svgFile), 'utf8') : '';
+        check('SVG export contains vector edges, live dimension labels, and an embedded preview',
+            exported.includes('class="edges"') && exported.includes('data:image/png;base64,') &&
+            exported.includes('fill="#f4d6c4"') && exported.includes('fill="#cfdfec"') &&
+            dimensionCount > 0 && (exported.match(/class="dim-label"/g) || []).length === dimensionCount,
+            JSON.stringify({ svgFile, dimensionCount, bytes: exported.length }));
+        if (svgFile && ARTIFACTS) fs.copyFileSync(path.join(exportsDir, svgFile), path.join(ARTIFACTS, svgFile));
+        fs.rmSync(exportsDir, { recursive: true, force: true });
         check('exporting leaves the view zoomed and panned as it was, at its own pixel ratio',
             after.view === before.view && after.ratio === before.ratio, JSON.stringify({ before, after }));
 

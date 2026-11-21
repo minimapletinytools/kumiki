@@ -6,7 +6,7 @@
 
 import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, THREE_D_MEASUREMENTS_ID, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
 import { SELECTION_MODES } from './selection-store.js';
-import { composeDrawingPng, drawingFileName } from './drawing-export.js';
+import { composeDrawingPng, drawingFileName, previewImage, standaloneSvg } from './drawing-export.js';
 
 // The exported page's longer side, in pixels; less where the GPU can't draw that large.
 const EXPORT_LONG_SIDE_PX = 3000;
@@ -263,6 +263,57 @@ export const DrawingsMixin = (Base) => class extends Base {
         }
     }
 
+    /** Capture the fitted sheet, live cameras, preview images, and printable dimension overlay. */
+    exportDrawingSvg() {
+        if (!vscode || !this.isInDrawing || !this.renderer || !this.activePage) return;
+        const scene = this.sceneStore.activeScene();
+        const fileName = drawingFileName(scene.name || scene.id, 'svg');
+        const saved = this.pageView;
+        this.pageView = { zoom: 1, offsetX: 0, offsetY: 0 };
+        this._exportingDrawing = true;
+        try {
+            const size = this.renderer.getSize(new THREE.Vector2());
+            const page = this.pageScreenRect(size.x, size.y);
+            const views = [];
+            this.renderViewports((viewport, rect) => {
+                const spec = { id: viewport.id, rect: viewport.spec.rect };
+                const camera = viewport.camera;
+                if (camera.isOrthographicCamera) {
+                    const axis = (x, y) => new THREE.Vector3(x, y, 0).transformDirection(camera.matrixWorld).toArray();
+                    spec.camera = {
+                        center: new THREE.Vector3(0, 0, 0).unproject(camera).toArray(),
+                        right: axis(1, 0), up: axis(0, 1),
+                        width: 2 / camera.projectionMatrix.elements[0], height: 2 / camera.projectionMatrix.elements[5],
+                    };
+                } else {
+                    spec.image = previewImage(this.renderer.domElement, rect, this.renderer.getPixelRatio(), size.y);
+                }
+                views.push(spec);
+            });
+            const visible = [], ghosts = [];
+            for (const [key, bundle] of this.sceneManager.entries()) {
+                if (!bundle.mesh.visible) continue;
+                visible.push(key);
+                if (bundle.idMesh && !bundle.idMesh.visible) ghosts.push(key);
+            }
+            const overlay = this.renderRoot.querySelector('#measurement-overlay');
+            vscode.postMessage({ type: 'exportDrawingSvg', fileName, sheet: {
+                page, paper: this.activePage, views, visible, ghosts,
+                geometryMode: this.viewerOptions?.geometryMode || 'actual',
+                dimensions: standaloneSvg(overlay, size.x, size.y),
+                styles: { centerlines: this.showDrawingCenterplanes, perfect_faces: this.showDrawingPerfectFaces,
+                    references: this.showDrawingReferenceFeatures && this.referenceFeatures !== 'never',
+                    reference_faces: this.tintSvgReferenceFaces },
+            } });
+        } catch (error) {
+            vscode.postMessage({ type: 'exportDrawingSvg', fileName, error: String(error) });
+        } finally {
+            this.pageView = saved;
+            this._exportingDrawing = false;
+            this.renderViewports();
+        }
+    }
+
     /** Render the open drawing to a PNG and send it to be saved with the frame's exports. */
     async exportDrawingPng() {
         const scene = this.sceneStore.activeScene();
@@ -337,6 +388,7 @@ export const DrawingsMixin = (Base) => class extends Base {
         if (!host.dataset.bound) {
             host.dataset.bound = 'true';
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
+            host.addEventListener('kigumi-export-drawing-svg', () => this.exportDrawingSvg());
             host.addEventListener('kigumi-export-drawing-png', () => void this.exportDrawingPng());
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);

@@ -485,6 +485,10 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'exportDrawingSvg') {
+                void this._writeDrawingSvg(message);
+                return;
+            }
             if (message.type === 'exportDrawingPng') {
                 void this._writeDrawingPng(message);
                 return;
@@ -1290,6 +1294,24 @@ class FrameViewSession {
         fs.writeFileSync(outputPath, Buffer.from(match[1], 'base64'));
         this.log(`[drawing] Wrote ${outputPath}`);
         void getHost().showMessage('info', t('message.drawingExported', { path: outputPath }));
+    }
+
+    async _writeDrawingSvg(message) {
+        try {
+            const fileName = path.basename(message.fileName || '');
+            if (message.error || !fileName.endsWith('.svg') || !message.sheet) {
+                throw new Error(message.error || 'Missing SVG sheet');
+            }
+            const outputPath = path.join(exportDirectory(this), 'drawings', fileName);
+            const result = await this.runnerSession.slotRequest('render_drawing_svg', this.slotName, { sheet: message.sheet });
+            fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+            fs.writeFileSync(outputPath, result.svg, 'utf8');
+            this.log(`[drawing] Wrote ${outputPath}`);
+            void getHost().showMessage('info', t('message.drawingExported', { path: outputPath }));
+        } catch (error) {
+            this.log(`[drawing] SVG export failed: ${error.message}`, 'error');
+            void getHost().showMessage('error', t('message.drawingExportFailed', { error: error.message }));
+        }
     }
 
     async _handleRequestDrawingFromSelection(message) {
