@@ -131,6 +131,13 @@ The face-aligned basic cross-lap and housing names are deprecated; use the gener
 
 This is not the complete list of joints. Search patterns to find joints not listed here. (TODO create a complete list of all joints)
 
+| Finger joint example | Parameters |
+|---|---|
+| [Box corner](../patterns/corner/finger_corner_joint_patterns.py) | `cut_finger_corner_joint(arrangement, finger_count=5)` (alias `cut_box_corner_joint`). Depth follows the mating piece. |
+| [Finger splice](../patterns/splice/finger_splice_joint_patterns.py) | `cut_finger_splice_joint(arrangement, finger_length, finger_count=5, *, taper_angle=atan(1/8), splice_point=None)`. The point locates the middle of the overlap in world space. Use a zero angle for straight fingers. |
+
+Both cutters count the total alternating fingers starting at timber 1’s layout face. Timber 1 keeps the first finger.
+
 ## Creating the frame
 
 Your kumiki project is not done until there is a `@frame` decorated function that returns a Frame. Always use Frame.from_joints and pass in the list of joint objects returned by the joint functions above. If Only use `additional_unjointed_timbers` if there are timbers that have no joints.
