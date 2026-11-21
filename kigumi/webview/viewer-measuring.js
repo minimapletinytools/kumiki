@@ -1201,7 +1201,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         text.setAttribute('y', layout.label.y);
         text.setAttribute('class', `dim-label${extra}`);
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
-        text.textContent = this.fmt(value.value);
+        text.textContent = this.fmt(value.value) + (measure.note ? ` ${measure.note}` : '');
         into.appendChild(text);
     }
 

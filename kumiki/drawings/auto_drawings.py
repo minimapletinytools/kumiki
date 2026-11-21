@@ -6,6 +6,8 @@ reference features and bottom end. Matching pieces (match_timbers) share one sho
 """
 
 from dataclasses import replace
+
+import numpy as np
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..csg.assumptions import sheet_axis_assumptions, square_assumptions
@@ -189,9 +191,49 @@ def piece_drawing(group: SymmetricTimberGroup, extra_views: Mapping[str, ViewAxe
     measurements: Dict[ViewportId, List] = {ids[labels[view]]: [] for view in labels}
     for pick in result.picks:
         measurements[ids[labels[pick.candidate.view]]].append(pick.candidate.measure)
+    import os
+    if os.environ.get("KUMIKI_OVERALL") == "1":
+        # EXPERIMENT: the piece's overall length, end to end, in the front view. It solves nothing
+        # the picks have not; it is what a reader looks for first.
+        overall = _overall_length(cut, measurements[ids[labels["front"]]])
+        if overall is not None:
+            measurements[ids[labels["front"]]].append(overall)
     path = cut.timber.ticket.path
     return Drawing(name=f"{path}{_count(group)} (generated)", drawing_id=DrawingId(f"{path} (generated)"),
                    timbers=[cut.timber], viewports=viewports, measurements=measurements)
+
+
+def _overall_length(cut: CutTimber, measures):
+    """EXPERIMENT: a measure between the end-most anchors `measures` already use: lines or faces
+    square to the length, nearest each end."""
+    from .measure import Measure
+    from ..geometry import Line
+    timber = cut.timber
+    along = np.array([float(v) for v in timber.get_length_direction_global()])
+    ends = []
+    for measure in measures:
+        for handle in (measure.anchor_a, measure.anchor_b):
+            located = handle.feature.locate_simple_unbounded(handle.owner)
+            if isinstance(located, Plane):
+                normal = np.array([float(v) for v in timber.transform.local_to_global_direction(located.normal)])
+                if abs(abs(normal @ along) - 1) > 1e-6:
+                    continue
+                point = located.point
+            elif isinstance(located, Line):
+                direction = np.array([float(v) for v in timber.transform.local_to_global_direction(located.direction)])
+                if abs(direction @ along) > 1e-6:
+                    continue
+                point = located.point
+            else:
+                continue
+            at = np.array([float(v) for v in timber.transform.local_to_global(point)]) @ along
+            ends.append((float(at), handle))
+    if len(ends) < 2:
+        return None
+    ends.sort(key=lambda end: end[0])
+    if ends[-1][0] - ends[0][0] < 1e-6:
+        return None
+    return Measure(ends[0][1], ends[-1][1])
 
 
 def _ids_by_label(viewports: Sequence[Viewport]) -> Dict[str, ViewportId]:

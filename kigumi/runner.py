@@ -2725,6 +2725,152 @@ def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']
     return None
 
 
+_LAB_MESHES: Dict[int, Any] = {}
+
+
+def _member_meshes(frame: 'Frame') -> Dict[str, Any]:
+    """EXPERIMENT: each member's world mesh, by member key, cached per cut timber."""
+    from kumiki.csg.cutcsg import adopt_csg
+    from kumiki.csg.triangles import triangulate_cutcsg
+    from kumiki.rule import Transform
+
+    counts: Dict[str, int] = {}
+    out = {}
+    for cut in frame.cut_timbers:
+        base = get_timber_display_name(cut.timber)
+        key = f"{base}#{counts.get(base, 0)}"
+        counts[base] = counts.get(base, 0) + 1
+        if id(cut) not in _LAB_MESHES:
+            try:
+                mesh = triangulate_cutcsg(adopt_csg(cut.timber.transform, Transform.identity(),
+                                                    cut.render_timber_with_cuts_csg_local())).mesh
+                _LAB_MESHES[id(cut)] = (cut, (mesh.vertices, mesh.faces))
+            except Exception as exc:  # noqa: BLE001
+                log_warning(f"[layout] no mesh for {key}: {exc}")
+                _LAB_MESHES[id(cut)] = (cut, None)
+        out[key] = _LAB_MESHES[id(cut)][1]
+    return out
+
+
+def _collapse_mirrored(scene: DrawingWire, meshes: Dict[str, Any]) -> None:
+    """EXPERIMENT: where two code dimensions in a viewport are each other's mirror image across the
+    work's middle (same length, same direction), draw one, noted (2×)."""
+    import numpy as np
+    from kumiki.drawings.dimension_layout import MaterialGrid, SheetView, material_bounds
+
+    page = scene.get("page")
+    for viewport in scene.get("viewports") or []:
+        view = SheetView.of(viewport, page)
+        measures = viewport.get("measurements") or []
+        if view is None or len(measures) < 2:
+            continue
+        members = viewport.get("members") or scene.get("members") or list(meshes)
+        work = material_bounds(MaterialGrid(view, [meshes[k] for k in members if meshes.get(k) is not None]))
+        if work is None:
+            continue
+        centre = np.array([(work[0] + work[2]) / 2, (work[1] + work[3]) / 2])
+        seen = []
+        for measure in measures:
+            a, b = (measure.get("a") or {}).get("at"), (measure.get("b") or {}).get("at")
+            value = ((measure.get("settled") or {}).get("value") or {}).get("value")
+            if a is None or b is None or value is None or measure.get("origin") not in (None, "code"):
+                seen.append(None)
+                continue
+            sa, sb = view.to_sheet([a, b])
+            seen.append((float(value), sa, sb))
+        dropped = set()
+        for i, one in enumerate(seen):
+            if one is None or i in dropped:
+                continue
+            for j in range(i + 1, len(seen)):
+                other = seen[j]
+                if other is None or j in dropped or abs(one[0] - other[0]) > 1e-6:
+                    continue
+                for axis in (0, 1):
+                    flip = lambda p: np.array([2 * centre[0] - p[0], p[1]]) if axis == 0 else np.array([p[0], 2 * centre[1] - p[1]])
+                    mine = sorted([tuple(np.round(flip(one[1]), 1)), tuple(np.round(flip(one[2]), 1))])
+                    theirs = sorted([tuple(np.round(other[1], 1)), tuple(np.round(other[2], 1))])
+                    if np.allclose(mine, theirs, atol=0.8):
+                        dropped.add(j)
+                        measures[i] = {**measures[i], "note": "(2\u00d7)"}
+                        break
+                if j in dropped:
+                    break
+        viewport["measurements"] = [m for k, m in enumerate(measures) if k not in dropped]
+
+
+def _lay_out_dimensions(scene: DrawingWire, frame: 'Frame') -> None:
+    """EXPERIMENT: place each viewport's code dimensions (kumiki/drawings/dimension_layout.py), then
+    refit the dimensioned viewports, one scale for the drawing, so the work and its dimensions fit,
+    and place them again."""
+    from kumiki.drawings.dimension_layout import (MaterialGrid, SheetView, bands, fit_scale, material_bounds,
+                                                  place_viewport, placement_wire, refit)
+
+    meshes = _member_meshes(frame)
+    page = scene.get("page")
+    if os.environ.get("KUMIKI_TYP") == "1":
+        _collapse_mirrored(scene, meshes)
+    originals = {id(v): [dict(m) for m in (v.get("measurements") or [])] for v in scene.get("viewports") or []}
+
+    def place_all(apply: bool):
+        found = []
+        for viewport in scene.get("viewports") or []:
+            view = SheetView.of(viewport, page)
+            if view is None or viewport.get("projection") != "orthographic":
+                continue
+            members = viewport.get("members") or scene.get("members") or list(meshes)
+            drawn = [meshes[key] for key in members if meshes.get(key) is not None]
+            viewport["measurements"] = [dict(m) for m in originals[id(viewport)]]
+            placed = place_viewport(viewport, page, drawn, bounded=apply)
+            work = material_bounds(MaterialGrid(view, drawn))
+            found.append((viewport, view, work, placed))
+            if apply:
+                measures = viewport["measurements"]
+                for one in placed:
+                    measure = {**measures[one.dim.index], "placement": placement_wire(one, view.mm_per_world)}
+                    if one.along_world is not None:
+                        measure = _resolve_measurement(frame, measure, _viewport_axes(scene, viewport["id"]))
+                    measures[one.dim.index] = measure
+        return found
+
+    from kumiki.drawings.dimension_layout import MIN_SCALE
+    shrunk = 1.0
+    for _round in range(4 if os.environ.get("KUMIKI_LAYOUT_FIT", "1") == "1" else 0):
+        first = [(v, view, work, bands(placed, work)) for v, view, work, placed in place_all(False) if work]
+        scale = min((fit_scale(view, work, band) for _, view, work, band in first), default=1.0)
+        # MIN_SCALE bounds the shrink over every round together, not each.
+        scale = max(scale, min(1.0, MIN_SCALE / shrunk))
+        shrunk *= scale
+        if first:
+            # Views in one column keep lining up across, and in one row up and down: each takes the
+            # widest band any view in its column (row) needs on each side.
+            def shared(entry, axis):
+                rect = entry[0]["rect"]
+                same = [other for other in first
+                        if abs(other[0]["rect"][axis] - rect[axis]) < 1e-6
+                        and abs(other[0]["rect"][axis + 2] - rect[axis + 2]) < 1e-6]
+                lo = max(other[3][axis] for other in same)
+                hi = max(other[3][axis + 2] for other in same)
+                work_lo = min(other[2][axis] for other in same)
+                work_hi = max(other[2][axis + 2] for other in same)
+                return lo, hi, work_lo, work_hi
+            aligned = []
+            for entry in first:
+                l, r, wl, wr = shared(entry, 0)
+                t, b, wt, wb = shared(entry, 1)
+                aligned.append((entry[0], entry[1], (wl, wt, wr, wb), (l, t, r, b)))
+            first = aligned
+            # Every orthographic view of the drawing shares one scale, dimensioned or not.
+            for viewport in scene.get("viewports") or []:
+                view = SheetView.of(viewport, page)
+                match = next((entry for entry in first if entry[0] is viewport), None)
+                if match is not None:
+                    refit(viewport, view, match[2], match[3], scale)
+        if scale > 0.99:
+            break
+    place_all(True)
+
+
 def _attach_measurements(
     scene: DrawingWire,
     by_viewport: Dict[str, List[MeasureWire]],
@@ -2747,6 +2893,8 @@ def _attach_measurements(
     }
     for viewport in scene.get("viewports") or []:
         viewport["measurements"] = remaining.pop(viewport.get("id"), [])
+    if os.environ.get("KUMIKI_LAYOUT") == "1":
+        _lay_out_dimensions(scene, frame)
     unplaceable = {
         viewport: measures for viewport, measures in remaining.items() if measures
     }
