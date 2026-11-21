@@ -2435,7 +2435,8 @@
         },
         "pattern_names": [
           "through",
-          "half_blind"
+          "half_blind",
+          "angled"
         ],
         "patterns": [
           {
@@ -2455,11 +2456,20 @@
             "path": "corner/dovetail_corner_joint/half_blind",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "names": {
+              "en": "Angled dovetail",
+              "ja": "\u89d2\u5ea6\u4ed8\u304d\u87fb\u7d44\u307f"
+            },
+            "path": "corner/dovetail_corner_joint/angled",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "corner/dovetail_corner_joint_patterns.py",
-      "sha256": "01fd566004ff53d5e5703b7cd730fc0c350a630af145c2604ebad55330414e29",
+      "sha256": "2db5eef89a90ad76c4f3aefcde11c9fa04d3fba04324aeca7ffad91573d39cb9",
       "title": {
         "en": "Dovetail corner joints",
         "ja": "\u9685\u306e\u87fb\u7d44\u307f"
@@ -6078,7 +6088,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T18:21:57.924168+00:00",
+  "generated_at": "2026-11-21T18:25:53.336833+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }

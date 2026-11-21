@@ -351,10 +351,14 @@ class TestDovetailCornerJoint:
         with pytest.raises(AssertionError, match="flush"):
             cut([scalar(3)], [_dovetail()], dataclasses.replace(offset_arrangement, timber2=offset_timber2))
 
-        # Non-orthogonal timbers have no corner square to interlock in.
-        skew_arrangement = _make_corner_arrangement(create_v3(1, 0, 0), create_v3(1, 1, 0))
-        with pytest.raises(KumikiArrangementError, match="orthogonal"):
-            cut([scalar(3)], [_dovetail()], skew_arrangement)
+        # Parallel timbers make no corner.
+        parallel_arrangement = dataclasses.replace(
+            _make_corner_arrangement(create_v3(1, 0, 0), create_v3(0, 1, 0)),
+            timber2=create_timber(length=scalar(60), size=create_v2(scalar(6), scalar(6)),
+                                  bottom_position=create_v3(0, 0, 0), length_direction=create_v3(-1, 0, 0),
+                                  width_direction=create_v3(0, 0, 1), ticket="timber2"))
+        with pytest.raises((AssertionError, KumikiArrangementError)):
+            cut([scalar(3)], [_dovetail()], parallel_arrangement)
 
     def test_a_tail_is_named_on_the_timber_that_keeps_it(self):
         """The tail's faces, and why the base and both caps are left unnamed.
@@ -409,3 +413,86 @@ class TestDovetailCornerJoint:
 
         socket_found = named(joint.cuttings["socket_timber"])
         assert not [name for name in socket_found if name.startswith("dovetail_")]
+
+
+
+class TestAngledDovetailCornerJoint:
+    """Corners at angles other than 90 degrees, in the plane the timbers share."""
+
+    @staticmethod
+    def _arrangement(corner_degrees, timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM):
+        angle = degrees(corner_degrees)
+        return _make_corner_arrangement(create_v3(1, 0, 0), create_v3(cos(angle), sin(angle), 0),
+                                        timber1_end=timber1_end, timber2_end=timber2_end)
+
+    @staticmethod
+    def _corner_planes(arrangement):
+        """Each timber's in-plane axis across it, and the outer face planes the corner is flush to,
+        as (unit normal pointing out of the corner, offset) in numbers."""
+        import numpy as np
+        d1 = np.array([1.0, 0.0, 0.0])
+        d2 = np.array([float(x) for x in arrangement.timber2.get_length_direction_global()])
+        if arrangement.timber2_end == TimberEnd.TOP:
+            d2 = -d2
+        across1 = np.array([0.0, 1.0, 0.0])
+        across2 = np.cross([0.0, 0.0, 1.0], d2)
+        # timber1 stops at timber2's far face (away from timber1's arm), timber2 at timber1's outside
+        # face (away from timber2's arm).
+        far2 = -across2 if across2 @ d1 > 0 else across2
+        out1 = -across1 if across1 @ d2 > 0 else across1
+        return d1, d2, across1, across2, (far2, HALF), (out1, HALF)
+
+    def _check(self, arrangement, distances, dovetails):
+        import numpy as np
+        joint = cut_dovetail_corner_joint(arrangement, distances, dovetails)
+        render1 = _render_cutting(joint.cuttings["dovetail_timber"])
+        render2 = _render_cutting(joint.cuttings["socket_timber"])
+        d1, d2, across1, across2, (far2, far_offset), (out1, out_offset) = self._corner_planes(arrangement)
+
+        def owners(point):
+            v = create_v3(*(float(x) for x in point))
+            return (render1.contains_point(arrangement.timber1.transform.global_to_local(v)),
+                    render2.contains_point(arrangement.timber2.transform.global_to_local(v)))
+
+        rng = np.random.default_rng(7)
+        counts = {"timber1": 0, "timber2": 0}
+        for point in rng.uniform([-8, -8, -2.9], [8, 8, 2.9], size=(1500, 3)):
+            in1_raw = abs(point @ across1) < HALF and point @ d1 > -12
+            in2_raw = abs(point @ across2) < HALF and point @ d2 > -12
+            kept1 = in1_raw and point @ far2 < far_offset
+            kept2 = in2_raw and point @ out1 < out_offset
+            in1, in2 = owners(point)
+            assert not (in1 and in2), f"both timbers at {point}"
+            if kept1 and kept2:
+                assert in1 or in2, f"a gap in the corner at {point}"
+                counts["timber1" if in1 else "timber2"] += 1
+            else:
+                assert in1 == kept1 and in2 == kept2, f"wrong owner at {point}: {in1, in2}, expected {kept1, kept2}"
+        # The tails reach into timber2 and the sockets leave some of it standing.
+        assert counts["timber1"] and counts["timber2"], counts
+        return joint
+
+    @pytest.mark.parametrize("corner_degrees", [45, 60, 120, 135, 150])
+    def test_the_corner_is_filled_once_and_flush(self, corner_degrees):
+        self._check(self._arrangement(corner_degrees), [scalar(3, 2), scalar(3)], [_dovetail(), _dovetail()])
+
+    @pytest.mark.parametrize("ends", [(TimberEnd.TOP, TimberEnd.BOTTOM), (TimberEnd.BOTTOM, TimberEnd.TOP)])
+    def test_either_end_can_be_joined(self, ends):
+        self._check(self._arrangement(120, *ends), [scalar(3)], [_dovetail(small_width=scalar(2))])
+
+    def test_a_half_blind_dovetail_at_an_angle(self):
+        self._check(self._arrangement(120), [scalar(3)], [_dovetail(small_width=scalar(2), depth=scalar(4))])
+
+    @pytest.mark.parametrize("corner_degrees", [60, 120])
+    def test_it_slides_apart_along_timber2(self, corner_degrees):
+        import numpy as np
+        arrangement = self._arrangement(corner_degrees)
+        joint = cut_dovetail_corner_joint(arrangement, [scalar(3)], [_dovetail()])
+        freedom = joint.cuttings["dovetail_timber"].assembly_freedom
+        assert freedom is not None
+        (direction, freed_after), = [(t.direction, t.freed_after) for t in freedom.translations]
+        along = np.array([float(x) for x in direction])
+        length2 = np.array([float(x) for x in arrangement.timber2.get_length_direction_global()])
+        assert abs(abs(along @ length2) - 1) < 1e-9
+        # timber1's 6 thick faces, crossed at the corner angle.
+        assert float(freed_after) == pytest.approx(6 / abs(np.sin(np.radians(corner_degrees))))
