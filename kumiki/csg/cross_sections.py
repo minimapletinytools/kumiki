@@ -13,6 +13,7 @@ import numpy as np
 from .cutcsg import CutCSG, Cylinder, Difference, FaceFeature, Intersection, SolidUnion
 from .edges_on_csg import convex_hull_2d
 from .feature_paths import FeatureHandle
+from .curves import CylindricalPatch
 from ..geometry import Plane, perpendicular_axes
 from ..rule import Matrix, V3, as_ndarray, unit_ndarray
 
@@ -200,13 +201,9 @@ def _cylinder_cross_section(csg: Cylinder, frame: PlaneFrame, seed: PolygonRegio
         c = float(side @ (centre - frame.origin))
         region = [_clip(_clip(polygon, a, b, c + half_width), -a, -b, -c + half_width) for polygon in seed]
     else:
-        middle = centre + axis * float(frame.normal @ (frame.origin - centre)) / across
-        e1, e2 = (as_ndarray(axis_) for axis_ in perpendicular_axes(Matrix(axis)))
-        points = []
-        for k in range(ELLIPSE_POINTS):
-            angle = 2 * math.pi * k / ELLIPSE_POINTS
-            ring = radius * (math.cos(angle) * e1 + math.sin(angle) * e2)
-            points.append(frame.to_2d(middle + ring - axis * float(frame.normal @ ring) / across))
+        ellipse = CylindricalPatch.of_cylinder(csg).section(frame.origin, frame.normal)
+        assert ellipse is not None
+        points = [frame.to_2d(ellipse.point(math.tau * k / ELLIPSE_POINTS)) for k in range(ELLIPSE_POINTS)]
         region = _intersect([points], seed)
     caps = []
     if csg.start_distance is not None:
