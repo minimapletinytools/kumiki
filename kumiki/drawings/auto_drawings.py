@@ -22,6 +22,7 @@ from ..timber import CutTimber, Frame, PerfectTimberWithin
 from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
+from .dimension_layout import with_placed_dimensions
 from .drawing import ELEVATION_IDS, Drawing, Viewport, columns, covering_page, elevation_viewports, rows
 from .measure import ViewAxes
 from .measure_solving import DrawingSolve
@@ -210,7 +211,8 @@ def _count(group: SymmetricTimberGroup) -> str:
 
 def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[ExtraViews] = None,
                        dimensioned: Optional[Callable[[CutTimber], bool]] = None) -> Frame:
-    """Return `frame` with a finishing routine adding a generated plan and a shop drawing per distinct piece.
+    """Return `frame` with a finishing routine adding a generated plan and a shop drawing per distinct piece,
+    their dimensions placed clear of the work (dimension_layout).
 
     `fixed_path` names the timber the plan is measured from. `extra_views` adds views to a piece's
     shop drawing; `dimensioned` picks which members the plan dimensions (all by default).
@@ -221,9 +223,11 @@ def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[Extr
     def generate(finishing: Finishing) -> None:
         groups = match_timbers(cut_timbers)
         finishing.progress(0, 1 + len(groups), "plan")
-        finishing.add_drawing(plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members))
+        plan = plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members)
+        finishing.add_drawing(with_placed_dimensions(plan, frame))
         for done, group in enumerate(groups, start=1):
             finishing.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
-            finishing.add_drawing(piece_drawing(group, extra_views(group.representative) if extra_views else {}))
+            piece = piece_drawing(group, extra_views(group.representative) if extra_views else {})
+            finishing.add_drawing(with_placed_dimensions(piece, frame))
 
     return frame.with_finishing(generate)

@@ -1,19 +1,25 @@
-"""Where a drawing's code dimensions go on the sheet.
+"""Where a drawing's dimensions go on the sheet: `with_placed_dimensions` gives each one a placement.
 
-Works on the drawing wire the viewer draws (a viewport's camera and rect, the page, each
-measurement's resolved ends) and the drawn members' world meshes. Layout is in sheet millimetres
-(y down); `place_dimensions` returns each placement in world metres.
-
-Each dimension, shortest first, is tried at a few lanes out on both sides, with its witness lines
-either where its ends are or slid to where its two features stop. The cheapest try wins: a label or
-line over the work costs most, then landing on what is already placed, leaving the viewport, and
-distance from the work.
+Each view is framed as the viewer frames it (kigumi_drawing_view_helpers) and laid out in sheet
+millimetres, y down. Each dimension, shortest first, is tried at a few lanes out on both sides,
+with its witness lines either where its ends are or slid to where its two features stop. The
+cheapest try wins: a label or line over the drawn timbers costs most, then landing on what is
+already placed, leaving the viewport, and distance from the work.
 """
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
+
+from .drawing import Drawing, Page
+from .measure import FromViewport, Measure, MeasurementOperation, MeasurementPlacement, ViewAxes
+
+if TYPE_CHECKING:
+    from ..timber import CutTimber, Frame
+
+#: The sheet the viewer draws code drawings on (A3 landscape), in metres.
+SHEET = Page(0.420, 0.297)
 
 #: A label on the sheet: cap height, and width per character, in millimetres.
 TEXT_MM = 4.8
@@ -40,15 +46,9 @@ class SheetView:
     rect: Tuple[float, float, float, float]
     page_mm: Tuple[float, float]
 
-    @classmethod
-    def of(cls, viewport: Mapping[str, Any], page: Optional[Mapping[str, Any]]) -> Optional['SheetView']:
-        """Return the view of a wire viewport, or None without a camera or page."""
-        camera = viewport.get("camera")
-        if not camera or not page or not viewport.get("rect"):
-            return None
-        return cls(np.array(camera["right"], float), np.array(camera["up"], float),
-                   np.array(camera["target"], float), float(camera["extent"]),
-                   tuple(viewport["rect"]), (page["width"] * 1000, page["height"] * 1000))
+    @property
+    def axes(self) -> ViewAxes:
+        return ViewAxes(right=self.right.tolist(), up=self.up.tolist(), look=np.cross(self.up, self.right).tolist())
 
     @property
     def mm_per_world(self) -> float:
@@ -211,40 +211,6 @@ class Placed:
     cost: float
 
 
-def _label_text(measure: Mapping[str, Any]) -> Optional[str]:
-    """Return about the text a length's label takes, or None for anything else."""
-    value = (measure.get("settled") or {}).get("value") or {}
-    if value.get("unit") != "length" or value.get("value") is None:
-        return None
-    return f"{float(value['value']) * 1000:.0f}mm"
-
-
-def _dims(viewport: Mapping[str, Any], view: SheetView) -> List[Dim]:
-    """Return the viewport's code lengths that have no placement yet."""
-    out = []
-    for index, measure in enumerate(viewport.get("measurements") or []):
-        a, b = (measure.get("a") or {}).get("at"), (measure.get("b") or {}).get("at")
-        text = _label_text(measure)
-        if a is None or b is None or text is None or measure.get("origin") not in (None, "code"):
-            continue
-        if (measure.get("placement") or {}).get("offset") is not None:
-            continue
-        slide, extents = measure.get("slide"), measure.get("extents") or {}
-        stretch, t0, slide_world = None, 0.0, None
-        if slide is not None and extents.get("a") and extents.get("b"):
-            slide_world = np.array(slide, float)
-            ta = [float(np.dot(p, slide_world)) for p in extents["a"]]
-            tb = [float(np.dot(p, slide_world)) for p in extents["b"]]
-            low, high = max(min(ta), min(tb)), min(max(ta), max(tb))
-            if high > low:
-                stretch, t0 = (low, high), float(np.dot(a, slide_world))
-        sa, sb = view.to_sheet([a, b])
-        dim = Dim(index, sa, sb, text, slide_world, stretch, t0)
-        if dim.span > 0.3:
-            out.append(dim)
-    return out
-
-
 def _candidates(dim: Dim, view: SheetView) -> List[Tuple[Optional[float], float, np.ndarray, np.ndarray]]:
     """Return the (along, offset, a, b) to try."""
     out = []
@@ -289,14 +255,9 @@ def _try(dim: Dim, along, offset, a, b, grid: MaterialGrid, placed: List[Placed]
     return Placed(dim, along, offset, a, b, (la, lb), label, cost)
 
 
-def place_dimensions(viewport: Mapping[str, Any], page: Optional[Mapping[str, Any]],
-                     meshes: Sequence[Mesh]) -> Dict[int, Dict[str, float]]:
-    """Return a wire placement (`offset`, and `along` if the ends slide) for each code length in an
-    orthographic `viewport` with none, by its index in the viewport's measurements."""
-    view = SheetView.of(viewport, page)
-    if view is None or viewport.get("projection") not in (None, "orthographic"):
-        return {}
-    dims = _dims(viewport, view)
+def place(dims: Sequence[Dim], view: SheetView, meshes: Sequence[Mesh]) -> Dict[int, MeasurementPlacement]:
+    """Return a placement for each of `dims`, by its index, with the offset as the viewer reads it
+    for the ends in the order given (positive along `Dim.away`)."""
     if not dims:
         return {}
     grid = MaterialGrid(view, meshes)
@@ -305,10 +266,134 @@ def place_dimensions(viewport: Mapping[str, Any], page: Optional[Mapping[str, An
     for dim in sorted(dims, key=lambda d: d.span):
         placed.append(min((_try(dim, along, offset, a, b, grid, placed, rect)
                            for along, offset, a, b in _candidates(dim, view)), key=lambda p: p.cost))
-    out = {}
-    for one in placed:
-        wire = {"offset": one.offset / view.mm_per_world}
-        if one.along is not None:
-            wire["along"] = one.along
-        out[one.dim.index] = wire
-    return out
+    return {one.dim.index: MeasurementPlacement(offset=one.offset / view.mm_per_world, along=one.along)
+            for one in placed}
+
+
+# --- from a drawing ---------------------------------------------------------------------------
+
+#: A shop drawing's long faces: label -> (timber axis the face looks along, its sign), as the viewer has them.
+_LONG_FACES = {"front": ("height", 1), "right": ("width", 1), "back": ("height", -1), "left": ("width", -1)}
+#: World elevations: label -> (right, up), as the viewer has them.
+_ELEVATIONS = {"front": ((1, 0, 0), (0, 0, 1)), "top": ((1, 0, 0), (0, 1, 0)), "right": ((0, 1, 0), (0, 0, 1))}
+
+
+def sheet_views(drawing: Drawing, cuts: Sequence['CutTimber'], page: Page = SHEET) -> Dict[str, SheetView]:
+    """Return each orthographic leaf's view, by viewport id, framed as the viewer frames a code drawing
+    of `cuts`: one timber's long faces, several timbers' world elevations, or a leaf's own camera."""
+    from .kigumi_drawing_view_helpers import camera_looking_at_face, view_extent, world_bounds
+    from .layout import resolve_viewports
+
+    def floats(vector) -> List[float]:
+        return [float(v) for v in vector]
+
+    centre, half = world_bounds(cuts)
+    page_mm = (float(page.width) * 1000, float(page.height) * 1000)
+    views = {}
+    for placed in resolve_viewports(drawing.roots, page):
+        x, y, w, h = (float(v) for v in placed.rect)
+        rect = (x, y, w, h)
+        label = (placed.label or "").lower()
+        if placed.viewport.camera is not None:
+            right = floats(placed.viewport.camera.right)
+            up = floats(placed.viewport.camera.up)
+            right, up = (list(np.array(v) / np.linalg.norm(v)) for v in (right, up))
+        elif len(cuts) == 1 and label in _LONG_FACES:
+            timber = cuts[0].timber
+            axis, sign = _LONG_FACES[label]
+            normal = floats(timber.get_height_direction_global() if axis == "height"
+                            else timber.get_width_direction_global())
+            frame = camera_looking_at_face([v * sign for v in normal], floats(timber.get_length_direction_global()))
+            right, up = frame.right, frame.up
+        elif len(cuts) != 1 and label in _ELEVATIONS:
+            right, up = (list(map(float, v)) for v in _ELEVATIONS[label])
+        else:
+            continue
+        aspect = rect[2] * page_mm[0] / (rect[3] * page_mm[1])
+        views[str(placed.id)] = SheetView(np.array(right, float), np.array(up, float), np.array(centre, float),
+                                          view_extent(half, right, up, aspect), rect, page_mm)
+    return views
+
+
+def _world_mesh(cut: 'CutTimber') -> Optional[Mesh]:
+    """Return a cut timber's world mesh, or None if it has none."""
+    from ..csg.cutcsg import adopt_csg
+    from ..csg.triangles import triangulate_cutcsg
+    from ..rule import Transform
+
+    mesh = triangulate_cutcsg(adopt_csg(cut.timber.transform, Transform.identity(),
+                                        cut.render_timber_with_cuts_csg_local())).mesh
+    return (np.asarray(mesh.vertices, float), np.asarray(mesh.faces, int)) if len(mesh.faces) else None
+
+
+def _dim(index: int, measure: Measure, view: SheetView, frame: 'Frame') -> Optional[Tuple[Dim, bool]]:
+    """Return a length in a view as a Dim, its ends in the order the viewer has them, and whether
+    that order is the measure's own reversed; None for anything else."""
+    from .feature_span import feature_span
+    from .kigumi_measuring_helpers import place_pair, world_geometry
+
+    if not isinstance(measure.plane, FromViewport):
+        return None
+    from ..csg.feature_paths import to_feature_path
+
+    path_a, path_b = to_feature_path(measure.anchor_a, frame), to_feature_path(measure.anchor_b, frame)
+    if path_a is None or path_b is None:
+        return None
+    # The viewer runs a length from the anchor whose path sorts first (Measure.wire_anchors).
+    swapped = not path_a.sort_key <= path_b.sort_key
+    first, second = (measure.anchor_b, measure.anchor_a) if swapped else (measure.anchor_a, measure.anchor_b)
+    axes = view.axes
+    spans = []
+    for handle in (first, second):
+        cut = frame.cut_timber_of(handle.timber)
+        if cut is None:
+            return None
+        spans.append(feature_span(handle, cut.render_timber_with_cuts_csg_local(), axes.look))
+    if spans[0] is None or spans[1] is None:
+        return None
+    placement = place_pair(world_geometry(first), world_geometry(second), spans[0], spans[1], measure.kind,
+                           axes.look, axes, False)
+    settled = placement.settled
+    if (placement.kind is None or placement.kind.operation is not MeasurementOperation.DISTANCE
+            or placement.anchors is None or settled.unit != "length" or settled.value is None):
+        return None
+    a, b = (np.array([float(v) for v in end], float) for end in placement.anchors)
+    stretch, t0, slide = None, 0.0, None
+    ends = placement.extents
+    if placement.slide is not None and ends[0] is not None and ends[1] is not None:
+        slide = np.array([float(v) for v in placement.slide], float)
+        ta = [float(np.dot([float(v) for v in p], slide)) for p in ends[0]]
+        tb = [float(np.dot([float(v) for v in p], slide)) for p in ends[1]]
+        low, high = max(min(ta), min(tb)), min(max(ta), max(tb))
+        if high > low:
+            stretch, t0 = (low, high), float(a @ slide)
+    sa, sb = view.to_sheet([a, b])
+    dim = Dim(index, sa, sb, f"{float(settled.value) * 1000:.0f}mm", slide, stretch, t0)
+    return (dim, swapped) if dim.span > 0.3 else None
+
+
+def with_placed_dimensions(drawing: Drawing, frame: 'Frame', page: Page = SHEET) -> Drawing:
+    """Return `drawing` with a placement on each of its lengths (in `Drawing.measurements`) that has none,
+    in the orthographic views the viewer frames on `page`."""
+    cuts = [cut for cut in (frame.cut_timber_of(timber) for timber in drawing.timbers) if cut is not None]
+    views = sheet_views(drawing, cuts, page)
+    meshes = [mesh for mesh in (_world_mesh(cut) for cut in cuts) if mesh is not None]
+    measurements = {}
+    for viewport_id, measures in drawing.measurements.items():
+        measures = list(measures)
+        view = views.get(str(viewport_id))
+        if view is None:
+            measurements[viewport_id] = measures
+            continue
+        found = {}
+        for index, measure in enumerate(measures):
+            one = _dim(index, measure, view, frame) if measure.placement is None else None
+            if one is not None:
+                found[index] = one
+        for index, placement in place([dim for dim, _ in found.values()], view, meshes).items():
+            if found[index][1] and placement.offset is not None:
+                # The measure's own order runs the other way: wire_anchors negates it back.
+                placement = replace(placement, offset=-placement.offset)
+            measures[index] = replace(measures[index], placement=placement)
+        measurements[viewport_id] = measures
+    return replace(drawing, measurements=measurements)
