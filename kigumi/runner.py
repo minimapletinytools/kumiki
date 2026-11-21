@@ -5530,8 +5530,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         }), False
 
     if command == "render_drawing_svg":
-        from kumiki.drawings.drawing_solid import DrawingSolid
-        from kumiki.drawings.svg import render_svg_sheet
+        from kumiki.drawings.svg import DrawingSolid, render_svg_sheet
         from kumiki.csg.cutcsg import adopt_csg
         from kumiki.rule import Transform
 

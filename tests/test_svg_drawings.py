@@ -6,8 +6,7 @@ import pytest
 from kumiki import CutTimber, Timber, TimberFeature, TimberTicket, Transform, create_v2, create_v3
 from kumiki.csg.cutcsg import Cylinder, Difference, RectangularPrism
 from kumiki.csg.pathcsg import ArcSegment, FancyPath, PathExtrusion, StraightSegment
-from kumiki.drawings.drawing_solid import DrawingSolid
-from kumiki.drawings.svg import DrawingStyles, render_svg_view
+from kumiki.drawings.svg import DrawingSolid, DrawingStyles, render_svg_view
 from kumiki.measuring import locate_face
 from kumiki.rule import as_ndarray
 
