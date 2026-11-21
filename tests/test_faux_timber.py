@@ -38,14 +38,61 @@ def test_rotated_off_center_edge_tenon_and_matching_blind_mortise():
         pytest.fail("Expected a shoulder dimension from the board's reference edge")
 
 
-def test_reversed_ends_keep_the_real_stock_extension():
+@pytest.mark.parametrize("orientation,faux_bottom,faux_top,real_bottom,real_top", [
+    (TimberFace.TOP, None, 83, None, 83),
+    (TimberFace.TOP, 7, None, 7, None),
+    (TimberFace.TOP, -4, 110, -4, 110),
+    (TimberFace.TOP, 7, 83, 7, 83),
+    (TimberFace.BOTTOM, None, 110, -10, None),
+    (TimberFace.BOTTOM, -4, None, None, 104),
+    (TimberFace.BOTTOM, 7, 83, 17, 93),
+])
+def test_end_trims_restore_real_end_distances_and_finished_length(
+        orientation, faux_bottom, faux_top, real_bottom, real_top):
     board = Board(mm(100), create_v2(mm(12), mm(16)), Transform.identity(), TimberTicket("board"))
-    view = FauxTimber(board, top=TimberFace.BOTTOM, front=TimberFace.RIGHT)
-    cut = Cutting(view, maybe_top_end_cut_distance_from_bottom=mm(110))
+    view = FauxTimber(board, top=orientation, front=TimberFace.RIGHT)
+    cut = Cutting(view,
+                  maybe_bottom_end_cut_distance_from_bottom=mm(faux_bottom) if faux_bottom is not None else None,
+                  maybe_top_end_cut_distance_from_bottom=mm(faux_top) if faux_top is not None else None)
     joint = view.restore_joint(Joint({"board": cut}, JointTicket("trim")))
-    assert joint.cuttings["board"].timber is board
-    assert joint.cuttings["board"].maybe_bottom_end_cut_distance_from_bottom == pytest.approx(-.010)
-    assert joint.cuttings["board"].maybe_top_end_cut_distance_from_bottom is None
+    restored = joint.cuttings["board"]
+    assert restored.timber is board
+    for distance, expected in [(restored.maybe_bottom_end_cut_distance_from_bottom, real_bottom),
+                               (restored.maybe_top_end_cut_distance_from_bottom, real_top)]:
+        if expected is None:
+            assert distance is None
+        else:
+            assert distance == pytest.approx(mm(expected))
+
+    solid = Frame.from_joints([joint]).cut_timbers[0].render_timber_with_cuts_csg_local()
+    low = real_bottom if real_bottom is not None else 0
+    high = real_top if real_top is not None else 100
+    for z, wood in [(low - 1, False), (low + 1, True), (high - 1, True), (high + 1, False)]:
+        assert solid.contains_point(create_v3(0, 0, mm(z))) == wood
+
+
+@pytest.mark.parametrize("side,axis,low,high", [
+    (TimberFace.RIGHT, 0, -24, 19), (TimberFace.LEFT, 0, -19, 24),
+    (TimberFace.FRONT, 1, -14, 9), (TimberFace.BACK, 1, -9, 14),
+])
+def test_both_faux_end_cuts_on_a_side_trim_only_the_cross_section(side, axis, low, high):
+    transform = example_board_edge_tenon().cuttings["board"].timber.transform
+    board = Board(mm(100), create_v2(mm(60), mm(40)), transform, TimberTicket("board"))
+    view = FauxTimber(board, top=side, front=TimberFace.TOP)
+    cut = Cutting(view, maybe_bottom_end_cut_distance_from_bottom=mm(6),
+                  maybe_top_end_cut_distance_from_bottom=view.length - mm(11))
+    joint = view.restore_joint(Joint({"board": cut}, JointTicket("side")))
+    restored = joint.cuttings["board"]
+    assert restored.timber is board
+    assert restored.get_maybe_bottom_end_cut() is None
+    assert restored.get_maybe_top_end_cut() is None
+    solid = Frame.from_joints([joint]).cut_timbers[0].render_timber_with_cuts_csg_local()
+    for z in (1, 50, 99):
+        for across, wood in [(low - 1, False), (low + 1, True), (high - 1, True), (high + 1, False)]:
+            x, y = (across, 0) if axis == 0 else (0, across)
+            assert solid.contains_point(create_v3(mm(x), mm(y), mm(z))) == wood
+    for z in (-1, 101):
+        assert not solid.contains_point(create_v3(0, 0, mm(z)))
 
 
 def test_side_stock_must_reach_the_cut_and_faces_must_be_perpendicular():
