@@ -133,8 +133,8 @@ This is not the complete list of joints. Search patterns to find joints not list
 
 | Finger joint example | Parameters |
 |---|---|
-| [Basic box corner](../patterns/basic_joints_patterns.py) | `cut_basic_uniform_finger_corner_joint(arrangement)` sizes equal fingers from the average board thickness. |
-| [Basic finger splice](../patterns/basic_joints_patterns.py) | `cut_basic_uniform_finger_splice_joint(arrangement, *, splice_point=None)` uses an overlap twice the fitted finger width. |
+| [Basic box corner](../patterns/basic_joints_patterns.py) | `cut_basic_finger_corner_joint(arrangement)` sizes equal fingers from the average board thickness. |
+| [Basic finger splice](../patterns/basic_joints_patterns.py) | `cut_basic_finger_splice_joint(arrangement, *, splice_point=None)` uses an overlap twice the fitted finger width. |
 | [Box corner](../patterns/corner/finger_corner_joint_patterns.py) | `cut_uniform_finger_corner_joint(arrangement, finger_count=None, *, finger_width=None)` (alias `cut_box_corner_joint`). Depth follows the mating piece. |
 | [Finger splice](../patterns/splice/finger_splice_joint_patterns.py) | `cut_uniform_finger_splice_joint(arrangement, finger_length, finger_count=None, *, finger_width=None, taper_angle=atan(1/8), splice_point=None)`. The point locates the middle of the overlap in world space. Use a zero angle for straight fingers. |
 

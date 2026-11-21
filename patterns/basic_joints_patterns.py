@@ -22,8 +22,8 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_mortise_and_tenon_joint,
     cut_basic_round_mortise_and_tenon_joint,
     cut_basic_dovetail_corner_joint,
-    cut_basic_uniform_finger_corner_joint,
-    cut_basic_uniform_finger_splice_joint,
+    cut_basic_finger_corner_joint,
+    cut_basic_finger_splice_joint,
     cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers,
     cut_basic_practice_roundover_decoration,
     cut_basic_practice_rounded_end_decoration,
@@ -165,7 +165,7 @@ def basic_finger_corner(k: Optional[Kiwari] = None) -> Joint:
     k = FINGER_STOCK.resolve(k)
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(
         timber_size=create_v2(k.length("width"), k.length("thickness")), timber_length=mm(115))
-    return cut_basic_uniform_finger_corner_joint(arrangement)
+    return cut_basic_finger_corner_joint(arrangement)
 
 
 @pattern("basic_joints/finger_splice_joint", name={"en": "Finger splice", "ja": "フィンガージョイント"}, kiwari=FINGER_STOCK)
@@ -174,7 +174,7 @@ def basic_finger_splice(k: Optional[Kiwari] = None) -> Joint:
     k = FINGER_STOCK.resolve(k)
     arrangement = create_canonical_example_splice_joint_timbers(
         timber_size=create_v2(k.length("thickness"), k.length("width")), timber_length=mm(100))
-    return cut_basic_uniform_finger_splice_joint(replace(arrangement, front_face_on_timber1=TimberLongFace.FRONT))
+    return cut_basic_finger_splice_joint(replace(arrangement, front_face_on_timber1=TimberLongFace.FRONT))
 
 
 @pattern("basic_joints/butt_splice_joint", name={"en": "Butt splice", "ja": "突き付け継ぎ"})

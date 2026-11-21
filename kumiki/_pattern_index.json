@@ -792,7 +792,7 @@
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "7745cdf9629b74301de0265efd6490011d87bd0935d0a222c42c5d31bc8f5b28",
+      "sha256": "ef6b56545be71be0912c2f96199da72ca8ca1a8c857409b2c18e99d916b6b03c",
       "title": {
         "en": "Basic joints",
         "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
@@ -6108,7 +6108,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T18:29:47.383475+00:00",
+  "generated_at": "2026-11-21T23:35:39.277477+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }

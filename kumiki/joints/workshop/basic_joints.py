@@ -91,7 +91,7 @@ def _square_finger_count(span: Numeric, thickness: Numeric) -> int:
     return max(2, int(span / thickness + scalar(1, 2)))
 
 
-def cut_basic_uniform_finger_corner_joint(arrangement: CornerJointTimberArrangement) -> Joint:
+def cut_basic_finger_corner_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     """Cut a box corner with equal fingers roughly as wide as the boards' average thickness."""
     first, second = arrangement.timber1, arrangement.timber2
     first_face = first.get_closest_oriented_long_face_from_global_direction(second.get_length_direction_global())
@@ -101,7 +101,7 @@ def cut_basic_uniform_finger_corner_joint(arrangement: CornerJointTimberArrangem
     return cut_uniform_finger_corner_joint(arrangement, finger_count=_square_finger_count(span, thickness))
 
 
-def cut_basic_uniform_finger_splice_joint(
+def cut_basic_finger_splice_joint(
     arrangement: SpliceJointTimberArrangement, *, splice_point: Optional[V3] = None,
 ) -> Joint:
     """Cut a tapered splice with fingers about one board thickness wide and twice that width long.

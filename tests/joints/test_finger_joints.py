@@ -4,8 +4,8 @@ from math import atan
 import pytest
 
 from kumiki import (CornerJointTimberArrangement, Frame, Joint, KumikiArrangementError, Orientation, TimberEnd, TimberLongFace,
-                    Transform, create_v2, create_v3, cut_basic_uniform_finger_corner_joint,
-                    cut_basic_uniform_finger_splice_joint, cut_box_corner_joint, cut_uniform_finger_corner_joint,
+                    Transform, create_v2, create_v3, cut_basic_finger_corner_joint,
+                    cut_basic_finger_splice_joint, cut_box_corner_joint, cut_uniform_finger_corner_joint,
                     cut_uniform_finger_splice_joint, degrees, mm)
 from kumiki.example_shavings import (create_canonical_example_right_angle_corner_joint_timbers,
                                     create_canonical_example_splice_joint_timbers)
@@ -188,7 +188,7 @@ def test_basic_corner_sizes_fingers_from_both_thicknesses(span, first_thickness,
     pose = Transform(create_v3(.1, .2, -.3), Orientation.from_angle_axis(degrees(37), create_v3(1, 2, 3)))
     a = replace(a, timber1=replace(a.timber1, transform=pose * a.timber1.transform),
                 timber2=replace(a.timber2, transform=pose * a.timber2.transform))
-    joint = cut_basic_uniform_finger_corner_joint(a)
+    joint = cut_basic_finger_corner_joint(a)
     _assert_finger_widths(joint, pose.position, a.compute_normalized_timber_cross_product(), span, count)
 
 
@@ -201,7 +201,7 @@ def test_basic_corner_sizes_fingers_from_both_thicknesses(span, first_thickness,
 def test_basic_splice_overlap_is_twice_the_fitted_width(width, height, front, expected_front, span, count):
     a = create_canonical_example_splice_joint_timbers(timber_size=create_v2(mm(width), mm(height)), timber_length=mm(100))
     center = create_v3(mm(7), 0, 0)
-    joint = cut_basic_uniform_finger_splice_joint(replace(a, front_face_on_timber1=front), splice_point=center)
+    joint = cut_basic_finger_splice_joint(replace(a, front_face_on_timber1=front), splice_point=center)
     _assert_finger_widths(joint, center, a.timber1.get_face_direction_global(expected_front), span, count)
     pitch = mm(span / count)
     assert joint.cuttings["timber1"].maybe_top_end_cut_distance_from_bottom == pytest.approx(mm(107) + pitch)
