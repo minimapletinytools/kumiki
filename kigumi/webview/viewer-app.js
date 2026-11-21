@@ -930,7 +930,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
     }
 
-    renderViewports() {
+    renderViewports(afterViewport) {
         if (!this.renderer || !this.scene) {
             return;
         }
@@ -978,6 +978,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.aimViewLight(viewport.camera);
             }
             this.renderer.render(this.scene, viewport.camera);
+            if (afterViewport) afterViewport(viewport, rect);
         }
         // After the scene, so dimensions sit over what they measure.
         this.renderMeasurements();
