@@ -1,11 +1,14 @@
 # Last checked on kumiki 0.9.0
-"""Through and half-blind dovetail corners."""
+"""Through, half-blind and angled dovetail corners."""
 
 __title__ = {"en": "Dovetail corner joints", "ja": "隅の蟻組み"}
 
 from typing import Optional
 from kumiki import *
-from kumiki.example_shavings import create_canonical_example_right_angle_corner_joint_timbers
+from kumiki.example_shavings import (
+    create_canonical_example_corner_joint_timbers,
+    create_canonical_example_right_angle_corner_joint_timbers,
+)
 
 pattern_folders(KUMIKI_PATTERN_FOLDERS)
 
@@ -16,11 +19,13 @@ DOVETAIL = kiwari(
     spacing=kiwari.length(inches(2)),
 )
 HALF_BLIND = kiwari(**dict(DOVETAIL.declarations), depth=kiwari.length(inches(5, 2)))
+ANGLED = kiwari(**dict(DOVETAIL.declarations),
+                corner_angle=kiwari.angle(degrees(120), minimum=degrees(45), maximum=degrees(150)))
 
 
-def _dovetail(k: Kiwari, depth: Optional[Numeric]) -> Joint:
+def _dovetail(k: Kiwari, depth: Optional[Numeric], arrangement: Optional[CornerJointTimberArrangement] = None) -> Joint:
     return cut_dovetail_corner_joint(
-        create_canonical_example_right_angle_corner_joint_timbers(),
+        arrangement or create_canonical_example_right_angle_corner_joint_timbers(),
         distances=[k.length("first_distance"), k.length("spacing")],
         dovetails=[SingleDovetailSizeParameter(
             angle=k.angle("angle"), small_width=k.length("small_width"), depth=depth)
@@ -36,3 +41,10 @@ def through(k: Optional[Kiwari] = None) -> Joint:
 def half_blind(k: Optional[Kiwari] = None) -> Joint:
     k = HALF_BLIND.resolve(k)
     return _dovetail(k, k.length("depth"))
+
+
+@pattern("corner/dovetail_corner_joint/angled", name={"en": "Angled dovetail", "ja": "角度付き蟻組み"}, kiwari=ANGLED)
+def angled(k: Optional[Kiwari] = None) -> Joint:
+    """A through dovetail where the timbers meet at an angle other than 90 degrees."""
+    k = ANGLED.resolve(k)
+    return _dovetail(k, None, create_canonical_example_corner_joint_timbers(corner_angle=k.angle("corner_angle")))
