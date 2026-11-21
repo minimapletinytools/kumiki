@@ -70,6 +70,16 @@ module.exports = {
         await capture('03c-drawing-dotted-lines');
         if (!drawn) return;
 
+        // The agent's drawings tool: list them, go back to 3D, and open one again by its name.
+        const toModel = await runAppCommand('kigumi.automationDrawings', { filePath: DRAWING_FRAME, open: '3d' }).catch((error) => ({ error: String(error) }));
+        const inModel = await inShell(`${viewerApp}.isInDrawing`);
+        const named = toModel && Array.isArray(toModel.drawings) ? toModel.drawings.find((one) => one.id === drawingId) : null;
+        const reopened = named ? await runAppCommand('kigumi.automationDrawings', { filePath: DRAWING_FRAME, open: named.name }).catch((error) => ({ error: String(error) })) : null;
+        const reentered = await inShell(`${viewerApp}.isInDrawing && ${viewerApp}.sceneStore.activeScene().id`);
+        check('the agent\'s drawings command lists the frame\'s drawings, goes back to 3D, and opens one by its name',
+            toModel && toModel.open === '3d' && inModel === false && named && reopened && reopened.open === named.name && reentered === drawingId,
+            JSON.stringify({ toModel, inModel, reopened, reentered }));
+
         // This drawing is in another frame's view, whose options are its own.
         await inShell(`${viewerApp}.setScaleRulerEnabled(true)`);
         const rulerDrawing = await waitFor(() => ruler(), { timeoutMs: 5000 }).catch(() => null);

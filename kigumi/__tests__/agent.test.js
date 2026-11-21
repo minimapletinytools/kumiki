@@ -4,7 +4,7 @@ const path = require('path');
 
 const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
-const { viewFrames, checkFrameTool, describeFrameTool } = require('../agent/frames');
+const { viewFrames, checkFrameTool, describeFrameTool, drawingsTool } = require('../agent/frames');
 const { sharedTools, agentTools, viewHost } = require('../agent/agent');
 const { startMcpHttpServer } = require('../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
@@ -80,7 +80,7 @@ describe('the tools', () => {
         const shared = sharedTools(host).map((tool) => tool.name);
         const own = agentTools(host, { checkpoints: () => null }).map((tool) => tool.name);
 
-        expect(shared).toEqual(expect.arrayContaining(['list_panels', 'screenshot', 'check_frame', 'kumiki_api', 'kumiki_source']));
+        expect(shared).toEqual(expect.arrayContaining(['describe_panel', 'screenshot', 'check_frame', 'kumiki_api', 'kumiki_source']));
         expect(shared).not.toContain('edit_file');
         expect(own).toEqual([...shared, 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'update_todos']);
         // Headless: no views, so no view tools; a host whose frames can be described still has describe_frame.
@@ -120,6 +120,29 @@ describe('the tools', () => {
         expect(textOf(await describe.run({ file_path: '/p/a.py' }))).toEqual(answer);
     });
 
+    test('drawings opens a frame no view shows before listing its drawings, and goes to the one asked for', async () => {
+        const ran = [];
+        let shown = [];
+        const panels = { list: () => shown.map((filePath) => ({ kind: 'viewer', filePath })) };
+        const tool = drawingsTool(viewFrames({ panels, files: { resolve: (file) => (file.startsWith('/p/') ? file : null) }, run: async (id, args) => {
+            ran.push([id, args]);
+            if (id === 'kigumi.automationOpenFileInViewer') return { ok: true, filePath: args.filePath };
+            if (id === 'kigumi.automationDrawings') return { ok: true, open: args.open || '3d', drawings: [{ id: 'd1', name: 'West Foot' }] };
+            return { ok: true, entries: [] };
+        } }));
+
+        expect(tool.effect).toBe('run');
+        expect(textOf(await tool.run({ file_path: '/p/a.py' })).drawings).toEqual([{ id: 'd1', name: 'West Foot' }]);
+        expect(ran.map(([id]) => id)).toEqual(['kigumi.automationOpenFileInViewer', 'kigumi.automationBuildReport', 'kigumi.automationDrawings']);
+
+        ran.length = 0;
+        shown = ['/p/a.py'];
+        expect(textOf(await tool.run({ file_path: '/p/a.py', open: 'West Foot' })).open).toBe('West Foot');
+        expect(ran).toEqual([['kigumi.automationDrawings', { filePath: '/p/a.py', open: 'West Foot' }]]);
+
+        expect(textOf(await tool.run({ file_path: '/etc/evil.py' }))).toMatchObject({ ok: false, reason: 'outside-project' });
+    });
+
     test('check_frame takes a file in the project, relative or absolute, and refuses one outside', async () => {
         const { createProjectFiles } = require('../agent/project-files');
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-sandbox-')));
@@ -141,14 +164,17 @@ describe('the tools', () => {
         fs.rmSync(root, { recursive: true, force: true });
     });
 
-        test('list_panels and describe_panel only look', async () => {
+    test('describe_panel only looks, and lists every panel with the one it describes', async () => {
         const panels = directory({ views: [{ id: 'viewer:/a.py', session: view('/a.py', { active: true }) }] });
         const tools = createKigumiTools({ panels, run: async () => { throw new Error('no commands here'); } });
         const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 
-        expect([byName.list_panels.effect, byName.describe_panel.effect]).toEqual(['read', 'read']);
-        expect(textOf(await byName.list_panels.run({})).active).toBe('viewer:/a.py');
-        expect(textOf(await byName.describe_panel.run({})).kind).toBe('viewer');
+        expect(byName.list_panels).toBeUndefined();
+        expect(byName.describe_panel.effect).toBe('read');
+        const described = textOf(await byName.describe_panel.run({}));
+        expect(described.active).toBe('viewer:/a.py');
+        expect(described.panels).toHaveLength(1);
+        expect(described.panel.kind).toBe('viewer');
     });
 
     test('a view tool runs its command on the view asked for, by file, or by slot for a pattern', async () => {
@@ -229,9 +255,9 @@ describe('the MCP server', () => {
         }));
         try {
             const { tools } = await client.listTools();
-            expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['list_panels', 'describe_panel', 'screenshot']));
+            expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['describe_panel', 'screenshot']));
 
-            const result = await client.callTool({ name: 'list_panels', arguments: {} });
+            const result = await client.callTool({ name: 'describe_panel', arguments: {} });
             const listed = JSON.parse(result.content[0].text);
             expect(listed.active).toBe('viewer:/w/a.py');
             expect(listed.panels[0]).toMatchObject({ fileName: 'a.py', relativePath: 'a.py' });

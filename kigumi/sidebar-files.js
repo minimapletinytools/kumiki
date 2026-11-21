@@ -7,7 +7,19 @@ const fs = require('fs');
 const path = require('path');
 
 // Names left out of the tree. `*` matches any run of characters.
-const DEFAULT_FILES_EXCLUDE = Object.freeze(['.git', '.venv', 'node_modules', '__pycache__', '.kigumi', '.DS_Store']);
+const DEFAULT_FILES_EXCLUDE = Object.freeze(['.git', '.venv', 'node_modules', '__pycache__', '.DS_Store']);
+
+// Of the .kigumi folder Kigumi keeps, only the drawings saved there are shown.
+const KIGUMI_FOLDER = '.kigumi';
+const KIGUMI_SHOWN = 'drawings';
+
+/** Whether `name` in `dirPath` is Kigumi's own: .kigumi without drawings, or anything in it but them. */
+function kigumiOwn(dirPath, name) {
+    if (path.basename(dirPath) === KIGUMI_FOLDER) {
+        return name !== KIGUMI_SHOWN;
+    }
+    return name === KIGUMI_FOLDER && !fs.existsSync(path.join(dirPath, name, KIGUMI_SHOWN));
+}
 
 function excludeMatcher(patterns) {
     const regexes = (Array.isArray(patterns) ? patterns : [])
@@ -71,7 +83,7 @@ class FileTree {
             return [];
         }
         return dirents
-            .filter((dirent) => !excluded(dirent.name))
+            .filter((dirent) => !excluded(dirent.name) && !kigumiOwn(dirPath, dirent.name))
             .map((dirent) => ({
                 name: dirent.name,
                 filePath: path.join(dirPath, dirent.name),
@@ -98,7 +110,7 @@ async function listFiles(root, exclude, { limit = 20000 } = {}) {
             continue;
         }
         for (const dirent of dirents) {
-            if (excluded(dirent.name)) {
+            if (excluded(dirent.name) || kigumiOwn(dirPath, dirent.name)) {
                 continue;
             }
             const filePath = path.join(dirPath, dirent.name);

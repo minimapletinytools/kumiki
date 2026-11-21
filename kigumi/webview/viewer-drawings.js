@@ -4,7 +4,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
-import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
+import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, THREE_D_MEASUREMENTS_ID, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
 import { SELECTION_MODES } from './selection-store.js';
 import { composeDrawingPng, drawingFileName } from './drawing-export.js';
 
@@ -278,6 +278,30 @@ export const DrawingsMixin = (Base) => class extends Base {
         }
     }
 
+    /**
+     * The frame's drawings and the one open, for an agent; `open` (a drawing's id or name, or '3d')
+     * goes there first. Where each came from: 'code', 'file', or 'overridden' (code, with the file's
+     * dimensions).
+     */
+    agentDrawings(open) {
+        const drawings = this.sceneStore.drawings().filter((drawing) => drawing.id !== THREE_D_MEASUREMENTS_ID);
+        if (open === '3d') {
+            this.leaveDrawing();
+        } else if (open) {
+            const target = drawings.find((drawing) => drawing.id === open)
+                || drawings.find((drawing) => drawing.name === open);
+            if (!target) {
+                throw new Error(`No drawing ${JSON.stringify(open)}. These are: ${drawings.map((drawing) => drawing.name || drawing.id).join(', ') || 'none'}.`);
+            }
+            this.enterDrawing(target.id);
+        }
+        const active = this.sceneStore.activeScene();
+        return {
+            open: this.isInDrawing ? (active.name || active.id) : '3d',
+            drawings: drawings.map((drawing) => ({ id: drawing.id, name: drawing.name || drawing.id, origin: drawing.origin, unsaved: drawing.dirty })),
+        };
+    }
+
     /** Enter a drawing by id, from the layers panel. */
     enterDrawing(sceneId) {
         this.setActiveScene(sceneId);
@@ -307,6 +331,11 @@ export const DrawingsMixin = (Base) => class extends Base {
         if (!this._drawingPanel) {
             this._drawingPanel = new DrawingPanel(this.selectionManager);
             this._drawingPanel.mount(host);
+        }
+        // The host outlives each panel, so its listeners go on once: added again on every
+        // entry, one click on export png ran two exports.
+        if (!host.dataset.bound) {
+            host.dataset.bound = 'true';
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
             host.addEventListener('kigumi-export-drawing-png', () => void this.exportDrawingPng());
             host.addEventListener('kigumi-focus-measurement', (event) => {

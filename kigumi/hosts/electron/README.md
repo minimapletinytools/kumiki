@@ -91,10 +91,10 @@ take their accelerators from it. Not configurable yet.
   (`../../agent/mcp-setup.js`) and lists the clients seen in the last 10 minutes. Kigumi > Copy MCP
   Setup for Claude Code copies the `claude mcp add` line. Not in VS Code yet:
   `.claude/plans/todo/vscode-mcp.md`.
-- **The tools** (`../../agent/tools.js`): `list_panels` (with each panel's file), `describe_panel` (what a panel shows and
-  what is selected in it), `get_selection_history`, `read_view_log`, `camera`, `screenshot`, and
-  `get_workspace_folder` where there are no project tools. Building a frame is `check_frame`
-  (`../../agent/frames.js`). Panels answer through `../../agent/panel-directory.js`.
+- **The tools** (`../../agent/tools.js`): `describe_panel` (the panels open with each one's file, and what one
+  shows and what is selected in it), `get_selection_history`, `read_view_log`, `camera`, `screenshot`, and
+  `get_workspace_folder` where there are no project tools. Building a frame is `check_frame`, and listing
+  or opening its drawings is `drawings` (`../../agent/frames.js`). Panels answer through `../../agent/panel-directory.js`.
 
 ## Signing
 

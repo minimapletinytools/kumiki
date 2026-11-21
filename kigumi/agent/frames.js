@@ -8,6 +8,7 @@
  *   rebuild(file)  build a file a view shows, after an edit
  *   picture(file)  a picture of its view as a data URL, or null; optional
  *   describe(file) where its timbers are (frame-description.js describeFrame), or { ok: false, … }; optional
+ *   drawings(file, open) a view's drawings, after going to `open`; the active view's with no file; optional
  * check and rebuild resolve to a build report: { ok, error, entries: [{ level, message }] }. A file is
  * relative to the project folder or absolute; check refuses one outside the project and the folders
  * the agent may read.
@@ -44,6 +45,18 @@ function viewFrames({ panels, run, files }) {
             const opened = await run('kigumi.automationOpenFileInViewer', { filePath: target });
             if (opened && opened.ok === false) return { ok: false, reason: opened.reason, filePath: file };
             return run('kigumi.automationDescribeFrame', { filePath: (opened && opened.filePath) || target });
+        },
+        async drawings(file, open) {
+            let target = null;
+            if (file) {
+                target = resolved(file);
+                if (!target) return { ok: false, reason: 'outside-project', filePath: file };
+                if (!this.shows(target)) {
+                    const built = await this.check(target);
+                    if (built && built.reason) return built;
+                }
+            }
+            return run('kigumi.automationDrawings', { filePath: target || undefined, open });
         },
         rebuild(file) {
             return Promise.resolve(run('kigumi.automationBuildReport', { filePath: file, reason: 'agent edit' }))
@@ -91,4 +104,20 @@ function describeFrameTool(frames) {
     };
 }
 
-module.exports = { viewFrames, checkFrameTool, describeFrameTool };
+/** The drawings tool over `frames`: list a frame's drawings, or open one. */
+function drawingsTool(frames) {
+    return {
+        name: 'drawings',
+        description: 'A frame\'s drawings (those its code declares and those saved in the project), and which one '
+            + 'its view shows. Give open (a drawing\'s name or id, or "3d" for the model) to show that one. Opens '
+            + 'the frame in a view first if none shows it.',
+        shape: {
+            file_path: z.string().optional().describe('A .py frame file: relative to the project folder, or absolute inside it. Defaults to the active view\'s.'),
+            open: z.string().optional().describe('A drawing\'s name or id to show, or "3d".'),
+        },
+        effect: 'run',
+        run: async ({ file_path: filePath, open }) => [{ type: 'text', text: JSON.stringify(await frames.drawings(filePath, open), null, 2) }],
+    };
+}
+
+module.exports = { viewFrames, checkFrameTool, describeFrameTool, drawingsTool };

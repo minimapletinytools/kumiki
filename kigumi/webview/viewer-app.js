@@ -1527,6 +1527,11 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
 
+        if (message.type === 'drawingsRequest') {
+            this.respondToRequest(message, 'drawingsResult', () => this.agentDrawings(message.open), 'Failed to list the drawings');
+            return;
+        }
+
         if (message.type === 'setCameraStateRequest') {
             this.handleSetCameraStateRequest(message);
             return;

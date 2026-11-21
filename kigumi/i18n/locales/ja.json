@@ -577,7 +577,7 @@
   "agent.tool.say.check_frame": "{target} をビルドして確認中",
   "agent.tool.say.describe_frame": "{target} を調べています",
   "agent.tool.say.describe_panel": "{target} を見ています",
-  "agent.tool.say.list_panels": "開いているものを確認中",
+  "agent.tool.say.drawings": "{target} の図面を見ています",
   "agent.tool.say.read_view_log": "{target} のログを読んでいます",
   "agent.tool.say.get_selection_history": "選択したものを確認中",
   "agent.tool.say.edit_file": "{target} を編集中",

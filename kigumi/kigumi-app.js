@@ -420,6 +420,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             return { ok: true, filePath: session.filePath, slotName: session.slotName, ...snapshot };
         }, { entries: [] }),
 
+        'kigumi.automationDrawings': async (options = {}) => withSession(options, async (session) => ({
+            ok: true, filePath: session.filePath, ...(await session.drawings(options.open)),
+        })),
+
         'kigumi.automationGetCameraState': async (options = {}) => withSession(options, async (session) => {
             const payload = await session.getCameraState();
             return { ok: true, payload };

@@ -441,6 +441,25 @@ describe('all files', () => {
     expect(findNode(files.children, (one) => one.label === 'patterns').lazyDir).toBe(path.join(root, 'patterns'));
   });
 
+  test('of .kigumi only its saved drawings show, and .kigumi without them not at all', async () => {
+    filesHost();
+    const kigumi = path.join(root, '.kigumi');
+    fs.mkdirSync(path.join(kigumi, 'logs'), { recursive: true });
+    const model = new SidebarModel();
+    await model.openFolder(root);
+    expect(rootOf(model, 'filesRoot').children.map((child) => child.label)).not.toContain('.kigumi');
+
+    fs.mkdirSync(path.join(kigumi, 'drawings'));
+    fs.writeFileSync(path.join(kigumi, 'drawings', 'b_frame.json'), '{}');
+    fs.writeFileSync(path.join(kigumi, 'kigumi.yaml'), '');
+    await model.openFolder(kigumi);
+    await model.openFolder(path.join(kigumi, 'drawings'));
+    await model.refreshFiles();
+    const folder = findNode(rootOf(model, 'filesRoot').children, (one) => one.label === '.kigumi');
+    expect(folder.children.map((child) => child.label)).toEqual(['drawings']);
+    expect(folder.children[0].children.map((child) => child.label)).toEqual(['b_frame.json']);
+  });
+
   test('the exclude setting replaces the default', async () => {
     filesHost({ getConfig: (key, fallback) => (key === 'app.filesExclude' ? ['*.txt'] : fallback) });
     const model = new SidebarModel();

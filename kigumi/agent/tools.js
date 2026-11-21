@@ -22,7 +22,7 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  */
 function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve = (file) => file, workspaceTool = true }) {
     const panelId = z.string().optional()
-        .describe('A panel id from list_panels. Defaults to the active panel, or the active view.');
+        .describe('A panel id from describe_panel. Defaults to the active panel, or the active view.');
 
     /** The automation commands pick a view by file, or by slot for a pattern. */
     function viewOptions(id) {
@@ -48,27 +48,22 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
             },
         }] : []),
         {
-            name: 'list_panels',
-            description: 'Every open Kigumi panel (3D views, code editors, the log), which one is active, '
-                + 'and the file each shows.',
-            shape: {},
-            effect: 'read',
-            run: async () => {
-                const active = panels.active();
-                return text({ active: active ? active.id : null, panels: panels.list() });
-            },
-        },
-        {
             name: 'describe_panel',
-            description: 'What a panel shows and what is selected in it. For a view: the frame, whether it '
-                + 'is in 3D or a drawing, and the selected timbers (sizes, positions in metres, tags) or '
-                + 'the focused feature with the reference that finds it in code. For an editor: the file '
-                + 'and the selected text.',
+            description: 'Every open Kigumi panel (3D views, code editors, the log) and the file each shows, '
+                + 'which is active, and what one panel shows and what is selected in it. For a view: the frame, '
+                + 'whether it is in 3D or a drawing, and the selected timbers (sizes, positions in metres, tags) '
+                + 'or the focused feature with the reference that finds it in code. For an editor: the file and '
+                + 'the selected text.',
             shape: { panel_id: panelId },
             effect: 'read',
             run: async ({ panel_id: id }) => {
+                const active = panels.active();
                 const described = await panels.describe(id);
-                return text(described || { error: 'No such panel, and no panel is active.' });
+                return text({
+                    active: active ? active.id : null,
+                    panels: panels.list(),
+                    panel: described || { error: 'No such panel, and no panel is active.' },
+                });
             },
         },
         {

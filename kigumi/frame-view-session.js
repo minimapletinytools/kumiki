@@ -752,6 +752,13 @@ class FrameViewSession {
         return { ...view, filePath: this.filePath, slotName: this.slotName };
     }
 
+    /** The view's drawings and the one open, after opening `open` if given (viewer-drawings.js agentDrawings). */
+    async drawings(open) {
+        // Fetched first, so a view opened a moment ago has them too.
+        await this._handleDrawingsCommand('get_drawings', {}, { enter: false });
+        return this._requestWebviewAction('drawings', 'drawings', open ? { open } : {});
+    }
+
     setCameraState(cameraState, options = {}) {
         return this._requestWebviewAction('setCameraState', 'set-camera-state', {
             cameraState,
