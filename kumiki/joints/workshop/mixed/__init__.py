@@ -4,6 +4,7 @@ Kumiki - Mixed joint construction functions
 
 from .mortise_and_tenon_joints import (
     WedgeParameters,
+    WedgeOrientation,
     TuskParameters,
     TuskEntryFace,
     MeasureOppositeShoulderFrom,
@@ -19,6 +20,7 @@ from .mortise_and_tenon_joints import (
 
 __all__ = [
     "WedgeParameters",
+    "WedgeOrientation",
     "TuskParameters",
     "TuskEntryFace",
     "MeasureOppositeShoulderFrom",

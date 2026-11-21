@@ -2480,8 +2480,9 @@ class Wedge(Accessory):
             create_v2(-half_stickout_width, base_z),      # Bottom-left (base with stickout)
             create_v2(half_stickout_width, base_z),       # Bottom-right (base with stickout)
             create_v2(half_tip_width, self.length),       # Top-right (tip)
-            create_v2(-half_tip_width, self.length)        # Top-left (tip)
         ]
+        if self.tip_width != 0:
+            trapezoid_points.append(create_v2(-half_tip_width, self.length))
         
         # Rotate transform so that +Y goes to +Z
         # This rotates around X axis by +90° (pi/2 radians)

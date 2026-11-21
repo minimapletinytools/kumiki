@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.9.0
+# Last checked on kumiki 0.9.8
 """
 Mortise and Tenon Joints Patterns
 """
@@ -661,3 +661,28 @@ def example_board_edge_tenon(k: Optional[Kiwari] = None) -> Joint:
         tenon_position=create_v2(k.length("offset"), 0),
         relief=None,
     ))
+
+
+BLIND_WEDGE = kiwari(
+    orientation=kiwari.choice(WedgeOrientation, WedgeOrientation.SPREAD_Y),
+    position=kiwari.length(mm(4)), kerf_size=kiwari.length(mm(2), minimum=0),
+    wedge_length=kiwari.length(mm(30), optional=True), wedge_angle=kiwari.angle(degrees(8)),
+    mortise_side_angle=kiwari.angle(degrees(5)),
+)
+
+
+@pattern("mixed/mortise_and_tenon/blind_wedged", name={"en": "Blind wedged tenon", "ja": "地獄枘"}, kiwari=BLIND_WEDGE)
+def blind_wedged_tenon(k: Optional[Kiwari] = None) -> Joint:
+    """Cut a 40 mm tenon and flare the blind mortise through its 10 mm of bottom clearance."""
+    k = BLIND_WEDGE.resolve(k)
+    arrangement = create_canonical_example_butt_joint_timbers(timber_size=create_v2(mm(54), mm(70)),
+                                                              timber_length=mm(150))
+    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement, tenon_width_relative_to_joint=mm(40), tenon_height_relative_to_joint=mm(25),
+        tenon_length=mm(40), mortise_depth=mm(50),
+        wedge_parameters=WedgeParameters(
+            wedge_orientation=k.choice("orientation"), wedge_position=k.length("position"),
+            wedge_angle=k.angle("wedge_angle"), wedge_length=k.length("wedge_length"),
+            tenon_kerf_size=k.length("kerf_size"), mortise_side_angle=k.angle("mortise_side_angle"),
+        ),
+    )

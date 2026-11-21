@@ -42,6 +42,7 @@ from kumiki.measuring import (
     Space,
 )
 from ..shavings import *
+from ..shavings.tenon_wedge import WedgeOrientation, WedgeParameters, flared_mortise, lay_out_tenon_wedge
 from ..shavings.relief import (
     warn_if_arrangement_timbers_imperfect,
     chop_shoulder_notch_on_timber_face,
@@ -79,25 +80,6 @@ def _union_into_cut(existing: CutCSG, additions: List[CutCSG], label: CutCSGLabe
     if isinstance(existing, SolidUnion) and existing.label == label:
         return SolidUnion(children=list(existing.children) + list(additions), label=label)
     return SolidUnion(children=[existing] + list(additions), label=label)
-
-
-@dataclass(frozen=True)
-class WedgeParameters:
-    """
-    Parameters for wedges in mortise and tenon joints.
-
-    Attributes:
-        shape: Shape specification for the wedge
-        depth: Depth of the wedge cut (may differ from length of wedge)
-        width_axis: Wedges run along this axis.
-        positions: Positions from center of timber in the width axis
-        expand_mortise: Amount to fan out bottom of mortise to fit wedges
-    """
-    shape: WedgeShape
-    depth: Numeric
-    width_axis: Direction3D
-    positions: List[Numeric]
-    expand_mortise: Numeric = scalar(0)
 
 
 class InsetShoulderReliefStyle(Enum):
@@ -140,8 +122,11 @@ def cut_mortise_and_tenon_joint(
     relief: Union[None, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
     inset_shoulder_relief_style: InsetShoulderReliefStyle = InsetShoulderReliefStyle.Rough,
 ) -> Joint:
-    """
-    Creates a mortise and tenon joint with full control over all parameters.
+    """Cut a mortise and tenon with optional pegs and one end-driven wedge.
+
+    wedge_parameters sizes the wedge and saw kerf on a rectangular tenon.
+    Flared walls run from the shoulder to mortise_depth, or through the receiver
+    when depth is omitted.
     """
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
@@ -240,6 +225,16 @@ def cut_mortise_and_tenon_joint(
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
+    wedge_layout = None
+    if wedge_parameters is not None:
+        if use_round_tenon or (bore_mortise_perpendicular_to_face and not is_square):
+            raise ValueError("Wedging requires a rectangular tenon with the mortise bored along the tenon axis")
+        spread_global = (tenon_timber.get_width_direction_global()
+                         if wedge_parameters.wedge_orientation is WedgeOrientation.SPREAD_X
+                         else tenon_timber.get_height_direction_global())
+        wedge_layout = lay_out_tenon_wedge(wedge_parameters, tenon_base_transform, tenon_size,
+                                           tenon_length, mortise_depth, spread_global)
+
     if use_round_tenon:
         tenon_radius = tenon_size[0] / scalar(2)
         axis_direction_global = safe_normalize_vector(tenon_end_direction)
@@ -257,6 +252,7 @@ def cut_mortise_and_tenon_joint(
             transform=marking_space.transform,
             start_distance=-back_extension,
             end_distance=tenon_length,
+            extra_features=wedge_layout.kerf_datums if wedge_layout else (),
             feature_overrides=[
                 # Cheek to cheek is the tenon's thickness; tip to shoulder its length, and the tip
                 # is measured from nothing else.
@@ -328,9 +324,11 @@ def cut_mortise_and_tenon_joint(
     tenon_prism_local = adopt_csg(None, tenon_timber.transform, tenon_prism_cropped)
     shoulder_half_space_local = adopt_csg(None, tenon_timber.transform, shoulder_half_space_global)
 
-    mortise_hole_prism_global = None
-
-    if do_lengthwise_cropping:
+    mortise_hole_prism_global: CutCSG
+    if wedge_parameters is not None and wedge_parameters.mortise_side_angle > 0:
+        mortise_hole_prism_global = flared_mortise(wedge_parameters, tenon_size, tenon_base_transform,
+                                                   -shoulder_plane.normal, -back_extension, mortise_depth)
+    elif do_lengthwise_cropping:
         if use_round_tenon:
             mortise_radius = tenon_size[0] / scalar(2)
             axis_direction_global = safe_normalize_vector(tenon_end_direction)
@@ -482,7 +480,7 @@ def cut_mortise_and_tenon_joint(
     else:
         shoulder_notch_relief_geom = None
 
-    tenon_cut_csg = Difference(
+    tenon_cut_csg: CutCSG = Difference(
         base=shoulder_half_space_local,
         subtract=[tenon_prism_local],
         label=CutCSGLabel("tenon_waste"),
@@ -493,6 +491,12 @@ def cut_mortise_and_tenon_joint(
             [shoulder_notch_relief_geom.butting_timber_relief_negative_CSG],
             TENON_CUT_LABEL,
         )
+
+    if wedge_layout is not None and wedge_layout.kerf_global is not None:
+        slot: CutCSG = wedge_layout.kerf_global
+        if not is_square:
+            slot = Intersection(slot, shoulder_relief_bound_global)
+        tenon_cut_csg = _union_into_cut(tenon_cut_csg, [adopt_csg(None, tenon_timber.transform, slot)], TENON_CUT_LABEL)
 
     mortise_hole_prism_local = adopt_csg(None, mortise_timber.transform, mortise_hole_prism_global)
 
@@ -524,7 +528,9 @@ def cut_mortise_and_tenon_joint(
         label=CutCSGLabel("mortise_and_tenon"),
     )
 
-    joint_accessories = {}
+    joint_accessories: dict[str, Accessory] = {}
+    if wedge_layout is not None:
+        joint_accessories["wedge"] = wedge_layout.accessory
     if peg_parameters is not None:
         peg_results = compute_peg_positions(
             arrangement=arrangement,
