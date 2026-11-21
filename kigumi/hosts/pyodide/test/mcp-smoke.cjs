@@ -67,8 +67,8 @@ app.whenReady().then(async () => {
         };
         const initialized = await call('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } });
         assert.equal(initialized.instructions, MCP_INSTRUCTIONS);
-        assert.ok((await call('tools/list')).tools.some(tool => tool.name === 'list_panels'));
-        const result = await call('tools/call', { name: 'list_panels', arguments: {} });
+        assert.ok((await call('tools/list')).tools.some(tool => tool.name === 'describe_panel'));
+        const result = await call('tools/call', { name: 'describe_panel', arguments: {} });
         assert.ok(Array.isArray(JSON.parse(result.content[0].text).panels));
         const tool = (name, args) => call('tools/call', { name, arguments: args });
         const names = (await call('tools/list')).tools.map(one => one.name);

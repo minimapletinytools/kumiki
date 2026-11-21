@@ -284,12 +284,12 @@ app.whenReady().then(async () => {
             worker.addEventListener('message', listen);
             worker.postMessage({ type: 'test:agentTool', id, name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)} });
         })`);
-        const listedPanels = JSON.parse(await tool('list_panels'));
+        const listedPanels = JSON.parse(await tool('describe_panel'));
         const editorPanel = listedPanels.panels.find((panel) => panel.kind === 'editor' && panel.filePath === filePath);
         check('agent tools list the browser editor panel', Boolean(editorPanel));
         if (editorPanel) {
             const description = JSON.parse(await tool('describe_panel', { panel_id: editorPanel.id }));
-            check('agent tools describe the browser editor', description.kind === 'editor' && description.filePath === filePath);
+            check('agent tools describe the browser editor', description.panel.kind === 'editor' && description.panel.filePath === filePath);
         }
         const found = await tool('search_files', { pattern: 'def my_cute_frame' });
         check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
