@@ -4406,7 +4406,8 @@
           "stopped_face_aligned",
           "round_plane_aligned",
           "front_entry",
-          "top_entry"
+          "top_entry",
+          "board_edge"
         ],
         "patterns": [
           {
@@ -4516,11 +4517,20 @@
             "path": "mixed/tusked_mortise_and_tenon/top_entry",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "names": {
+              "en": "Tenon on a board edge",
+              "ja": "\u677f\u306e\u5074\u9762\u306e\u6798"
+            },
+            "path": "mixed/mortise_and_tenon/board_edge",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "mixed/mortise_and_tenon_joints_patterns.py",
-      "sha256": "b2c9be7c05461a5ef117b47bfb7fdc842b19d329ab31a9c1e736479990266903",
+      "sha256": "f48f08662261251d11f3f650deeacb8ba0388b2515605fa56097b08c7ea0c06d",
       "title": {
         "en": "Mortise and tenon joints",
         "ja": "\u6798\u5dee\u3057"
@@ -5738,7 +5748,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-19T05:23:09.869084+00:00",
+  "generated_at": "2026-11-21T17:43:06.889200+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
