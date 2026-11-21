@@ -51,8 +51,18 @@ async function composeDrawingPng({ canvas, overlay, pageRect, cssWidth, cssHeigh
 }
 
 /** A file name for a drawing's export: its name with anything awkward in a path replaced. */
-function drawingFileName(name) {
-    return `${String(name || 'drawing').replace(/[^\p{L}\p{N}._-]+/gu, '_').replace(/^_+|_+$/g, '') || 'drawing'}.png`;
+function drawingFileName(name, format = 'png') {
+    return `${String(name || 'drawing').replace(/[^\p{L}\p{N}._-]+/gu, '_').replace(/^_+|_+$/g, '') || 'drawing'}.${format}`;
 }
 
-export { composeDrawingPng, drawingFileName };
+/** Capture a perspective viewport at the canvas's device resolution. */
+function previewImage(canvas, rect, ratio, canvasHeight) {
+    const image = document.createElement('canvas');
+    image.width = Math.max(1, Math.round(rect.width * ratio));
+    image.height = Math.max(1, Math.round(rect.height * ratio));
+    image.getContext('2d').drawImage(canvas, rect.x * ratio, (canvasHeight - rect.y - rect.height) * ratio,
+        rect.width * ratio, rect.height * ratio, 0, 0, image.width, image.height);
+    return image.toDataURL('image/png');
+}
+
+export { composeDrawingPng, drawingFileName, previewImage, standaloneSvg };

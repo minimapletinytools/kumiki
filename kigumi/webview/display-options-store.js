@@ -55,6 +55,7 @@ function optionSpecs(themeIds) {
         showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
         // What a drawing's views draw over the timbers: the perfect timber within's faces and
         // its centerplanes, dotted, and the reference features, lit.
+        tintSvgReferenceFaces: { value: false, normalize: bool },
         showDrawingPerfectFaces: { value: true, normalize: bool },
         showDrawingCenterplanes: { value: true, normalize: bool },
         showDrawingReferenceFeatures: { value: true, normalize: bool },
