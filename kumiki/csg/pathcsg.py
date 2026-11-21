@@ -900,15 +900,15 @@ class PathExtrusion(HasFeatures, CutCSG):
 
 
     def get_convex_hull(self) -> 'ConvexHull':
-        """Return the convex hull of the path's segment start points, extruded.
-
-        KNOWN BUG: an arc bulging outward lies outside this hull, so the bound is too small.
-        """
+        """Return an extruded hull containing the path, including its circular bulges."""
         from .edges_on_csg import _hull_or_unknown, _extruded_hull_half_spaces
-        points = [seg.start for seg in self.path.segments]
+        points = [(float(seg.start[0]), float(seg.start[1])) for seg in self.path.segments]
+        for segment in self.path.segments:
+            if isinstance(segment, ArcSegment):
+                low, high = segment.bounds()
+                points.extend((float(x), float(y)) for x in (low[0], high[0]) for y in (low[1], high[1]))
         return _hull_or_unknown(_extruded_hull_half_spaces(
-            [(float(point[0, 0]), float(point[1, 0])) for point in points],
-            self.transform, self.start_distance, self.end_distance))
+            points, self.transform, self.start_distance, self.end_distance))
 
     def plane_sides(self, frame: 'PlaneFrame', seed: 'PolygonRegions') -> 'Sides':
         """Return the union of its convex pieces' plane_sides."""
