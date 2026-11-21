@@ -30,6 +30,7 @@
   "viewer.options.edges.noOverlay": "オーバーレイなし",
   "viewer.options.edgeVisibility.label": "エッジ線の表示 ({percent}%)",
   "viewer.options.edgeThickness.label": "エッジ線の太さ ({px}px)",
+  "viewer.options.renderTimberGrain": "木目を表示",
   "viewer.options.shadows": "影",
   "viewer.options.reflection": "反射",
   "viewer.options.footprint.ariaLabel": "フットプリントの色",

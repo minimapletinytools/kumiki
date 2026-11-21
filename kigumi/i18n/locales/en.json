@@ -30,6 +30,7 @@
   "viewer.options.edges.noOverlay": "no overlay",
   "viewer.options.edgeVisibility.label": "edge line visibility ({percent}%)",
   "viewer.options.edgeThickness.label": "edge thickness ({px}px)",
+  "viewer.options.renderTimberGrain": "render timber grain",
   "viewer.options.shadows": "shadows",
   "viewer.options.reflection": "reflection",
   "viewer.options.footprint.ariaLabel": "footprint color",
