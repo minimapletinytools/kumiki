@@ -29,11 +29,14 @@ from .cutcsg import (
 )
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
 from .meshcsg import TriangleSolid
+from .coplanar_cuts import detach_coplanar_cuts
 from ..rule import Matrix, Numeric, Transform, V2, V3
 from ..user_warnings import warn_user
 
 
 TRIANGLES_FLOAT_DIGITS = 8
+# Before a difference, move cutter faces off the faces they coincide with (see coplanar_cuts).
+TRIANGLES_DETACH_COPLANAR_CUTS = True
 # A half space or open-ended prism is meshed as a box sized to the solid it cuts (see _Reach):
 # manifold's tolerance grows with a solid's size, so one big box loses fine cuts.
 # This size is only for one meshed with nothing to cut.
@@ -276,6 +279,8 @@ def _mesh_difference_cuts(csg: Difference, base: trimesh.Trimesh) -> TriangleMes
             meshes.extend(flattened)
         else:
             meshes.append(triangulate_cutcsg(child).mesh)
+    if TRIANGLES_DETACH_COPLANAR_CUTS:
+        meshes = [base, *detach_coplanar_cuts(base, meshes[1:])]
     result_mesh = _run_boolean("difference", meshes)
     return TriangleMesh(mesh=result_mesh)
 
