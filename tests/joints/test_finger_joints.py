@@ -4,7 +4,8 @@ from math import atan
 import pytest
 
 from kumiki import (CornerJointTimberArrangement, Frame, Joint, KumikiArrangementError, Orientation, TimberEnd, TimberLongFace,
-                    Transform, create_v2, create_v3, cut_box_corner_joint, cut_uniform_finger_corner_joint,
+                    Transform, create_v2, create_v3, cut_basic_finger_corner_joint,
+                    cut_basic_finger_splice_joint, cut_box_corner_joint, cut_uniform_finger_corner_joint,
                     cut_uniform_finger_splice_joint, degrees, mm)
 from kumiki.example_shavings import (create_canonical_example_right_angle_corner_joint_timbers,
                                     create_canonical_example_splice_joint_timbers)
@@ -167,3 +168,41 @@ def test_taper_must_leave_a_tip_on_the_partial_last_finger():
     a = create_canonical_example_splice_joint_timbers(timber_size=create_v2(mm(49), mm(20)))
     with pytest.raises(ValueError, match="no finger tip"):
         cut_uniform_finger_splice_joint(a, mm(20), finger_width=mm(12))
+
+
+def _assert_finger_widths(joint, center_global, toward_front_global, span_mm, count):
+    at = _ownership(joint)
+    pitch = span_mm / count
+    for i in range(count):
+        for distance in (i * pitch + .1, (i + 1) * pitch - .1):
+            point = center_global + toward_front_global * mm(span_mm / 2 - distance)
+            assert at(point) == (i % 2 == 0, i % 2 == 1)
+
+
+@pytest.mark.parametrize("span,first_thickness,second_thickness,count",
+                         [(84, 18, 18, 5), (96, 16, 32, 4), (96, 32, 16, 4), (18, 18, 18, 2)])
+def test_basic_corner_sizes_fingers_from_both_thicknesses(span, first_thickness, second_thickness, count):
+    a = create_canonical_example_right_angle_corner_joint_timbers(timber_size=create_v2(mm(span), mm(first_thickness)))
+    a = replace(a, timber2=replace(a.timber2, size=create_v2(mm(span), mm(second_thickness))),
+                front_face_on_timber1=None)
+    pose = Transform(create_v3(.1, .2, -.3), Orientation.from_angle_axis(degrees(37), create_v3(1, 2, 3)))
+    a = replace(a, timber1=replace(a.timber1, transform=pose * a.timber1.transform),
+                timber2=replace(a.timber2, transform=pose * a.timber2.transform))
+    joint = cut_basic_finger_corner_joint(a)
+    _assert_finger_widths(joint, pose.position, a.compute_normalized_timber_cross_product(), span, count)
+
+
+@pytest.mark.parametrize("width,height,front,expected_front,span,count", [
+    (84, 18, None, TimberLongFace.RIGHT, 84, 5),
+    (18, 84, None, TimberLongFace.FRONT, 84, 5),
+    (84, 18, TimberLongFace.LEFT, TimberLongFace.LEFT, 84, 5),
+    (84, 18, TimberLongFace.FRONT, TimberLongFace.FRONT, 18, 2),
+])
+def test_basic_splice_overlap_is_twice_the_fitted_width(width, height, front, expected_front, span, count):
+    a = create_canonical_example_splice_joint_timbers(timber_size=create_v2(mm(width), mm(height)), timber_length=mm(100))
+    center = create_v3(mm(7), 0, 0)
+    joint = cut_basic_finger_splice_joint(replace(a, front_face_on_timber1=front), splice_point=center)
+    _assert_finger_widths(joint, center, a.timber1.get_face_direction_global(expected_front), span, count)
+    pitch = mm(span / count)
+    assert joint.cuttings["timber1"].maybe_top_end_cut_distance_from_bottom == pytest.approx(mm(107) + pitch)
+    assert joint.cuttings["timber2"].maybe_bottom_end_cut_distance_from_bottom == pytest.approx(mm(7) - pitch)

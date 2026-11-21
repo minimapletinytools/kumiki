@@ -436,6 +436,8 @@
           "face_aligned",
           "tongue_and_fork_corner_joint",
           "face_aligned",
+          "finger_corner_joint",
+          "finger_splice_joint",
           "butt_splice_joint",
           "cross_lap_joint",
           "house_joint",
@@ -510,6 +512,24 @@
               "ja": "\u9762\u3092\u63c3\u3048\u305f\u7a81\u304d\u4ed8\u3051"
             },
             "path": "basic_joints/plain_butt_joint/face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "names": {
+              "en": "Box corner",
+              "ja": "\u3042\u3089\u308c\u7d44\u307f"
+            },
+            "path": "basic_joints/finger_corner_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "names": {
+              "en": "Finger splice",
+              "ja": "\u30d5\u30a3\u30f3\u30ac\u30fc\u30b8\u30e7\u30a4\u30f3\u30c8"
+            },
+            "path": "basic_joints/finger_splice_joint",
             "pattern_type": "frame",
             "tags": []
           },
@@ -772,7 +792,7 @@
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "faf42a0106caccd8f7fa9be8ed930675a10305a193be6145e954ded3b480cddc",
+      "sha256": "ef6b56545be71be0912c2f96199da72ca8ca1a8c857409b2c18e99d916b6b03c",
       "title": {
         "en": "Basic joints",
         "ja": "\u57fa\u672c\u306e\u7d99\u624b\u30fb\u4ed5\u53e3"
@@ -6088,7 +6108,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T18:25:53.336833+00:00",
+  "generated_at": "2026-11-21T23:35:39.277477+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
