@@ -27,6 +27,25 @@ module.exports = {
                 && described.selection && Array.isArray(described.selection.members),
             described && JSON.stringify({ view: described.view, frame: described.frameName }));
 
+        const grain = await inShell(`(() => {
+            const doc = ${viewDoc};
+            const app = doc.querySelector('kigumi-app');
+            const toggle = doc.getElementById('timber-grain-toggle');
+            const before = app.renderTimberGrain;
+            toggle.click();
+            const saved = app.collectViewerSettingsPayload();
+            const bundles = [...app.sceneManager.bundles()];
+            const materialsMatch = bundles.every(bundle =>
+                Boolean(bundle.mesh.material.defines.TIMBER_GRAIN) === (bundle.memberType === 'timber'));
+            toggle.click();
+            app.applyPersistedViewerSettings(saved);
+            const restored = app.renderTimberGrain;
+            app.setRenderTimberGrain(before);
+            return { before, materialsMatch, restored, saved: saved.ui.renderTimberGrain };
+        })()`);
+        check('timber grain toggles on the wood and survives saving and restoring options',
+            !grain.before && grain.materialsMatch && grain.saved && grain.restored, JSON.stringify(grain));
+
         // The mouse controls hint can be turned off, and back on.
         const hint = () => inShell(`(() => {
             const el = ${viewDoc}.getElementById('hint');

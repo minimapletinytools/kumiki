@@ -68,6 +68,7 @@ function optionSpecs(themeIds) {
         edgeMode: { value: 'noOverlay', normalize: oneOf(EDGE_MODES, 'noOverlay') },
         edgeLineVisibilityPercent: { value: 100, normalize: percent(0, 100, 5, 100) },
         edgeLineThicknessPx: { value: 1.5, normalize: range(0.5, 6, 1.5) },
+        renderTimberGrain: { value: false, normalize: bool },
         shadowsEnabled: { value: false, normalize: bool },
         reflectionsEnabled: { value: true, normalize: bool },
         footprintColor: { value: 'orange', normalize: oneOf(FOOTPRINT_COLORS, 'orange') },

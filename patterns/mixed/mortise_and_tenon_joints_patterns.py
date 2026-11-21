@@ -632,3 +632,32 @@ def tusked_front(k: Optional[Kiwari] = None) -> Joint:
 @pattern("mixed/tusked_mortise_and_tenon/top_entry", name={"en": "From the top", "ja": "上から差す"}, kiwari=TUSKED)
 def tusked_top(k: Optional[Kiwari] = None) -> Joint:
     return _tusked(TUSKED.resolve(k), TuskEntryFace.Top)
+
+
+EDGE_TENON = kiwari(
+    width=kiwari.length(mm(40)),
+    thickness=kiwari.length(mm(8), minimum=mm(1), maximum=mm(20)),
+    length=kiwari.length(mm(20), minimum=mm(1), maximum=mm(20)),
+    offset=kiwari.length(mm(35)),
+)
+
+
+@pattern('mixed/mortise_and_tenon/board_edge', name={"en": "Tenon on a board edge", "ja": "板の側面の枘"}, kiwari=EDGE_TENON)
+def example_board_edge_tenon(k: Optional[Kiwari] = None) -> Joint:
+    """Cut an off-center tenon across the grain into a rail parallel to the board."""
+    k = EDGE_TENON.resolve(k)
+    axes = Orientation.from_z_and_y(z_direction=create_v3(1, 0, 0), y_direction=create_v3(0, 0, 1))
+    board = Board(mm(300), create_v2(mm(120), mm(20)), Transform(create_v3(0, 0, mm(10)), axes),
+                  TimberTicket("board", reference_features=(TimberFeature.FRONT_LEFT_EDGE,)))
+    rail = Board(board.length, create_v2(mm(50), mm(20)),
+                 Transform(board.transform.local_to_global(create_v3(mm(65), 0, 0)), axes), TimberTicket("rail"))
+    edge = FauxTimber(board, top=TimberFace.RIGHT, front=TimberFace.FRONT)
+    return edge.restore_joint(cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        ButtJointTimberArrangement(edge, rail, TimberEnd.TOP),
+        tenon_width_relative_to_joint=k.length("width"),
+        tenon_height_relative_to_joint=k.length("thickness"),
+        tenon_length=k.length("length"),
+        mortise_depth=k.length("length") + mm(2),
+        tenon_position=create_v2(k.length("offset"), 0),
+        relief=None,
+    ))

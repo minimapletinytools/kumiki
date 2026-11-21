@@ -393,6 +393,7 @@ class MemberMeshWire(TypedDict, total=False):
     nominal_height: float
     csg_nodes: int
     csg_features: int
+    timberToWorld: List[float]  # Row-major stock frame for wood grain.
     timberClass: str
     stlPlacement: Dict[str, bool]
     isPerfectTimber: bool
@@ -1153,6 +1154,7 @@ def _cut_timber_to_triangle_mesh_payload(
     payload.update(
         csg_nodes=csg_nodes,
         csg_features=csg_features,
+        timberToWorld=[float(value) for value in timber.get_transform_matrix()],
         timberClass=timber_class,
         isPerfectTimber=is_perfect,
         cut_length=_cut_length(cut_timber),
@@ -1313,6 +1315,7 @@ def _cut_timber_to_bbox_mesh_payload(
         csg_nodes=csg_nodes,
         csg_features=csg_features,
         meshSource="bounding-prism-fallback",
+        timberToWorld=[float(value) for value in timber.get_transform_matrix()],
         timberClass=timber_class,
         isPerfectTimber=is_perfect,
         hasActualGeometryDifferentFromPerfect=False,
