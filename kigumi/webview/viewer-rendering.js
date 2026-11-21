@@ -1,3 +1,4 @@
+import { showTimberGrain } from './timber-grain.js';
 import { STL_PLACEMENT_STYLE } from './viewer-shared.js';
 /**
  * How the scene looks: theme and geometry mode, the center gizmo, edges, shadows, reflections, footprints, materials, the light and cylinder silhouettes.
@@ -365,6 +366,15 @@ export const RenderingMixin = (Base) => class extends Base {
                 bundle.edges.material.depthWrite = depthTested;
                 bundle.edges.material.needsUpdate = true;
             }
+        }
+        this.requestUpdate();
+    }
+
+    setRenderTimberGrain(enabled) {
+        this.displayOptions.set('renderTimberGrain', enabled);
+        for (const bundle of this.sceneManager.bundles()) {
+            showTimberGrain(bundle.mesh.material, enabled);
+            showTimberGrain(bundle.reflection.material, enabled);
         }
         this.requestUpdate();
     }
