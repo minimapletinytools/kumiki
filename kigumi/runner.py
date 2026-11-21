@@ -11,6 +11,7 @@ Protocol:
 from __future__ import annotations
 
 import contextlib
+import copy
 import importlib
 import importlib.util
 import inspect
@@ -429,6 +430,8 @@ class MeshCacheEntry(TypedDict, total=False):
     world_box: Tuple[List[float], List[float]]
     # The mesh's triangles, world space: worked out on first use.
     world_triangles: 'WorldTriangles'
+    # The mesh's world vertices and triangle indices: worked out on first use.
+    world_mesh: 'Mesh'
 
 
 class RemeshMetricWire(TypedDict, total=False):
@@ -701,6 +704,7 @@ if TYPE_CHECKING:
                                            MeasurementPlane, MeasurementSpace, VectorLike, ViewAxes)
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
+    from kumiki.drawings.dimension_layout import Mesh
     from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
     from kumiki.viewer.picking import DrawnMember, MemberCandidate, Pick
     from kumiki.drawings.layout import PlacedViewport
@@ -2543,12 +2547,14 @@ def collect_drawings(
     example_path: Optional[Path],
     pending: Optional[List[DrawingWire]] = None,
     finishing: bool = False,
+    meshes: Optional[Mapping[str, 'Mesh']] = None,
 ) -> List[DrawingWire]:
     """Return every drawing for a frame: from code, from the file, and unsaved.
 
     A file drawing either overrides a code drawing (adding measurements), stands alone, or dangles if
     its code drawing is gone. `dirty` marks a drawing not yet in the file. While `finishing`, an
-    override's drawing may be yet to come, so it doesn't dangle.
+    override's drawing may be yet to come, so it doesn't dangle. Given the members' world `meshes`,
+    by member key, code dimensions are placed clear of the work (dimension_layout).
     """
     saved = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
     # Unsaved entries replace saved ones of the same id, through the same merge.
@@ -2574,7 +2580,8 @@ def collect_drawings(
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
-        _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame)
+        _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame,
+                             meshes)
         drawings.append(scene)
 
     for entry in from_file:
@@ -2593,7 +2600,8 @@ def collect_drawings(
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
-        _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame)
+        _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame,
+                             meshes)
         drawings.append(scene)
 
     # Not in the file yet: either the drawing itself is unsaved, or the override
@@ -2725,13 +2733,55 @@ def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']
     return None
 
 
+#: Placed measurements by what placing them read, so a drawing sent again isn't placed again.
+_PLACED_DIMENSIONS: Dict[Tuple[str, Tuple[int, ...]], Tuple[List['Mesh'], List[MeasureWire]]] = {}
+
+
+def _place_dimensions(scene: DrawingWire, viewport: ViewportWire, frame: 'Frame',
+                      meshes: Mapping[str, 'Mesh']) -> None:
+    """Give the viewport's code dimensions that have none a placement clear of its members."""
+    try:
+        from kumiki.drawings.dimension_layout import place_dimensions
+    except ImportError:  # a kumiki older than dimension_layout
+        return
+
+    members = viewport.get("members") or scene.get("members") or list(meshes)
+    drawn = [meshes[key] for key in members if key in meshes]
+    key = (json.dumps([viewport.get(k) for k in ("camera", "rect", "projection", "measurements")]
+                      + [scene.get("page")], sort_keys=True, default=str),
+           tuple(id(mesh) for mesh in drawn))
+    cached = _PLACED_DIMENSIONS.get(key)
+    if cached is not None:
+        viewport["measurements"] = copy.deepcopy(cached[1])
+        return
+    try:
+        placements = place_dimensions(viewport, scene.get("page"), drawn)
+    except Exception as exc:  # noqa: BLE001 -- placing is cosmetic; the default placement still draws
+        log_warning(f"could not place the dimensions of {scene.get('name')!r}: {exc}")
+        return
+    measures = viewport["measurements"]
+    for index, placement in placements.items():
+        measure = MeasureWire(**measures[index])
+        measure["placement"] = PlacementWire(**placement)
+        if "along" in placement:
+            # The ends move with `along`.
+            measure = _resolve_measurement(frame, measure, _viewport_axes(scene, viewport["id"]))
+        measures[index] = measure
+    if len(_PLACED_DIMENSIONS) >= 256:
+        _PLACED_DIMENSIONS.clear()
+    # The meshes go in too, so the ids in the key stay theirs.
+    _PLACED_DIMENSIONS[key] = (drawn, copy.deepcopy(measures))
+
+
 def _attach_measurements(
     scene: DrawingWire,
     by_viewport: Dict[str, List[MeasureWire]],
     drawing_name: str,
     frame: 'Frame',
+    meshes: Optional[Mapping[str, 'Mesh']] = None,
 ) -> None:
-    """Attach each viewport's measurements to it, resolved against `frame`.
+    """Attach each viewport's measurements to it, resolved against `frame`, and with `meshes` place its
+    code dimensions.
 
     Measurements for viewports the layout lacks are warned about and kept, not drawn.
     """
@@ -2747,6 +2797,8 @@ def _attach_measurements(
     }
     for viewport in scene.get("viewports") or []:
         viewport["measurements"] = remaining.pop(viewport.get("id"), [])
+        if meshes is not None:
+            _place_dimensions(scene, viewport, frame, meshes)
     unplaceable = {
         viewport: measures for viewport, measures in remaining.items() if measures
     }
@@ -4375,6 +4427,16 @@ def _world_triangles(entry: MeshCacheEntry) -> WorldTriangles:
     return entry["world_triangles"]
 
 
+def _world_mesh(entry: MeshCacheEntry) -> 'Mesh':
+    """Return a member's world vertices and triangle indices as arrays, cached on its entry."""
+    import numpy as np
+
+    if "world_mesh" not in entry:
+        entry["world_mesh"] = (np.array(entry["mesh"]["vertices"], dtype=float).reshape(-1, 3),
+                               np.array(entry["mesh"]["indices"], dtype=int).reshape(-1, 3))
+    return entry["world_mesh"]
+
+
 def _ray_meets_mesh(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3') -> bool:
     """Return whether the ray passes through any of a member's triangles."""
     import numpy as np
@@ -5101,7 +5163,8 @@ def _finishing_in_progress(ss: SlotState) -> bool:
 
 def _slot_drawings(ss: SlotState) -> List[DrawingWire]:
     """Return every drawing for the slot's frame."""
-    return collect_drawings(ss.frame, ss.file_path, ss.pending_drawings, _finishing_in_progress(ss))
+    meshes = {key: _world_mesh(entry) for key, entry in ss.mesh_cache.items() if entry.get("mesh")}
+    return collect_drawings(ss.frame, ss.file_path, ss.pending_drawings, _finishing_in_progress(ss), meshes)
 
 
 def _run_finishing(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
