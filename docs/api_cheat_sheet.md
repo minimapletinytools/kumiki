@@ -60,6 +60,13 @@ Omit placement for an editable placeholder; see [STL timbers](stl_timbers.md).
 
 ## Joints
 
+A `FauxTimber` lets an end-based cutter work across a perfect rectangular board or timber.
+Choose two perpendicular faces of the stock. For a tenon on its right edge, use
+`edge = FauxTimber(board, top=TimberFace.RIGHT, front=TimberFace.FRONT)` as the butt timber
+with `TimberEnd.TOP`, then call `edge.restore_joint(joint)` before assembling the frame.
+The shoulder spans the edge, and the blank must already reach the tenon tip.
+[See the off-center board-edge tenon example](../patterns/mixed/mortise_and_tenon_joints_patterns.py).
+
 ### Arrangements
 
 Most joint functions take an arrangement naming the timbers in the joint and the "orientation" of the joint.
