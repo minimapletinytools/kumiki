@@ -4592,6 +4592,7 @@
         "pattern_names": [
           "round_face_aligned",
           "through_tenon",
+          "twin_tenon",
           "compound_angled",
           "joint_plane_aligned_notched_2sided",
           "brace_joint_mortise_and_tenon",
@@ -4603,7 +4604,9 @@
           "front_entry",
           "top_entry",
           "board_edge",
-          "blind_wedged"
+          "blind_wedged",
+          "through_wedged",
+          "angled_blind_wedged"
         ],
         "patterns": [
           {
@@ -4621,6 +4624,15 @@
               "ja": "\u901a\u3057\u6798"
             },
             "path": "mixed/mortise_and_tenon/through_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "names": {
+              "en": "Twin tenon",
+              "ja": "\u4e8c\u679a\u6798"
+            },
+            "path": "mixed/mortise_and_tenon/twin_tenon",
             "pattern_type": "frame",
             "tags": []
           },
@@ -4731,11 +4743,29 @@
             "path": "mixed/mortise_and_tenon/blind_wedged",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "names": {
+              "en": "Through wedged tenon",
+              "ja": "\u6954\u7de0\u3081\u306e\u901a\u3057\u6798"
+            },
+            "path": "mixed/mortise_and_tenon/through_wedged",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "names": {
+              "en": "Angled blind wedged tenon",
+              "ja": "\u659c\u3081\u306e\u5730\u7344\u6798"
+            },
+            "path": "mixed/mortise_and_tenon/angled_blind_wedged",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "mixed/mortise_and_tenon_joints_patterns.py",
-      "sha256": "48c1cd2c128c404c35b830a187b1808dd48146a11b977c00f0d62140b2e23ba3",
+      "sha256": "0281d304fe6649ac8e91684638b9e5b51375914fcc34a305e3ab534b16c94d45",
       "title": {
         "en": "Mortise and tenon joints",
         "ja": "\u6798\u5dee\u3057"
@@ -5919,7 +5949,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/dovetailed_sawhorse.py",
-      "sha256": "6ed072142868b412a2f43579b8e355a1e83e744a59cbe8f8e30aa28362f7619c",
+      "sha256": "30e769b100ec3042548866253443c1eac22e9f91aa9dcc71d412c32e6e15861c",
       "title": {
         "en": "Dovetailed sawhorse",
         "ja": "\u87fb\u3067\u7d44\u3093\u3060\u99ac"
@@ -6118,7 +6148,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-22T02:04:43.878198+00:00",
+  "generated_at": "2026-11-22T16:59:00.117260+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }

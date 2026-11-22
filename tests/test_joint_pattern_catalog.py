@@ -90,6 +90,27 @@ def test_compound_pattern_relief_and_peg_controls(notched, round_stock, pegged):
     assert bool(joint.jointAccessories) == pegged
 
 
+@pytest.mark.parametrize("notched", [False, True])
+def test_twin_tenon_pattern_flare_at_shared_shoulder(notched):
+    from dataclasses import replace
+    from kumiki import create_v3, inches
+    from patterns.mixed.mortise_and_tenon_joints_patterns import TWIN_TENON, twin_tenon
+
+    joint = twin_tenon(replace(TWIN_TENON, values={"notched": notched}))
+    receiver = joint.cuttings["receiving_timber"]
+    waste = receiver.negative_csg
+    assert waste is not None
+
+    def removed(x, y):
+        point = create_v3(inches(x), inches(y), 0)
+        return waste.contains_point(receiver.timber.transform.global_to_local(point))
+
+    assert removed(-1.5, -1) and removed(1.5, -1)
+    assert not removed(0, -1)
+    assert removed(0, -2.5)
+    assert removed(3.25, -2.5) == notched
+
+
 @pytest.mark.parametrize("top_entry", [False, True])
 def test_tusked_pattern_accepts_rough_reference_and_inset(top_entry):
     from dataclasses import replace

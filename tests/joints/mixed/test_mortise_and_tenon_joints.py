@@ -1802,3 +1802,107 @@ class TestAnOffsetTenonInAnAngledBoredMortise:
 
         assert trimesh.boolean.intersection([mesh("post"), mesh("stroke")], engine="manifold").volume < 1e-8
         assert abs(tenon_in_post.volume - expected) < 0.01 * expected
+
+
+def test_merge_twin_tenons_with_one_inset_shoulder(simple_T_configuration):
+    tenon, mortise = simple_T_configuration
+    arrangement = ButtJointTimberArrangement(tenon, mortise, TimberEnd.BOTTOM)
+
+    def component(x, length, **kwargs):
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement, tenon_length=length, tenon_width_relative_to_joint=1,
+            tenon_height_relative_to_joint=1, mortise_depth=length + 0.25,
+            tenon_position=create_v2(x, 0), mortise_shoulder_inset=1,
+            relief=None, inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief, **kwargs)
+
+    left = component(-1, 2)
+    right = component(1, 3)
+    merged = merge_mortise_and_tenon_joints([left, right], relief=ButtJointNotchReliefConfig())
+    shank = _render_cutting(merged.cuttings[tenon.ticket.path])
+    receiver = _render_cutting(merged.cuttings[mortise.ticket.path])
+
+    def holds(csg, timber, x, z):
+        return csg.contains_point(timber.transform.global_to_local(create_v3(x, 0, z)))
+
+    for x in (-1, 1):
+        assert holds(shank, tenon, x, 1)
+        assert not holds(receiver, mortise, x, 1)
+    assert not holds(shank, tenon, 0, 1)
+    assert holds(receiver, mortise, 0, 1)
+    assert holds(shank, tenon, 0, 2.5)
+    assert not holds(receiver, mortise, 0, 2.5)
+    assert not holds(shank, tenon, -1, -0.5)
+    assert holds(receiver, mortise, -1, -0.5)
+    assert holds(shank, tenon, 1, -0.5)
+    assert not holds(receiver, mortise, 1, -0.5)
+    freedom = merged.cuttings[tenon.ticket.path].assembly_freedom
+    assert freedom is not None and [dof.freed_after for dof in freedom.translations] == [3]
+
+
+def test_merge_preserves_wedges_and_kerfs(simple_T_configuration):
+    tenon, mortise = simple_T_configuration
+    arrangement = ButtJointTimberArrangement(tenon, mortise, TimberEnd.BOTTOM)
+    parts = [
+        cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement, tenon_length=3, tenon_width_relative_to_joint=1,
+            tenon_height_relative_to_joint=1, tenon_position=create_v2(x, 0),
+            wedge_parameters=WedgeParameters(wedge_length=1, tenon_kerf_size=0.1),
+        ).with_order(2)
+        for x in (-1, 1)
+    ]
+    merged = merge_mortise_and_tenon_joints(parts)
+    assert list(merged.jointAccessories.values()) == [part.jointAccessories["wedge"] for part in parts]
+    shank = _render_cutting(merged.cuttings[tenon.ticket.path])
+    for x in (-1, 1):
+        assert shank.contains_point(create_v3(x, 0, 2))
+        assert not shank.contains_point(create_v3(x, 0, 0.5))
+    assert merged.cuttings[tenon.ticket.path].assembly_ordering.order == 2
+
+
+def test_merge_rejects_incompatible_parts(simple_T_configuration):
+    from dataclasses import replace
+
+    tenon, mortise = simple_T_configuration
+    arrangement = ButtJointTimberArrangement(tenon, mortise, TimberEnd.BOTTOM)
+
+    def component(arrangement, inset=0, style=InsetShoulderReliefStyle.NoRelief):
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement, tenon_length=2, tenon_width_relative_to_joint=1, tenon_height_relative_to_joint=1,
+            mortise_shoulder_inset=inset, relief=None, inset_shoulder_relief_style=style)
+
+    base = component(arrangement)
+    for part, message in [
+        (component(arrangement, 1), "oriented shoulder plane"),
+        (component(replace(arrangement, receiving_timber=replace(mortise))), "same mortise timber"),
+        (component(replace(arrangement, butt_timber=replace(tenon))), "same tenon timber end"),
+        (component(arrangement, 1, InsetShoulderReliefStyle.Rough), "already have shoulder or scribe relief"),
+    ]:
+        with pytest.raises(AssertionError, match=message):
+            merge_mortise_and_tenon_joints([base, part])
+
+
+def test_merge_rebuilds_rough_scribe_after_both_mortises():
+    from kumiki.example_shavings import RoughTimberConfig
+
+    half_size = inches(3)
+    arrangement = create_canonical_example_butt_joint_timbers(
+        timber_config=RoughTimberConfig((half_size, half_size, half_size, half_size)))
+
+    def component(x, relief):
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement, tenon_length=inches(2), tenon_width_relative_to_joint=inches(1),
+            tenon_height_relative_to_joint=inches(1), inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
+            tenon_position=create_v2(inches(x), 0), relief=relief)
+
+    parts = [component(x, None) for x in (-1, 1)]
+    scribed = component(0, ButtJointScribeReliefConfig.butt_timber())
+    with pytest.raises(AssertionError, match="already have shoulder or scribe relief"):
+        merge_mortise_and_tenon_joints([parts[0], scribed])
+    merged = merge_mortise_and_tenon_joints(parts, relief=ButtJointScribeReliefConfig.receiving_timber())
+    tenon = merged.cuttings[arrangement.butt_timber.ticket.path].negative_csg
+    mortise = merged.cuttings[arrangement.receiving_timber.ticket.path].negative_csg
+    assert isinstance(tenon, SolidUnion) and tenon.label.name == "scribe_hollow_relief_cut"
+    assert isinstance(mortise, SolidUnion) and mortise.label.name == "scribe_relief_cut"
+    combined = mortise.children[0]
+    assert isinstance(combined, SolidUnion)
+    assert [cut.label.name for cut in combined.children] == ["mortise_0", "mortise_1"]

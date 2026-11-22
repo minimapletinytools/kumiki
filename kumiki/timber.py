@@ -2700,7 +2700,7 @@ class Joint:
                 key: replace(accessory, assembly_ordering=Ordering(order, accessory.assembly_ordering.suborder))
                 for key, accessory in self.jointAccessories.items()
             }
-            return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
+            return replace(self, cuttings=new_cuttings, jointAccessories=new_accessories)
 
         # Per-member form. Members are addressed as ("cutting"|"accessory", key).
         def resolve(reference) -> List[Tuple[str, str]]:
@@ -2760,7 +2760,7 @@ class Joint:
             key: replace(accessory, assembly_ordering=new_orderings[("accessory", key)])
             for key, accessory in self.jointAccessories.items()
         }
-        return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
+        return replace(self, cuttings=new_cuttings, jointAccessories=new_accessories)
 
 def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     """

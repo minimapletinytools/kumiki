@@ -10,7 +10,7 @@ import warnings
 from dataclasses import dataclass, replace
 from math import isfinite
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Sequence, Union
 
 from kumiki.timber import *
 from kumiki.construction import *
@@ -239,6 +239,138 @@ def _mortise_walls() -> List[FeatureOverride]:
         FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back", measured_against(wall, "mortise_front")),
         FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
     ]
+
+
+@dataclass(frozen=True, kw_only=True)
+class _MortiseAndTenonJoint(Joint):
+    arrangement: ButtJointTimberArrangement
+    shoulder_plane: Plane
+    shoulder_half_space_global: HalfSpace
+    shoulder_distance: Numeric
+    parallel_face: Union[TimberLongFace, bool]
+    tenon_local: CutCSG
+    independent_tenon_cuts: tuple[CutCSG, ...]
+    has_relief: bool
+
+
+def _plane_aligned_shoulder_notch(
+    arrangement: ButtJointTimberArrangement, notch_from: NotchFrom, shoulder_distance: Numeric,
+) -> ShoulderReliefCSGGeometry | None:
+    """Build the two-sided notch from the inset shoulder or the receiver's entry face."""
+    if notch_from is NotchFrom.Face:
+        direction = arrangement.butt_timber.get_face_direction_global(arrangement.butt_timber_end)
+        face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(-direction).to.face()
+        shoulder_distance = convert_mortise_shoulder_inset_to_centerline_distance(
+            scalar(0), face, arrangement.receiving_timber)
+    return chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, shoulder_distance)
+
+
+def _inset_shoulder_relief(
+    arrangement: ButtJointTimberArrangement,
+    shoulder_plane: Plane,
+    shoulder_half_space_global: HalfSpace,
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool],
+    relief: None | ButtJointScribeReliefConfig | ButtJointNotchReliefConfig,
+    inset_shoulder_relief_style: InsetShoulderReliefStyle,
+) -> ShoulderReliefCSGGeometry | None:
+    """Build the housing and matching shank relief at the shared shoulder."""
+    tenon_timber = arrangement.butt_timber
+    mortise_timber = arrangement.receiving_timber
+    tenon_end = arrangement.butt_timber_end
+    shoulder_relief_bound_global = replace(shoulder_half_space_global, feature_overrides=[])
+    if isinstance(relief, ButtJointNotchReliefConfig):
+        assert relief.notch_from == NotchFrom.Shoulder, (
+            "cut_mortise_and_tenon_joint only supports "
+            "ButtJointNotchReliefConfig(notch_from=NotchFrom.Shoulder)"
+        )
+        if inset_shoulder_relief_style is not InsetShoulderReliefStyle.NoRelief:
+            warnings.warn(
+                "inset_shoulder_relief_style is ignored when relief is a "
+                "ButtJointNotchReliefConfig -- the 4-sided notch is itself the "
+                "inset-shoulder relief. Pass InsetShoulderReliefStyle.NoRelief.",
+                stacklevel=2,
+            )
+        return chop_butt_joint_shoulder_notch_relief_4sided(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+            shoulder_plane=shoulder_plane,
+        )
+    elif inset_shoulder_relief_style is InsetShoulderReliefStyle.NoRelief:
+        return None
+    elif does_shoulder_plane_need_notching(
+        arrangement,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
+        check_against_rough_size=False,
+        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
+    ):
+        extend_bot = tenon_end == TimberEnd.BOTTOM
+        extend_top = tenon_end == TimberEnd.TOP
+        fit_rough_shank = inset_shoulder_relief_style is InsetShoulderReliefStyle.Rough
+        tenon_timber_scribe_csg_local = (
+            tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top)
+            if fit_rough_shank
+            else tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)
+        )
+        tenon_timber_csg_global = adopt_csg(
+            tenon_timber.transform,
+            None,
+            tenon_timber_scribe_csg_local,
+        )
+        mortise_ptw_global = adopt_csg(
+            mortise_timber.transform,
+            None,
+            RectangularPrism(
+                size=mortise_timber.size,
+                start_distance=scalar(0),
+                end_distance=mortise_timber.length,
+                label=CutCSGLabel("mortise_ptw_bounds"),
+            ),
+        )
+        scribe_csg_global = Intersection(
+            left=Difference(
+                base=tenon_timber_csg_global,
+                subtract=[shoulder_half_space_global],
+            ),
+            right=mortise_ptw_global,
+            label=CutCSGLabel("shoulder_scribe_relief"),
+        )
+        scribe_csg_mortise_local = adopt_csg(None, mortise_timber.transform, scribe_csg_global)
+
+        if fit_rough_shank or tenon_timber.is_perfect_timber():
+            tenon_relief_local = None
+        else:
+            tenon_imperfect_global = adopt_csg(
+                tenon_timber.transform,
+                None,
+                Difference(
+                    # The timber's own rough body without its labels: that body is already
+                    # in this timber's tree, and one surface declared twice puts two
+                    # features of one name on one plane (see the shoulder bound above).
+                    base=tenon_timber.get_extended_actual_csg_local(
+                        extend_bot=extend_bot, extend_top=extend_top, with_feature_labels=False),
+                    subtract=[tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)],
+                    label=CutCSGLabel("rough_fringe"),
+                ),
+            )
+            tenon_relief_local = adopt_csg(
+                None,
+                tenon_timber.transform,
+                Intersection(
+                    left=Difference(
+                        base=tenon_imperfect_global,
+                        subtract=[shoulder_relief_bound_global],
+                    ),
+                    right=mortise_ptw_global,
+                    label=CutCSGLabel("shoulder_rough_relief"),
+                ),
+            )
+
+        return ShoulderReliefCSGGeometry(
+            receiving_timber_notch_negative_CSG=scribe_csg_mortise_local,
+            butting_timber_relief_negative_CSG=tenon_relief_local,
+        )
+    return None
 
 
 def cut_mortise_and_tenon_joint(
@@ -514,98 +646,11 @@ def cut_mortise_and_tenon_joint(
             feature_overrides=_mortise_walls(), label=CutCSGLabel("mortise_hole"),
         )
 
-    if isinstance(relief, ButtJointNotchReliefConfig):
-        assert relief.notch_from == NotchFrom.Shoulder, (
-            "cut_mortise_and_tenon_joint only supports "
-            "ButtJointNotchReliefConfig(notch_from=NotchFrom.Shoulder)"
-        )
-        if inset_shoulder_relief_style is not InsetShoulderReliefStyle.NoRelief:
-            warnings.warn(
-                "inset_shoulder_relief_style is ignored when relief is a "
-                "ButtJointNotchReliefConfig -- the 4-sided notch is itself the "
-                "inset-shoulder relief. Pass InsetShoulderReliefStyle.NoRelief.",
-                stacklevel=2,
-            )
-        shoulder_notch_relief_geom: ShoulderReliefCSGGeometry | None = chop_butt_joint_shoulder_notch_relief_4sided(
-            arrangement,
-            mortise_shoulder_distance_from_centerline_or_centerplane,
-        )
-    elif inset_shoulder_relief_style is InsetShoulderReliefStyle.NoRelief:
-        shoulder_notch_relief_geom = None
-    elif does_shoulder_plane_need_notching(
-        arrangement,
-        mortise_shoulder_distance_from_centerline_or_centerplane,
-        check_against_rough_size=False,
-        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
-    ):
-        extend_bot = tenon_end == TimberEnd.BOTTOM
-        extend_top = tenon_end == TimberEnd.TOP
-        fit_rough_shank = inset_shoulder_relief_style is InsetShoulderReliefStyle.Rough
-        tenon_timber_scribe_csg_local = (
-            tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top)
-            if fit_rough_shank
-            else tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)
-        )
-        tenon_timber_csg_global = adopt_csg(
-            tenon_timber.transform,
-            None,
-            tenon_timber_scribe_csg_local,
-        )
-        mortise_ptw_global = adopt_csg(
-            mortise_timber.transform,
-            None,
-            RectangularPrism(
-                size=mortise_timber.size,
-                start_distance=scalar(0),
-                end_distance=mortise_timber.length,
-                label=CutCSGLabel("mortise_ptw_bounds"),
-            ),
-        )
-        scribe_csg_global = Intersection(
-            left=Difference(
-                base=tenon_timber_csg_global,
-                subtract=[shoulder_half_space_global],
-            ),
-            right=mortise_ptw_global,
-            label=CutCSGLabel("shoulder_scribe_relief"),
-        )
-        scribe_csg_mortise_local = adopt_csg(None, mortise_timber.transform, scribe_csg_global)
-
-        if fit_rough_shank or tenon_timber.is_perfect_timber():
-            tenon_relief_local = None
-        else:
-            tenon_imperfect_global = adopt_csg(
-                tenon_timber.transform,
-                None,
-                Difference(
-                    # The timber's own rough body without its labels: that body is already
-                    # in this timber's tree, and one surface declared twice puts two
-                    # features of one name on one plane (see the shoulder bound above).
-                    base=tenon_timber.get_extended_actual_csg_local(
-                        extend_bot=extend_bot, extend_top=extend_top, with_feature_labels=False),
-                    subtract=[tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)],
-                    label=CutCSGLabel("rough_fringe"),
-                ),
-            )
-            tenon_relief_local = adopt_csg(
-                None,
-                tenon_timber.transform,
-                Intersection(
-                    left=Difference(
-                        base=tenon_imperfect_global,
-                        subtract=[shoulder_relief_bound_global],
-                    ),
-                    right=mortise_ptw_global,
-                    label=CutCSGLabel("shoulder_rough_relief"),
-                ),
-            )
-
-        shoulder_notch_relief_geom = ShoulderReliefCSGGeometry(
-            receiving_timber_notch_negative_CSG=scribe_csg_mortise_local,
-            butting_timber_relief_negative_CSG=tenon_relief_local,
-        )
-    else:
-        shoulder_notch_relief_geom = None
+    shoulder_notch_relief_geom = _inset_shoulder_relief(
+        arrangement, shoulder_plane, shoulder_half_space_global,
+        mortise_shoulder_distance_from_centerline_or_centerplane, set_mortise_shoulder_parallel_to_face,
+        relief, inset_shoulder_relief_style,
+    )
 
     tenon_cut_csg: CutCSG = Difference(
         base=shoulder_half_space_local,
@@ -673,6 +718,7 @@ def cut_mortise_and_tenon_joint(
                 positive_csg=Intersection(wedge.get_csg_local(), bore_local))
         else:
             joint_accessories[f"wedge{suffix}"] = wedge
+    independent_tenon_cuts = list(slots)
     if peg_parameters is not None:
         peg_results = compute_peg_positions(
             arrangement=arrangement,
@@ -748,6 +794,7 @@ def cut_mortise_and_tenon_joint(
             )
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
+        independent_tenon_cuts.extend(peg_holes_in_tenon_local)
         if peg_holes_in_tenon_local:
             tenon_cut_with_pegs_csg = _union_into_cut(
                 tenon_cut_csg, peg_holes_in_tenon_local, TENON_CUT_LABEL)
@@ -799,7 +846,12 @@ def cut_mortise_and_tenon_joint(
         assembly_ordering=Ordering(0, 0),
     )
 
-    return Joint(
+    return _MortiseAndTenonJoint(
+        arrangement=arrangement, shoulder_plane=shoulder_plane, shoulder_half_space_global=shoulder_half_space_global,
+        shoulder_distance=mortise_shoulder_distance_from_centerline_or_centerplane,
+        parallel_face=set_mortise_shoulder_parallel_to_face,
+        tenon_local=tenon_prism_local, independent_tenon_cuts=tuple(independent_tenon_cuts),
+        has_relief=shoulder_notch_relief_geom is not None or tenon_cut is not tenon_cut_no_relief,
         cuttings={
             tenon_timber.ticket.path: tenon_cut_timber,
             mortise_timber.ticket.path: mortise_cut_timber,
@@ -807,6 +859,131 @@ def cut_mortise_and_tenon_joint(
         ticket=JointTicket(joint_type="mortise_and_tenon"),
         jointAccessories=joint_accessories,
     )
+
+
+def _same_direction(first: V3, second: V3) -> bool:
+    """Compare unit directions, including their sign."""
+    delta = first - second
+    return safe_zero_test_sq(safe_dot_product(delta, delta))
+
+
+def _common_withdrawal(cuttings: Sequence[Cutting]) -> AssemblyFreedom:
+    """Keep withdrawal directions shared by every cut, through the farthest release distance."""
+    freedoms = [cut.assembly_freedom for cut in cuttings]
+    assert all(freedom is not None for freedom in freedoms)
+    directions = [freedom.translations for freedom in freedoms if freedom is not None]
+    translations = []
+    for first in directions[0]:
+        if any(_same_direction(first.direction, dof.direction) for dof in translations):
+            continue
+        distances = [[dof.freed_after for dof in group if _same_direction(first.direction, dof.direction)]
+                     for group in directions]
+        if all(distances):
+            translations.append(replace(first, freed_after=max(max(group) for group in distances)))
+    return AssemblyFreedom(translations=tuple(translations))
+
+
+def merge_mortise_and_tenon_joints(
+    joints: Sequence[Joint],
+    *,
+    relief: None | ButtJointScribeReliefConfig | ButtJointNotchReliefConfig = ButtJointScribeReliefConfig.butt_timber(),
+    inset_shoulder_relief_style: InsetShoulderReliefStyle | None = None,
+) -> Joint:
+    """Merge tenons on one timber end that share a mortise timber and an oriented shoulder plane.
+
+    Supply single joints without relief. To suppress both scribing and inset housing on
+    the inputs, pass relief=None and inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief.
+    A plane-aligned notch flares on two sides. A general shoulder notch flares on four.
+    A face-referenced notch retains the housing at the inset shoulder.
+    The caller sets the spacing between mortises.
+    """
+    assert len(joints) >= 2, "Supply at least two mortise and tenon joints"
+    parts: list[_MortiseAndTenonJoint] = []
+    for joint in joints:
+        assert isinstance(joint, _MortiseAndTenonJoint) and joint.ticket.joint_type == "mortise_and_tenon", (
+            "Expected a single butt mortise and tenon joint"
+        )
+        assert not joint.has_relief, (
+            "Inputs already have shoulder or scribe relief. Cut them with relief=None "
+            "and inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief"
+        )
+        parts.append(joint)
+    assert len({id(part.tenon_local) for part in parts}) == len(parts), "A tenon was supplied more than once"
+
+    first = parts[0]
+    arrangement = first.arrangement
+    shoulder = first.shoulder_plane
+    for part in parts[1:]:
+        other = part.arrangement
+        assert other.receiving_timber is arrangement.receiving_timber, "Expected the same mortise timber"
+        assert (_same_direction(shoulder.normal, part.shoulder_plane.normal)
+                and safe_zero_test(safe_dot_product(shoulder.normal, part.shoulder_plane.point - shoulder.point))), (
+            "Expected the same oriented shoulder plane"
+        )
+        assert other.butt_timber is arrangement.butt_timber and other.butt_timber_end == arrangement.butt_timber_end, (
+            "Expected all tenons on the same tenon timber end"
+        )
+
+    tenon_key = arrangement.butt_timber.ticket.path
+    mortise_key = arrangement.receiving_timber.ticket.path
+    tenon_cuts = [part.cuttings[tenon_key] for part in parts]
+    mortise_cuts = [part.cuttings[mortise_key] for part in parts]
+    for cuts in (tenon_cuts, mortise_cuts):
+        assert all(cut.assembly_ordering == cuts[0].assembly_ordering for cut in cuts), (
+            "Cuttings on a shared timber must agree on assembly ordering"
+        )
+
+    shoulder_local = adopt_csg(None, arrangement.butt_timber.transform, first.shoulder_half_space_global)
+    tenons = [replace(part.tenon_local, label=CutCSGLabel(f"tenon_{i}")) for i, part in enumerate(parts)]
+    shoulder_waste = Difference(shoulder_local, tenons, label=CutCSGLabel("tenon_waste"))
+    remaining_cuts = [cut for part in parts for cut in part.independent_tenon_cuts]
+    holes = [replace(cut.negative_csg, label=CutCSGLabel(f"mortise_{i}"))
+             for i, cut in enumerate(mortise_cuts) if cut.negative_csg is not None]
+
+    inset_style = inset_shoulder_relief_style or InsetShoulderReliefStyle.Rough
+    notch = None
+    if isinstance(relief, ButtJointNotchReliefConfig):
+        located = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement, first.shoulder_distance)
+        plane_aligned = (arrangement.check_plane_aligned() is None
+                         and _same_direction(located.normal, shoulder.normal))
+        from_face = relief.notch_from is NotchFrom.Face
+        assert plane_aligned or not from_face, "A face-referenced notch requires a plane-aligned shoulder"
+        if plane_aligned:
+            notch = _plane_aligned_shoulder_notch(arrangement, relief.notch_from, first.shoulder_distance)
+        else:
+            notch = chop_butt_joint_shoulder_notch_relief_4sided(
+                arrangement, first.shoulder_distance, shoulder_plane=shoulder)
+        inset_style = InsetShoulderReliefStyle.PerfectOnly if from_face else InsetShoulderReliefStyle.NoRelief
+        if inset_shoulder_relief_style is not None and inset_shoulder_relief_style is not inset_style:
+            raise ValueError(f"A {relief.notch_from.name}-referenced notch requires inset housing style {inset_style.name}")
+
+    housing = _inset_shoulder_relief(arrangement, shoulder, first.shoulder_half_space_global, first.shoulder_distance,
+                                     first.parallel_face, None, inset_style)
+    for geometry in (housing, notch):
+        if geometry is not None:
+            holes.append(geometry.receiving_timber_notch_negative_CSG)
+            if geometry.butting_timber_relief_negative_CSG is not None:
+                remaining_cuts.append(geometry.butting_timber_relief_negative_CSG)
+
+    top_ends = [cut.maybe_top_end_cut_distance_from_bottom for cut in tenon_cuts
+                if cut.maybe_top_end_cut_distance_from_bottom is not None]
+    bottom_ends = [cut.maybe_bottom_end_cut_distance_from_bottom for cut in tenon_cuts
+                   if cut.maybe_bottom_end_cut_distance_from_bottom is not None]
+    tenon = replace(
+        tenon_cuts[0],
+        negative_csg=_union_into_cut(shoulder_waste, remaining_cuts, TENON_CUT_LABEL) if remaining_cuts else shoulder_waste,
+        maybe_top_end_cut_distance_from_bottom=max(top_ends, default=None),
+        maybe_bottom_end_cut_distance_from_bottom=min(bottom_ends, default=None),
+        assembly_freedom=_common_withdrawal(tenon_cuts),
+    )
+    mortise = replace(mortise_cuts[0], negative_csg=SolidUnion(holes, label=MORTISE_CUT_LABEL),
+                      assembly_freedom=_common_withdrawal(mortise_cuts))
+    tenon, mortise = _apply_scribe_relief_if_configured(
+        relief if isinstance(relief, ButtJointScribeReliefConfig) else None, tenon, mortise)
+    accessories = {f"{key}_tenon_{i}": accessory for i, part in enumerate(parts)
+                   for key, accessory in part.jointAccessories.items()}
+    return Joint({tenon_key: tenon, mortise_key: mortise}, JointTicket(joint_type="mortise_and_tenon"), accessories)
 
 
 def _tenon_height_index(arrangement: ButtJointTimberArrangement) -> int:
@@ -869,6 +1046,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
     relief: Union[None, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+    inset_shoulder_relief_style: Optional[InsetShoulderReliefStyle] = None,
 ) -> Joint:
     """
     Creates a mortise and tenon joint for plane-aligned timbers.
@@ -912,23 +1090,13 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         inset_shoulder_relief_style=(
             InsetShoulderReliefStyle.PerfectOnly if notch_from_face
             else InsetShoulderReliefStyle.NoRelief if isinstance(relief, ButtJointNotchReliefConfig)
-            else InsetShoulderReliefStyle.Rough
+            else inset_shoulder_relief_style or InsetShoulderReliefStyle.Rough
         ),
     )
 
     if isinstance(relief, ButtJointNotchReliefConfig):
-        notch_mortise_shoulder_distance_from_centerline_or_centerplane = (
-            convert_mortise_shoulder_inset_to_centerline_distance(
-                mortise_shoulder_inset=scalar(0),
-                mortise_face=mortise_face,
-                receiving_timber=arrangement.receiving_timber,
-            )
-            if notch_from_face
-            else mortise_shoulder_distance_from_centerline_or_centerplane
-        )
-        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
-            arrangement, notch_mortise_shoulder_distance_from_centerline_or_centerplane,
-        )
+        geom = _plane_aligned_shoulder_notch(
+            arrangement, relief.notch_from, mortise_shoulder_distance_from_centerline_or_centerplane)
         if geom is not None:
             tenon_key = arrangement.butt_timber.ticket.path
             mortise_key = arrangement.receiving_timber.ticket.path
@@ -954,7 +1122,8 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
                         TENON_CUT_LABEL,
                     ),
                 )
-            joint = replace(joint, cuttings=updated_cuttings)
+            assert isinstance(joint, _MortiseAndTenonJoint)
+            joint = replace(joint, cuttings=updated_cuttings, has_relief=True)
 
     return joint
 
@@ -972,6 +1141,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     peg_parameters: Optional[SimplePegParameters] = None,
     use_round_tenon: bool = False,
     relief: Union[None, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+    inset_shoulder_relief_style: Optional[InsetShoulderReliefStyle] = None,
 ) -> Joint:
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers.
@@ -991,6 +1161,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         peg_parameters=peg_parameters,
         use_round_tenon=use_round_tenon,
         relief=relief,
+        inset_shoulder_relief_style=inset_shoulder_relief_style,
     )
 
 
@@ -1001,6 +1172,9 @@ def cut_round_mortise_and_tenon_joint(
     mortise_depth: Optional[Numeric] = None,
     mortise_shoulder_distance_from_centerline_or_centerplane: Numeric = scalar(0),
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
+    *,
+    relief: None | ButtJointScribeReliefConfig | ButtJointNotchReliefConfig = ButtJointScribeReliefConfig.butt_timber(),
+    inset_shoulder_relief_style: InsetShoulderReliefStyle = InsetShoulderReliefStyle.Rough,
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint with any orientation.
@@ -1012,6 +1186,8 @@ def cut_round_mortise_and_tenon_joint(
         mortise_depth=mortise_depth,
         mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         use_round_tenon=True,
+        relief=relief,
+        inset_shoulder_relief_style=inset_shoulder_relief_style,
         set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     )
 
@@ -1022,32 +1198,23 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
     mortise_shoulder_inset: Numeric = scalar(0),
+    *,
+    relief: None | ButtJointScribeReliefConfig | ButtJointNotchReliefConfig = ButtJointScribeReliefConfig.butt_timber(),
+    inset_shoulder_relief_style: InsetShoulderReliefStyle = InsetShoulderReliefStyle.Rough,
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint for plane-aligned timbers.
     """
-    arrangement_check(arrangement.check_plane_aligned(), arrangement)
-
-    tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
-        TimberFace.TOP if arrangement.butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
-    )
-    mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
-        -tenon_end_direction
-    ).to.face()
-
-    mortise_shoulder_distance_from_centerline_or_centerplane = convert_mortise_shoulder_inset_to_centerline_distance(
-        mortise_shoulder_inset=mortise_shoulder_inset,
-        mortise_face=mortise_face,
-        receiving_timber=arrangement.receiving_timber,
-    )
-
-    return cut_mortise_and_tenon_joint(
+    return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([diameter, diameter]),
+        tenon_width_relative_to_joint=diameter,
+        tenon_height_relative_to_joint=diameter,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
-        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
+        mortise_shoulder_inset=mortise_shoulder_inset,
         use_round_tenon=True,
+        relief=relief,
+        inset_shoulder_relief_style=inset_shoulder_relief_style,
     )
 
 
