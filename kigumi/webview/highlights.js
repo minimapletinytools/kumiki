@@ -40,12 +40,12 @@ const MEASUREMENT_END_COLOR = 0xab47bc;
 const MEASUREMENT_END_OPACITY = 0.7;
 
 /**
- * A timber's reference features: the primary in red, as a drawing marks it, the rest
+ * A timber's reference features: the primary in blue, as a drawing marks it, the rest
  * fainter. Subtle on purpose -- a mark on the timber, not a highlight -- so thin, faint and
  * depth tested: it shows on the surface and not through what is in front of it.
  */
-const REFERENCE_COLOR = 0xc0392b;
-const REFERENCE_OTHER_COLOR = 0xe57373;
+const REFERENCE_COLOR = 0x2458ab;
+const REFERENCE_OTHER_COLOR = 0x5283c5;
 const REFERENCE_OPACITY = 0.7;
 const REFERENCE_OTHER_OPACITY = 0.45;
 const REFERENCE_EDGE_WIDTH_PX = 3;

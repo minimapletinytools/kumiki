@@ -80,7 +80,70 @@ def test_reference_arris_centerline_ptw_and_two_independently_colored_faces():
     assert len(plain.findall(".//{*}g[@class='face-fills']/{*}path")) == 0
     for kind in ('centerline', 'perfect-face', 'right_front_edge'):
         assert plain.findall(f".//{{*}}g[@class='{kind}']/{{*}}path")
+    assert plain.find(".//{*}g[@class='right_front_edge']").attrib['stroke'] == '#2458ab'
     tinted = _view(members, right, (0, 0, 1), DrawingStyles(reference_faces=True))
     fills = tinted.findall(".//{*}g[@class='face-fills']/{*}path")
     assert {p.get('data-feature') for p in fills} == {face.name for face in edge.long_faces_it_rests_on()}
     assert len({p.get('fill') for p in fills}) == 2
+
+
+def test_centerline_dashes_align_across_centerplane_outlines_and_foreground_clipping():
+    timber = Timber(length=4, size=create_v2(2, 2), transform=Transform.identity(),
+                    ticket=TimberTicket('beam', reference_features=(TimberFeature.CENTERLINE,)))
+    members = {'beam': DrawingSolid(CutTimber(timber).render_timber_with_cuts_csg_local(), timber.transform, timber),
+               'cover': DrawingSolid(_box(bottom=1.2, top=2.7, x=-5), Transform.identity())}
+    for show_centers in (False, True):
+        view = _view(members, right=(0, 0, 1), up=(0, 1, 0), styles=DrawingStyles(centerlines=show_centers))
+        if not show_centers:
+            assert not view.findall(".//{*}g[@class='centerline']")
+            continue
+        axis, = view.findall(".//{*}g[@class='centerline']")
+        planes = view.findall(".//{*}g[@class='centerplane']")
+        assert bool(planes) == show_centers
+        for group in [axis, *planes]:
+            assert group.get('stroke') == '#dc7777'
+            assert group.get('stroke-dasharray') == '6 10'
+            strokes = {(p.get('d'), p.get('stroke-dashoffset')) for p in group}
+            assert strokes == {('M50 50 L62 50', '50'), ('M77 50 L90 50', '77')}
+
+
+@pytest.mark.parametrize('edge', [TimberFeature.RIGHT_FRONT_EDGE, TimberFeature.FRONT_LEFT_EDGE,
+                                  TimberFeature.LEFT_BACK_EDGE, TimberFeature.BACK_RIGHT_EDGE])
+def test_reference_arris_is_highlighted_only_from_its_two_adjoining_faces(edge):
+    timber = Timber(length=4, size=create_v2(2, 2), transform=Transform.identity(),
+                    ticket=TimberTicket('beam', reference_features=(edge,)))
+    members = {'beam': DrawingSolid(CutTimber(timber).render_timber_with_cuts_csg_local(), timber.transform, timber)}
+    up = np.array([0., 0., 1.])
+    for face in edge.long_faces_it_rests_on():
+        normal = as_ndarray(locate_face(timber, face).normal)
+        for side in (1, -1):
+            right = np.cross(up, side * normal)
+            view = _view(members, right, up)
+            strokes = view.findall(f".//{{*}}g[@class='{edge.name.lower()}']/{{*}}path")
+            assert bool(strokes) == (side == 1)
+
+
+def test_nearer_ordinary_arris_hides_the_overlapping_part_of_a_blue_arris():
+    timber = Timber(length=4, size=create_v2(2, 2), transform=Transform.identity(),
+                    ticket=TimberTicket('beam', reference_features=(TimberFeature.RIGHT_FRONT_EDGE,)))
+    members = {'beam': DrawingSolid(CutTimber(timber).render_timber_with_cuts_csg_local(), timber.transform, timber),
+               'cover': DrawingSolid(_box(width=2, height=2, bottom=1, top=3, x=4, y=-1e-10), Transform.identity())}
+    view = _view(members, right=(0, 1, 0), up=(0, 0, 1))
+    path, = view.findall(".//{*}g[@class='right_front_edge']/{*}path")
+    segments = path.attrib['d'].replace('M', '').replace('L', '').split()
+    assert list(map(float, segments)) == pytest.approx([60, 50, 60, 40, 60, 20, 60, 10], abs=1e-5)
+
+@pytest.mark.parametrize('mode', ['none', 'noOverlay', 'overlay'])
+def test_inherit_viewer_materials_and_edge_mode_on_a_blind_bore(mode):
+    bore = Cylinder(axis_direction=create_v3(0, 0, 1), radius=1, start_distance=.5, end_distance=2)
+    members = {'beam': DrawingSolid(Difference(_box(), [bore]), Transform.identity())}
+    camera = dict(center=[0, 0, 0], right=[-1, 0, 0], up=[0, 1, 0], width=10, height=10)
+    materials = {'beam': dict(edge='#335588', edgeOpacity=.4, width=2, surface='#ccaa88', opacity=.65)}
+    view = render_svg_view(members, set(), camera, 100, 100, appearances=materials, edge_mode=mode)
+    surface, = view.findall(".//{*}g[@class='member-fills']/{*}path")
+    assert surface.get('fill') == '#ccaa88' and surface.get('fill-opacity') == '0.65'
+    edges, = view.findall(".//{*}g[@class='edges']/{*}g")
+    assert edges.get('stroke') == '#335588' and edges.get('stroke-width') == '2'
+    assert edges.get('stroke-opacity') == '0.4'
+    assert bool(edges.findall('{*}path')) == (mode != 'none')
+    assert bool(_arcs(view, 'beam')) == (mode == 'overlay')

@@ -74,17 +74,55 @@ export class ViewerSettingsPanel {
                     <input id="scale-ruler-toggle" type="checkbox" .checked=${Boolean(this.app.showScaleRuler)}>
                     ${t('viewer.options.scaleRuler')}
                 </label>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.controls')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.controls')}</div>
                 <label>
-                    <input id="feature-parent-toggle" type="checkbox" .checked=${Boolean(this.app.showFeatureParent)}>
-                    ${t('viewer.options.featureParent')}
+                    <input id="center-gizmo-toggle" type="checkbox" .checked=${this.app.showCenterGizmo}>
+                    ${t('viewer.options.centerGizmo')}
                 </label>
                 <label>
-                    ${t('viewer.options.referenceFeatures.label')}
-                    <select id="reference-features-select" .value=${this.app.referenceFeatures || 'drawings'}>
-                        <option value="drawings">${t('viewer.options.referenceFeatures.drawings')}</option>
-                        <option value="always">${t('viewer.options.referenceFeatures.always')}</option>
-                        <option value="never">${t('viewer.options.referenceFeatures.never')}</option>
+                    <input id="left-click-rotate-toggle" type="checkbox" .checked=${this.app.leftClickDragRotatesCamera}>
+                    ${t('viewer.options.leftClickRotate')}
+                </label>
+                <label>
+                    <input id="trackpad-scroll-orbits-toggle" type="checkbox" .checked=${this.app.trackpadScrollOrbits}>
+                    ${t('viewer.options.trackpadScrollOrbits')}
+                </label>
+                <label>
+                    <input id="navigation-hint-toggle" type="checkbox" .checked=${this.app.showNavigationHint}>
+                    ${t('viewer.options.navigationHint')}
+                </label>
+                <label>
+                    <input id="debug-toggle" type="checkbox" .checked=${this.app.debugEnabled}>
+                    ${t('viewer.options.debugInfo')}
+                </label>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.visual')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.visual')}</div>
+                <label>
+                    ${t('viewer.options.theme.label')}
+                    <select id="theme-select" .value=${this.app.activeTheme}>
+                        ${this.app.themeChoices.map(({ id, labelKey }) => html`<option value=${id}>${t(labelKey)}</option>`)}
                     </select>
+                </label>
+                <label>
+                    ${t('viewer.options.selectedVisibility.label', { percent: 100 - this.app.selectedTransparencyPercent })}
+                    <input
+                        id="selected-transparency-slider"
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        .value=${String(100 - this.app.selectedTransparencyPercent)}>
+                </label>
+                <label>
+                    ${t('viewer.options.unselectedVisibility.label', { percent: 100 - this.app.unselectedTransparencyPercent })}
+                    <input
+                        id="unselected-transparency-slider"
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        .value=${String(100 - this.app.unselectedTransparencyPercent)}>
                 </label>
                 <label>
                     <input id="timber-grain-toggle" type="checkbox" .checked=${this.app.renderTimberGrain}>
@@ -118,6 +156,31 @@ export class ViewerSettingsPanel {
                         step="0.5"
                         .value=${String(this.app.edgeLineThicknessPx)}>
                 </label>
+                <fieldset class="viewer-settings-subgroup">
+                    <legend>${t('viewer.options.section.threeD')}</legend>
+                    <span class="swatch-group" role="group" aria-label=${t('viewer.options.footprint.ariaLabel')}>
+                        ${t('viewer.options.footprint.label')}
+                        ${this.app.footprintColorIds.map((colorId) => html`
+                            <button
+                                id="footprint-color-${colorId}"
+                                type="button"
+                                class="color-swatch color-swatch-${colorId}"
+                                title=${footprintColorLabel(colorId)}
+                                aria-label=${footprintColorLabel(colorId)}
+                                aria-pressed=${String(this.app.footprintColor === colorId)}></button>
+                        `)}
+                    </span>
+                    <label>
+                        <input id="shadows-toggle" type="checkbox" .checked=${this.app.shadowsEnabled}>
+                        ${t('viewer.options.shadows')}
+                    </label>
+                    <label>
+                        <input id="reflections-toggle" type="checkbox" .checked=${this.app.reflectionsEnabled}>
+                        ${t('viewer.options.reflection')}
+                    </label>
+                </fieldset>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.geometry')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.geometry')}</div>
                 <label>
                     ${t('viewer.options.geometry.label')}
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
@@ -128,111 +191,46 @@ export class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
-                    ${t('viewer.options.unselectedVisibility.label', { percent: 100 - this.app.unselectedTransparencyPercent })}
-                    <input
-                        id="unselected-transparency-slider"
-                        type="range"
-                        min="5"
-                        max="100"
-                        step="5"
-                        .value=${String(100 - this.app.unselectedTransparencyPercent)}>
+                    <input id="highlight-reference-edges" type="checkbox" .checked=${this.app.highlightReferenceEdges}>
+                    ${t('viewer.options.highlightReferenceEdges')}
                 </label>
                 <label>
-                    ${t('viewer.options.selectedVisibility.label', { percent: 100 - this.app.selectedTransparencyPercent })}
-                    <input
-                        id="selected-transparency-slider"
-                        type="range"
-                        min="5"
-                        max="100"
-                        step="5"
-                        .value=${String(100 - this.app.selectedTransparencyPercent)}>
+                    <input id="color-reference-faces" type="checkbox" .checked=${this.app.colorReferenceFaces}>
+                    ${t('viewer.options.colorReferenceFaces')}
                 </label>
-                <label>
-                    <input id="left-click-rotate-toggle" type="checkbox" .checked=${this.app.leftClickDragRotatesCamera}>
-                    ${t('viewer.options.leftClickRotate')}
-                </label>
-                <label>
-                    <input id="navigation-hint-toggle" type="checkbox" .checked=${this.app.showNavigationHint}>
-                    ${t('viewer.options.navigationHint')}
-                </label>
-                <label>
-                    <input id="trackpad-scroll-orbits-toggle" type="checkbox" .checked=${this.app.trackpadScrollOrbits}>
-                    ${t('viewer.options.trackpadScrollOrbits')}
-                </label>
-                <label>
-                    ${t('viewer.options.theme.label')}
-                    <select id="theme-select" .value=${this.app.activeTheme}>
-                        ${this.app.themeChoices.map(({ id, labelKey }) => html`<option value=${id}>${t(labelKey)}</option>`)}
-                    </select>
-                </label>
-                <label>
-                    <input id="debug-toggle" type="checkbox" .checked=${this.app.debugEnabled}>
-                    ${t('viewer.options.debugInfo')}
-                </label>
-                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.threeD')}></div>
-                <div class="viewer-settings-subtitle">${t('viewer.options.section.threeD')}</div>
-                <label>
-                    <input id="center-gizmo-toggle" type="checkbox" .checked=${this.app.showCenterGizmo}>
-                    ${t('viewer.options.centerGizmo')}
-                </label>
-                <label>
-                    <input id="shadows-toggle" type="checkbox" .checked=${this.app.shadowsEnabled}>
-                    ${t('viewer.options.shadows')}
-                </label>
-                <label>
-                    <input id="reflections-toggle" type="checkbox" .checked=${this.app.reflectionsEnabled}>
-                    ${t('viewer.options.reflection')}
-                </label>
-                <span class="swatch-group" role="group" aria-label=${t('viewer.options.footprint.ariaLabel')}>
-                    ${t('viewer.options.footprint.label')}
-                    ${this.app.footprintColorIds.map((colorId) => html`
-                        <button
-                            id="footprint-color-${colorId}"
-                            type="button"
-                            class="color-swatch color-swatch-${colorId}"
-                            title=${footprintColorLabel(colorId)}
-                            aria-label=${footprintColorLabel(colorId)}
-                            aria-pressed=${String(this.app.footprintColor === colorId)}></button>
-                    `)}
-                </span>
-                ${this.app.panelFlags.assemblyPreview ? html`
-                <label>
-                    ${t('viewer.options.disassemblySpacing.label', { multiplier: this.app.disassemblyMultiplier })}
-                    <input
-                        id="disassembly-multiplier-slider"
-                        type="range"
-                        min="1"
-                        max="4"
-                        step="0.1"
-                        .value=${String(this.app.disassemblyMultiplier)}>
-                </label>` : ''}
-                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.drawing')}></div>
-                <div class="viewer-settings-subtitle">${t('viewer.options.section.drawing')}</div>
-                <label>
-                    <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
-                    ${t('viewer.options.drawingGhosts')}
-                </label>
-                <label>
-                    <input id="drawing-perfect-faces-toggle" type="checkbox" .checked=${this.app.showDrawingPerfectFaces}>
-                    ${t('viewer.options.drawingPerfectFaces')}
-                </label>
-                <label>
-                    <input id="drawing-centerplanes-toggle" type="checkbox" .checked=${this.app.showDrawingCenterplanes}>
-                    ${t('viewer.options.drawingCenterplanes')}
-                </label>
-                <label>
-                    <input id="drawing-reference-features-toggle" type="checkbox" .checked=${this.app.showDrawingReferenceFeatures}>
-                    ${t('viewer.options.drawingReferenceFeatures')}
-                </label>
-                <label>
-                    <input id="drawing-svg-face-toggle" type="checkbox" .checked=${this.app.tintSvgReferenceFaces}>
-                    ${t('viewer.options.tintSvgReferenceFaces')}
-                </label>
-                <button
-                    id="debug-drawing-btn"
-                    type="button"
-                    title=${t('viewer.options.debugDrawing.title')}
-                    @click=${() => this.app.openDebugDrawing()}>${t('viewer.options.debugDrawing')}</button>
+                <fieldset class="viewer-settings-subgroup">
+                    <legend>${t('viewer.options.section.threeD')}</legend>
+                    <label>
+                        <input id="feature-parent-toggle" type="checkbox" .checked=${Boolean(this.app.showFeatureParent)}>
+                        ${t('viewer.options.featureParent')}
+                    </label>
+                    ${this.app.panelFlags.assemblyPreview ? html`
+                    <label>
+                        ${t('viewer.options.disassemblySpacing.label', { multiplier: this.app.disassemblyMultiplier })}
+                        <input
+                            id="disassembly-multiplier-slider"
+                            type="range"
+                            min="1"
+                            max="4"
+                            step="0.1"
+                            .value=${String(this.app.disassemblyMultiplier)}>
+                    </label>` : ''}
+                </fieldset>
+                <fieldset class="viewer-settings-subgroup">
+                    <legend>${t('viewer.options.section.drawing')}</legend>
+                    <label>
+                        <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
+                        ${t('viewer.options.drawingGhosts')}
+                    </label>
+                    <label>
+                        <input id="drawing-centerplanes-toggle" type="checkbox" .checked=${this.app.showDrawingCenterplanes}>
+                        ${t('viewer.options.drawingCenterplanes')}
+                    </label>
+                    <label>
+                        <input id="drawing-perfect-faces-toggle" type="checkbox" .checked=${this.app.showDrawingPerfectFaces}>
+                        ${t('viewer.options.drawingPerfectFaces')}
+                    </label>
+                </fieldset>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
@@ -346,20 +344,15 @@ export class ViewerSettingsPanel {
                 sync: (el) => { el.checked = Boolean(app.showFeatureParent); },
             },
             {
-                id: 'reference-features-select', on: 'change',
-                apply: (el) => app.setReferenceFeatures(el.value),
-                sync: (el) => { el.value = app.referenceFeatures || 'drawings'; },
-            },
-            {
                 id: 'drawing-ghosts-toggle', on: 'change',
                 apply: (el) => app.setDrawingGhostsVisible(el.checked),
                 sync: (el) => { el.checked = app.showDrawingGhosts; },
             },
             ...[
-                ['drawing-svg-face-toggle', 'tintSvgReferenceFaces'],
+                ['color-reference-faces', 'colorReferenceFaces'],
                 ['drawing-perfect-faces-toggle', 'showDrawingPerfectFaces'],
                 ['drawing-centerplanes-toggle', 'showDrawingCenterplanes'],
-                ['drawing-reference-features-toggle', 'showDrawingReferenceFeatures'],
+                ['highlight-reference-edges', 'highlightReferenceEdges'],
             ].map(([id, option]) => ({
                 id, on: 'change',
                 apply: (el) => app.setDrawingOption(option, el.checked),

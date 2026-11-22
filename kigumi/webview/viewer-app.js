@@ -185,8 +185,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
-        // Testing scaffolding; see setDebugDrawingEnabled.
-        this.debugDrawingEnabled = false;
         // Where the reader has moved and scaled the sheet. Viewer-local: it is
         // how you look at the drawing, not part of it, and never goes back.
         this.pageView = { zoom: 1, offsetX: 0, offsetY: 0 };
@@ -926,7 +924,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 || viewportId === (role === 'hover' ? this._hoverViewportId : this.selectionManager.scope);
             // The selection echoes softly in the other views, so it can be found there too.
             const echo = !own && role === 'selection';
-            object.visible = !this._exportingDrawing && (own || echo);
+            object.visible = (!this._exportingDrawing || role === 'reference') && (own || echo);
             object.material.opacity = object.userData.opacity * (echo ? SELECTION_ECHO_OPACITY : 1);
         }
     }
@@ -1247,6 +1245,19 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
 
+        if (typeof ui.highlightReferenceEdges === 'boolean') {
+            this.setDrawingOption('highlightReferenceEdges', ui.highlightReferenceEdges);
+        } else if ('referenceFeatures' in ui || 'showDrawingReferenceFeatures' in ui) {
+            this.setDrawingOption('highlightReferenceEdges', ui.referenceFeatures !== 'never' && ui.showDrawingReferenceFeatures !== false);
+        }
+        const colorFaces = ui.colorReferenceFaces ?? ui.tintSvgReferenceFaces;
+        if (typeof colorFaces === 'boolean') this.setDrawingOption('colorReferenceFaces', colorFaces);
+        for (const key of ['showDrawingCenterplanes', 'showDrawingPerfectFaces']) {
+            if (typeof ui[key] === 'boolean') this.setDrawingOption(key, ui[key]);
+        }
+        if (typeof ui.showDrawingGhosts === 'boolean') this.setDrawingGhostsVisible(ui.showDrawingGhosts);
+        if (typeof ui.showFeatureParent === 'boolean') this.setShowFeatureParent(ui.showFeatureParent);
+        if (typeof ui.showScaleRuler === 'boolean') this.setScaleRulerEnabled(ui.showScaleRuler);
         if (typeof ui.showCenterGizmo === 'boolean') {
             this.setCenterGizmoEnabled(ui.showCenterGizmo);
         }
@@ -1612,7 +1623,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // saving or listing should leave you where you are.
             const entering = payload.enterId && ids.includes(payload.enterId)
                 ? payload.enterId
-                : (payload.enter || this.debugDrawingEnabled ? ids[0] : null);
+                : (payload.enter ? ids[0] : null);
             if (entering) {
                 this.setActiveScene(entering);
             } else {
@@ -2729,6 +2740,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 }
             }
             const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
+            if (mesh.referenceFacePlanes?.length) {
+                this.addReferenceFaceColors(geometry, vertexSource, indexSource, mesh.referenceFacePlanes);
+                this.applyReferenceFaceOption(solidMesh);
+            }
             // EdgesGeometry gives a flat, non-indexed position array (every
             // consecutive pair of vertices is one segment) -- exactly what
             // LineSegmentsGeometry.setPositions() expects, so it's used here

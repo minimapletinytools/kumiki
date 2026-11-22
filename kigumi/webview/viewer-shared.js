@@ -49,7 +49,6 @@ export const FOOTPRINT_COLOR_SWATCHES = {
 export const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = KigumiDisplayOptions;
 export const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
-export const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // The one reserved drawing that holds the 3D view's measurements. A drawing
 // like any other, so the file merge, saving, identity and the panel all apply
 // to it without a second implementation; reserved so nothing in python declares

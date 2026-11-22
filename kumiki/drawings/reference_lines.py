@@ -6,7 +6,18 @@ from typing import Any, List, Optional, Sequence, TypedDict
 
 from ..csg.cutcsg import CutCSG
 from ..timber import PerfectTimberWithin
-from ..timber_features import TimberFeature
+from ..timber_features import TimberFeature, TimberLongFace
+
+
+def reference_face_colors(timber: PerfectTimberWithin) -> dict[TimberLongFace, str]:
+    """Return the tint of each long face adjoining a ticket reference arris."""
+    colors = {}
+    for feature in timber.ticket.reference_features:
+        adjacent = feature.long_faces_it_rests_on()
+        if len(adjacent) == 2:
+            for face in adjacent:
+                colors[face] = '#f4d6c4' if face in (TimberLongFace.RIGHT, TimberLongFace.LEFT) else '#cfdfec'
+    return colors
 
 
 class ReferenceLineWire(TypedDict):

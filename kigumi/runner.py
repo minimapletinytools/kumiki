@@ -373,6 +373,12 @@ class PlaneOutlineWire(TypedDict):
     positions: List[float]  # segment pairs, flat
 
 
+class ReferenceFacePlane(TypedDict):
+    normal: Vec3
+    offset: float
+    color: str
+
+
 class MemberMeshWire(TypedDict, total=False):
     """One member's mesh and what the viewer shows about it. See _base_member_payload."""
     name: str
@@ -402,6 +408,7 @@ class MemberMeshWire(TypedDict, total=False):
     hasActualGeometryDifferentFromPerfect: bool
     perfectTimberWithinVertices: List[float]
     perfectTimberWithinIndices: List[int]
+    referenceFacePlanes: List[ReferenceFacePlane]
     centerplanes: List[PlaneOutlineWire]
     perfectFaces: List[PlaneOutlineWire]
     perfectBoxNoJointsVertices: List[float]
@@ -1116,6 +1123,9 @@ def _cut_timber_to_triangle_mesh_payload(
     local_csg: 'CutCSG',
     timber_key: str,
 ) -> MemberMeshWire:
+    from kumiki.drawings.reference_lines import reference_face_colors
+    from kumiki.measuring import locate_face
+
     actual = _triangulate_local_csg(cut_timber, local_csg)
     vertices = actual["vertices"]
     indices = actual["indices"]
@@ -1159,6 +1169,14 @@ def _cut_timber_to_triangle_mesh_payload(
         isPerfectTimber=is_perfect,
         cut_length=_cut_length(cut_timber),
     )
+
+    planes: List[ReferenceFacePlane] = []
+    for face, color in reference_face_colors(timber).items():
+        plane = locate_face(timber, face)
+        planes.append({"normal": _vector3_to_floats(plane.normal),
+                       "offset": float(plane.point.dot(plane.normal)), "color": color})
+    if planes:
+        payload["referenceFacePlanes"] = planes
 
     if hasattr(timber, "needs_stl_placement"):
         payload["stlPlacement"] = {"needed": bool(timber.needs_stl_placement)}

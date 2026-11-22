@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 import math
+import re
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -21,9 +22,9 @@ from ..geometry import Plane
 from ..measuring import locate_face
 from ..rule import Transform, as_ndarray, create_v3
 from ..timber import PerfectTimberWithin
-from ..timber_features import TimberFeature, TimberLongFace
+from ..timber_features import TimberFeature
 from ..viewer.picking import perfect_reference_outlines
-from .reference_lines import timber_reference_lines
+from .reference_lines import reference_face_colors, timber_reference_lines
 
 
 @dataclass
@@ -312,9 +313,12 @@ class ProjectedFaces:
     def nearby(self, low, high, ignore: int = -1) -> np.ndarray:
         return np.flatnonzero(((self.high >= low) & (self.low <= high)).all(axis=1) & (self.members != ignore))
 
-    def line(self, a, b, ignore: int = -1) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        indices = self.nearby(np.minimum(a[:2], b[:2]), np.maximum(a[:2], b[:2]), ignore)
+    def line(self, a, b, ignore: int = -1, margin: float = 0.) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        """Clip a line against nearer faces, allowing a projected boundary margin in metres."""
+        indices = self.nearby(np.minimum(a[:2], b[:2]) - margin, np.maximum(a[:2], b[:2]) + margin, ignore)
         values = self.normals[indices] @ a - self.offset[indices]
+        if margin:
+            values[:, :3] += margin * np.linalg.norm(self.normals[indices, :3, :2], axis=2)
         slopes = self.normals[indices] @ (b - a)
         crossing = np.divide(-values, slopes, out=np.zeros_like(values), where=slopes != 0)
         low = np.maximum(0., np.where(slopes > 0, crossing, -np.inf).max(axis=1))
@@ -424,14 +428,8 @@ def _visible_angles(arc, occlusion):
         yield start, arc.stop
 
 
-def _fill_reference_faces(fills, key, solid, timber, view, faces):
-    colored = {}
-    for ref in timber.ticket.reference_features:
-        adjacent = ref.long_faces_it_rests_on()
-        if len(adjacent) == 2:
-            for face in adjacent:
-                colored[face] = '#f4d6c4' if face in (TimberLongFace.RIGHT, TimberLongFace.LEFT) else '#cfdfec'
-    for face, color in colored.items():
+def _fill_reference_faces(fills, key, solid, timber, view, faces, opacity):
+    for face, color in reference_face_colors(timber).items():
         plane = locate_face(timber, face)
         normal = as_ndarray(plane.normal)
         if normal @ view.axes[:, 2] <= 1e-8:
@@ -445,7 +443,12 @@ def _fill_reference_faces(fills, key, solid, timber, view, faces):
                 paths.append('M' + ' L'.join(_xy(view.paper(p)) for p in region) + ' Z')
         if paths:
             ET.SubElement(fills, 'path', {'data-member': key, 'data-feature': face.name,
-                                           'fill': color, 'd': ' '.join(paths)})
+                                           'fill': color, 'fill-opacity': str(opacity), 'd': ' '.join(paths)})
+
+
+_CENTER_COLOR = '#dc7777'
+_CENTER_DASH = '6 10'
+_PERFECT_DASH = '5 3'
 
 
 def _reference_overlays(timber, solid, styles, view):
@@ -453,22 +456,67 @@ def _reference_overlays(timber, solid, styles, view):
         if enabled:
             for outline in perfect_reference_outlines(timber, solid.root, center):
                 if abs(np.dot(outline.normal, view.axes[:, 2])) < 1 - 1e-3:
-                    yield ('centerplane' if center else 'perfect-face', '#d0582f' if center else '#2f6fd0',
-                            outline.positions, True, True)
+                    yield ('centerplane' if center else 'perfect-face',
+                           _CENTER_COLOR if center else '#2f6fd0', outline.positions,
+                           _CENTER_DASH if center else _PERFECT_DASH, True)
     if styles.centerlines:
         axis = timber_reference_lines(timber, solid.root, [TimberFeature.CENTERLINE])[0]
-        yield 'centerline', '#d0582f', axis['edgePositions'], True, True
+        yield 'centerline', _CENTER_COLOR, axis['edgePositions'], _CENTER_DASH, True
     if styles.references:
         for refline in timber_reference_lines(timber, solid.root):
-            yield (refline['name'], '#c0392b' if refline['primary'] else '#e57373',
-                    refline['edgePositions'], False, refline['name'] == 'centerline')
+            name = refline['name']
+            if not name.endswith('_edge'):
+                continue
+            adjacent = TimberFeature[name.upper()].long_faces_it_rests_on()
+            if any(as_ndarray(locate_face(timber, face).normal) @ view.axes[:, 2] > 1e-8 for face in adjacent):
+                yield name, '#2458ab' if refline['primary'] else '#5283c5', refline['edgePositions'], None, False
+
+
+
+def _dashed_line(parent, name, start, end, length):
+    """Align dashes to a common paper origin across clipped and overlapping segments."""
+    direction = (end - start) / length
+    # Orient coincident segments alike, even when opposite sides of a face project onto one line.
+    if (direction[0] if abs(direction[0]) > 1e-8 else direction[1]) < 0:
+        start, end = end, start
+        direction = -direction
+    ET.SubElement(parent, 'path', {'data-feature': name, 'd': f'M{_xy(start)} L{_xy(end)}',
+                                   'stroke-dashoffset': f'{start @ direction:.8g}'})
+
+
+def _svg_color(color: str) -> str:
+    """Read a material color serialized by the viewer."""
+    if not re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+        raise ValueError('Invalid drawing material color')
+    return color
+
+
+def _fill_member(parent, key, triangles, faces, index, view, appearance):
+    """Fill visible parts of a member with its flat theme color and selection opacity."""
+    if appearance['opacity'] <= 0:
+        return
+    paths = []
+    other = faces.members != index
+    blockers = ProjectedFaces(faces.triangles[other], faces.members[other]) if not other.all() else faces
+    for triangle in triangles:
+        for region in blockers.visible_region(triangle):
+            # Keep one winding so overlapping front and rear triangles form a single silhouette.
+            area = sum(p[0] * q[1] - p[1] * q[0] for p, q in zip(region, region[1:] + region[:1]))
+            points = region if area > 0 else reversed(region)
+            paths.append('M' + ' L'.join(_xy(view.paper(p)) for p in points) + ' Z')
+    if paths:
+        ET.SubElement(parent, 'path', {'data-member': key, 'fill': _svg_color(appearance['surface']),
+                                       'fill-opacity': str(appearance['opacity']), 'd': ' '.join(paths)})
 
 
 def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: dict,
-                    width: float, height: float, styles: DrawingStyles = DrawingStyles()) -> ET.Element:
+                    width: float, height: float, styles: DrawingStyles = DrawingStyles(),
+                    *, appearances: dict | None = None, edge_mode: str = 'noOverlay') -> ET.Element:
     """Return SVG content for one orthographic viewport, with its live camera dimensions in metres."""
     view = _Viewport(camera, width, height)
+    appearances = appearances or {}
     svg = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg', 'viewBox': f'0 0 {width} {height}'})
+    surfaces = ET.SubElement(svg, 'g', {'class': 'member-fills'})
     fills = ET.SubElement(svg, 'g', {'class': 'face-fills'})
     segments = ET.SubElement(svg, 'g', {'class': 'edges', 'fill': 'none', 'stroke-linejoin': 'round'})
     overlays = ET.SubElement(svg, 'g', {'class': 'references', 'fill': 'none'})
@@ -486,47 +534,62 @@ def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: 
             return p @ basis + origin
 
         group = ET.SubElement(segments, 'g', {'data-member': key, 'stroke': '#b6bdc4' if ghost else '#252a30'})
+        appearance = appearances.get(key, {})
+        if appearance:
+            _fill_member(surfaces, key, project(solid.triangles), faces, index, view, appearance)
+            group.set('stroke', _svg_color(appearance['edge']))
+            group.set('stroke-opacity', str(appearance['edgeOpacity']))
+            group.set('stroke-width', str(appearance['width']))
         occlusion = faces
         if ghost:
             own = project(solid.triangles)
             occlusion = ProjectedFaces(np.concatenate([faces.triangles, own]),
                                        np.concatenate([faces.members, np.full(len(own), index)]))
-        def stroke(parent, name, a, b, ignore=-1):
-            parts = ['M' + _xy(view.paper(p)) + ' L' + _xy(view.paper(q))
-                     for p, q in occlusion.line(a, b, ignore) if np.linalg.norm(view.paper(q) - view.paper(p)) > .001]
+        def stroke(parent, name, a, b, ignore=-1, dashed=False, margin=0., overlay=False):
+            parts = []
+            for p, q in ([(a, b)] if overlay else occlusion.line(a, b, ignore, margin)):
+                start, end = view.paper(p), view.paper(q)
+                length = np.linalg.norm(end - start)
+                if length > .001:
+                    if dashed:
+                        _dashed_line(parent, name, start, end, length)
+                    else:
+                        parts.append(f'M{_xy(start)} L{_xy(end)}')
             if parts:
                 ET.SubElement(parent, 'path', {'data-feature': name, 'd': ' '.join(parts)})
 
-        for name, a, b in solid.lines:
-            stroke(group, name, project(a), project(b))
-        for name, a, b in solid.generators(basis[:, 2]):
-            stroke(group, name, project(a), project(b))
-        drawn_arcs = set()
-        for rim in solid.rims:
-            arc = EllipseArc(project(rim.arc.center), rim.arc.u @ basis, rim.arc.v @ basis, rim.start, rim.stop)
-            paths = []
-            for a, b in _visible_angles(arc, occlusion):
-                path = _arc_path(view, arc, a, b)
-                if path not in drawn_arcs:
-                    paths.append(path)
-                    drawn_arcs.add(path)
-            if paths:
-                attrs = {'data-feature': rim.name, 'd': ' '.join(paths)}
-                if rim.owner.label.name:
-                    attrs['data-source'] = rim.owner.label.name
-                ET.SubElement(group, 'path', attrs)
+        if edge_mode != 'none' and appearance.get('edgeOpacity', 1) > 0:
+            for name, a, b in solid.lines:
+                stroke(group, name, project(a), project(b), overlay=edge_mode == 'overlay')
+            for name, a, b in solid.generators(basis[:, 2]):
+                stroke(group, name, project(a), project(b), overlay=edge_mode == 'overlay')
+            drawn_arcs = set()
+            for rim in solid.rims:
+                arc = EllipseArc(project(rim.arc.center), rim.arc.u @ basis, rim.arc.v @ basis, rim.start, rim.stop)
+                paths = []
+                for a, b in ([(arc.start, arc.stop)] if edge_mode == 'overlay' else _visible_angles(arc, occlusion)):
+                    path = _arc_path(view, arc, a, b)
+                    if path not in drawn_arcs:
+                        paths.append(path)
+                        drawn_arcs.add(path)
+                if paths:
+                    attrs = {'data-feature': rim.name, 'd': ' '.join(paths)}
+                    if rim.owner.label.name:
+                        attrs['data-source'] = rim.owner.label.name
+                    ET.SubElement(group, 'path', attrs)
         timber = solid.timber
         if timber is None or ghost:
             continue
         if styles.reference_faces:
-            _fill_reference_faces(fills, key, solid, timber, view, faces)
-        for name, color, positions, dashed, through in _reference_overlays(timber, solid, styles, view):
+            _fill_reference_faces(fills, key, solid, timber, view, faces, appearance.get('opacity', 1))
+        for name, color, positions, dash, through in _reference_overlays(timber, solid, styles, view):
             lines = ET.SubElement(overlays, 'g', {'data-member': key, 'class': name, 'stroke': color,
                                                   'stroke-width': '1.5'})
-            if dashed:
-                lines.set('stroke-dasharray', '5 3')
+            if dash:
+                lines.set('stroke-dasharray', dash)
             for a, b in np.array(positions).reshape(-1, 2, 3):
-                stroke(lines, name, view.world(a), view.world(b), index if through else -1)
+                stroke(lines, name, view.world(a), view.world(b), index if through else -1, dashed=bool(dash),
+                       margin=SURFACE_TOLERANCE if name.endswith('_edge') else 0.)
     return svg
 
 
@@ -546,7 +609,8 @@ def render_svg_sheet(members: dict[str, DrawingSolid], sheet: dict) -> str:
                 raise ValueError('A perspective preview must be an embedded PNG')
             element = ET.SubElement(root, 'image', href=pane['image'], preserveAspectRatio='none')
         else:
-            element = render_svg_view(members, set(sheet['ghosts']), pane['camera'], width * w, height * h, styles)
+            element = render_svg_view(members, set(sheet['ghosts']), pane['camera'], width * w, height * h,
+                                      styles, appearances=sheet.get('appearances'), edge_mode=sheet.get('edgeMode', 'noOverlay'))
             root.append(element)
         element.attrib.update(rect)
         element.set('data-viewport', str(pane['id']))

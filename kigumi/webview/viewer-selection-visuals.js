@@ -254,16 +254,8 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
         this.requestUpdate();
     }
 
-    /**
-     * The timbers' reference features, lit where the option says: in drawings, on
-     * the members the drawing is about; everywhere, on every visible member; or not.
-     */
     _referenceSources() {
-        const mode = this.referenceFeatures;
-        const inDrawing = Boolean(this.selectionManager && this.selectionManager.inDrawing);
-        if (mode === 'never' || (mode === 'drawings' && !inDrawing) || (inDrawing && !this.showDrawingReferenceFeatures)) {
-            return [];
-        }
+        if (!this.highlightReferenceEdges) return [];
         const drawn = this.activeSceneMembers;
         const { featureKeyOf } = KigumiFeatureStates;
         const sources = [];
@@ -272,6 +264,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 continue;
             }
             for (const feature of features) {
+                if (!feature.name.endsWith('_edge')) continue;
                 sources.push({
                     key: featureKeyOf({ memberKey, path: ['reference'], featureLabel: feature.name }),
                     edgePositions: feature.edgePositions,
@@ -307,7 +300,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 measurementEnd: this._measurementEndSources(),
                 reference: this._referenceSources(),
             }),
-            showFeatureParent: Boolean(this.showFeatureParent),
+            showFeatureParent: !this.isInDrawing && Boolean(this.showFeatureParent),
             policy: this._getSelectionVisualPolicy(
                 this._getSelectionVisualContext().state,
                 1 - (this.unselectedTransparencyPercent / 100)),

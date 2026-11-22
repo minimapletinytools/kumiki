@@ -37,7 +37,6 @@ function bool(value) {
 }
 
 const EDGE_MODES = ['none', 'overlay', 'noOverlay'];
-const REFERENCE_FEATURE_MODES = ['drawings', 'always', 'never'];
 const FOOTPRINT_COLORS = ['slate', 'moss', 'orange', 'transparent'];
 const { UNIT_SYSTEMS, PRECISIONS, DEFAULT_PRECISIONS } = KigumiUnits;
 
@@ -55,16 +54,14 @@ function optionSpecs(themeIds) {
         showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
         // What a drawing's views draw over the timbers: the perfect timber within's faces and
         // its centerplanes, dotted, and the reference features, lit.
-        tintSvgReferenceFaces: { value: false, normalize: bool },
+        colorReferenceFaces: { value: false, normalize: bool },
         showDrawingPerfectFaces: { value: true, normalize: bool },
         showDrawingCenterplanes: { value: true, normalize: bool },
-        showDrawingReferenceFeatures: { value: true, normalize: bool },
+        highlightReferenceEdges: { value: true, normalize: bool },
         // A scale ruler at the bottom right of the 3D view and drawings (scale-ruler.js).
         showScaleRuler: { value: false, normalize: bool },
         // Light a selected feature's parent (the CSG node it is on) as well as the feature.
         showFeatureParent: { value: false, normalize: bool },
-        // Where timbers' reference features are lit: in drawings only, everywhere, or nowhere.
-        referenceFeatures: { value: 'drawings', normalize: oneOf(REFERENCE_FEATURE_MODES, 'drawings') },
         edgeMode: { value: 'noOverlay', normalize: oneOf(EDGE_MODES, 'noOverlay') },
         edgeLineVisibilityPercent: { value: 100, normalize: percent(0, 100, 5, 100) },
         edgeLineThicknessPx: { value: 1.5, normalize: range(0.5, 6, 1.5) },
@@ -175,6 +172,6 @@ class DisplayOptionsStore {
     }
 }
 
-const KigumiDisplayOptions = { DisplayOptionsStore, EDGE_MODES, FOOTPRINT_COLORS, UNIT_SYSTEMS, REFERENCE_FEATURE_MODES };
+const KigumiDisplayOptions = { DisplayOptionsStore, EDGE_MODES, FOOTPRINT_COLORS, UNIT_SYSTEMS };
 
-export { DisplayOptionsStore, EDGE_MODES, FOOTPRINT_COLORS, UNIT_SYSTEMS, REFERENCE_FEATURE_MODES };
+export { DisplayOptionsStore, EDGE_MODES, FOOTPRINT_COLORS, UNIT_SYSTEMS };

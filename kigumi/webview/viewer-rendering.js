@@ -531,6 +531,32 @@ export const RenderingMixin = (Base) => class extends Base {
         this.requestUpdate();
     }
 
+    /** Tint only triangles lying on the timber's actual reference planes, using world-space mesh data. */
+    addReferenceFaceColors(geometry, vertices, indices, planes) {
+        const colors = new Float32Array(indices.length * 3).fill(1);
+        for (const { normal, offset, color } of planes) {
+            const tint = new THREE.Color(color);
+            const onFace = (vertex) => {
+                const i = 3 * vertex;
+                return Math.abs(vertices[i] * normal[0] + vertices[i + 1] * normal[1]
+                    + vertices[i + 2] * normal[2] - offset) < 1e-7;
+            };
+            for (let i = 0; i < indices.length; i += 3) {
+                if (onFace(indices[i]) && onFace(indices[i + 1]) && onFace(indices[i + 2])) {
+                    for (let j = i; j < i + 3; j++) tint.toArray(colors, j * 3);
+                }
+            }
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
+
+    applyReferenceFaceOption(mesh) {
+        if (mesh?.geometry.getAttribute('color') && mesh.material.vertexColors !== this.colorReferenceFaces) {
+            mesh.material.vertexColors = this.colorReferenceFaces;
+            mesh.material.needsUpdate = true;
+        }
+    }
+
     resolveRenderProfile(profileId) {
         if (profileId && this.renderProfiles[profileId]) {
             return this.renderProfiles[profileId];

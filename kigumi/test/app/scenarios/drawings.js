@@ -13,9 +13,22 @@ module.exports = {
         await showTab('options');
         const drawingsOn = await waitFor(() => inShell(`(() => {
             const doc = ${viewDoc};
-            return !doc.getElementById('beta-drawing-toggle') && !!doc.getElementById('debug-drawing-btn');
+            const sections = [...doc.querySelectorAll('#render-controls .viewer-settings-subtitle')].slice(0, 4);
+            return sections.map(section => section.textContent.trim()).join(',') === 'common,controls,visual,geometry'
+                && doc.getElementById('save-settings-btn').textContent.trim() === 'save options'
+                && doc.getElementById('feature-parent-toggle').closest('fieldset').querySelector('legend').textContent === '3D'
+                && doc.getElementById('drawing-ghosts-toggle').closest('fieldset').querySelector('legend').textContent === 'drawing'
+                && !!doc.getElementById('disassembly-multiplier-slider') === Boolean(doc.getElementById('beta-assembly-toggle')?.checked)
+                && !!doc.getElementById('highlight-reference-edges') && !!doc.getElementById('color-reference-faces')
+                && !doc.getElementById('debug-drawing-btn') && !doc.getElementById('svg-export-pen');
         })()`), { timeoutMs: 20000 }).catch(() => false);
-        check('drawings are on with no setting: the options have their section, and no beta switch for them', drawingsOn);
+        check('geometry options are shared and the drawing export and debug controls are absent', drawingsOn);
+
+        if (ARTIFACTS) {
+            await inShell(`${viewDoc}.getElementById('color-reference-faces').scrollIntoView({ block: 'center' })`);
+            await inShell('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+            await capture('geometry-options');
+        }
 
         // The scale ruler: off until the options turn it on, then at the bottom right with a round length.
         const ruler = () => inShell(`(() => {
@@ -73,6 +86,27 @@ module.exports = {
         // The agent's drawings tool: list them, go back to 3D, and open one again by its name.
         const toModel = await runAppCommand('kigumi.automationDrawings', { filePath: DRAWING_FRAME, open: '3d' }).catch((error) => ({ error: String(error) }));
         const inModel = await inShell(`${viewerApp}.isInDrawing`);
+        const shared = await inShell(`(() => {
+            const app = ${viewerApp};
+            const checkBox = (id, checked) => {
+                const el = app.querySelector('#' + id);
+                el.checked = checked;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            };
+            checkBox('highlight-reference-edges', false);
+            const off = app._referenceSources().length === 0;
+            checkBox('highlight-reference-edges', true);
+            checkBox('color-reference-faces', true);
+            const colored = () => Array.from(app.sceneManager.bundles()).some(b => b.mesh.material.vertexColors &&
+                b.mesh.geometry.getAttribute('color')?.array.some(value => value < 0.99));
+            const model = !app.isInDrawing && off && app._referenceSources().length > 0 && colored();
+            const saved = app.collectViewerSettingsPayload();
+            checkBox('color-reference-faces', false);
+            const cleared = !colored() && app._referenceSources().length > 0;
+            app.applyPersistedViewerSettings(saved);
+            return model && cleared && colored();
+        })()`);
+        check('shared reference options independently highlight edges and tint the model faces and survive restore', shared);
         const named = toModel && Array.isArray(toModel.drawings) ? toModel.drawings.find((one) => one.id === drawingId) : null;
         const reopened = named ? await runAppCommand('kigumi.automationDrawings', { filePath: DRAWING_FRAME, open: named.name }).catch((error) => ({ error: String(error) })) : null;
         const reentered = await inShell(`${viewerApp}.isInDrawing && ${viewerApp}.sceneStore.activeScene().id`);
@@ -128,7 +162,8 @@ module.exports = {
         const dimensionCount = await inShell(`(() => {
             const app = ${viewerApp};
             const count = app.querySelectorAll('#measurement-overlay .dim-label').length;
-            app.setDrawingOption('tintSvgReferenceFaces', true);
+            app.setDrawingOption('colorReferenceFaces', true);
+            app.setEdgeLineThicknessPx(2.5);
             const button = Array.from(app.querySelectorAll('#drawing-panel button')).find(b => b.textContent === 'export svg');
             button.click();
             return count;
@@ -137,7 +172,7 @@ module.exports = {
             .find(name => name.endsWith('.svg'))) || null, { timeoutMs: 90000 }).catch(() => null);
         const exported = svgFile ? fs.readFileSync(path.join(exportsDir, svgFile), 'utf8') : '';
         check('SVG export contains vector edges, live dimension labels, and an embedded preview',
-            exported.includes('class="edges"') && exported.includes('data:image/png;base64,') &&
+            exported.includes('stroke-width="2.5"') && exported.includes('class="member-fills"') && exported.includes('class="edges"') && exported.includes('data:image/png;base64,') &&
             exported.includes('fill="#f4d6c4"') && exported.includes('fill="#cfdfec"') &&
             dimensionCount > 0 && (exported.match(/class="dim-label"/g) || []).length === dimensionCount,
             JSON.stringify({ svgFile, dimensionCount, bytes: exported.length }));

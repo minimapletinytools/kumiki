@@ -325,3 +325,22 @@
 .tool-parameters .kiwari-row {
     padding: 4px 0;
 }
+
+.viewer-settings-subgroup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+    padding: 4px 0 4px 10px;
+    border: 0;
+    border-inline-start: 2px solid var(--hv-control-border);
+    box-sizing: border-box;
+}
+.viewer-settings-subgroup legend {
+    padding: 0 4px 0 0;
+    color: var(--hv-dim);
+    font-weight: 600;
+}

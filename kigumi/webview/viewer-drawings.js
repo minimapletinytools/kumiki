@@ -4,7 +4,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
-import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, THREE_D_MEASUREMENTS_ID, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
+import { DEFAULT_SCENE_ID, DrawingPanel, THREE_D_MEASUREMENTS_ID, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
 import { SELECTION_MODES } from './selection-store.js';
 import { composeDrawingPng, drawingFileName, previewImage, standaloneSvg } from './drawing-export.js';
 
@@ -186,16 +186,13 @@ export const DrawingsMixin = (Base) => class extends Base {
         }
     }
 
-    /** Where reference features are lit: 'drawings', 'always' or 'never'. */
-    setReferenceFeatures(mode) {
-        if (this.displayOptions.set('referenceFeatures', mode)) {
-            this.requestUpdate();
-        }
-    }
-
-    /** One of a drawing's on/off options: showDrawingPerfectFaces, -Centerplanes, -ReferenceFeatures. */
     setDrawingOption(option, enabled) {
         if (this.displayOptions.set(option, Boolean(enabled))) {
+            if (option === 'colorReferenceFaces') {
+                for (const bundle of this.sceneManager.bundles()) {
+                    this.applyReferenceFaceOption(bundle.mesh);
+                }
+            }
             this.requestUpdate();
         }
     }
@@ -290,20 +287,27 @@ export const DrawingsMixin = (Base) => class extends Base {
                 }
                 views.push(spec);
             });
-            const visible = [], ghosts = [];
+            const visible = [], ghosts = [], appearances = Object.create(null);
             for (const [key, bundle] of this.sceneManager.entries()) {
                 if (!bundle.mesh.visible) continue;
                 visible.push(key);
+                appearances[key] = {
+                    edge: '#' + bundle.edges.material.color.getHexString(),
+                    width: bundle.edges.material.linewidth,
+                    edgeOpacity: bundle.edges.visible ? bundle.edges.material.opacity : 0,
+                    surface: '#' + bundle.mesh.material.color.getHexString(),
+                    opacity: bundle.mesh.material.opacity,
+                };
                 if (bundle.idMesh && !bundle.idMesh.visible) ghosts.push(key);
             }
             const overlay = this.renderRoot.querySelector('#measurement-overlay');
             vscode.postMessage({ type: 'exportDrawingSvg', fileName, sheet: {
-                page, paper: this.activePage, views, visible, ghosts,
+                page, paper: this.activePage, views, visible, ghosts, appearances, edgeMode: this.edgeMode,
                 geometryMode: this.viewerOptions?.geometryMode || 'actual',
                 dimensions: standaloneSvg(overlay, size.x, size.y),
                 styles: { centerlines: this.showDrawingCenterplanes, perfect_faces: this.showDrawingPerfectFaces,
-                    references: this.showDrawingReferenceFeatures && this.referenceFeatures !== 'never',
-                    reference_faces: this.tintSvgReferenceFaces },
+                    references: this.highlightReferenceEdges,
+                    reference_faces: this.colorReferenceFaces },
             } });
         } catch (error) {
             vscode.postMessage({ type: 'exportDrawingSvg', fileName, error: String(error) });
@@ -466,46 +470,12 @@ export const DrawingsMixin = (Base) => class extends Base {
 
     /** Back to the 3D scene, leaving the drawing where it was. */
     leaveDrawing() {
-        this.debugDrawingEnabled = false;
         this.setActiveScene(DEFAULT_SCENE_ID);
     }
 
     /** Whether the viewer is currently looking at a drawing rather than the model. */
     get isInDrawing() {
         return this.sceneStore.activeSceneId !== DEFAULT_SCENE_ID;
-    }
-
-    /**
-     * Testing scaffolding: swap between the 3D scene and the four-viewport
-     * drawing python builds (get_default_drawing_for_debugging), so the
-     * multi-viewport path has something to render until real drawings arrive.
-     */
-    /**
-     * Go to the debug drawing, asking python to build it the first time.
-     *
-     * A button rather than a checkbox, because it is a place to go rather than
-     * a state to be in: leaving is what the drawing's own control is for, and a
-     * checkbox that ticks itself off when you leave by any other route is a
-     * checkbox that lies about where you are.
-     */
-    openDebugDrawing() {
-        this.debugDrawingEnabled = true;
-        if (this.sceneStore.sceneIds().includes(DEBUG_DRAWING_SCENE_ID)) {
-            this.setActiveScene(DEBUG_DRAWING_SCENE_ID);
-            return;
-        }
-        if (vscode) {
-            vscode.postMessage({ type: 'requestDebugDrawing' });
-        }
-    }
-
-    setDebugDrawingEnabled(enabled) {
-        if (enabled) {
-            this.openDebugDrawing();
-            return;
-        }
-        this.debugDrawingEnabled = false;
-        this.setActiveScene(DEFAULT_SCENE_ID);
     }
 
     setProjectionMode(isOrthographic) {
