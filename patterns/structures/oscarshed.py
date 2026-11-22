@@ -1087,13 +1087,12 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Fill the two sides and the three back bays with 1x6 boards set in grooves
     # ============================================================================
     # Boards run horizontally and sit in a groove cut into the frame around each opening.
-    # The side posts and girts (x 3..7") only overlap the side mudsills (x 0..4") by 1",
-    # so the side boards sit centred in that overlap. The back boards sit centred in the
-    # back wall.
+    # Every panel sits centred in its posts, so the boards are set back from the posts'
+    # outer faces by the same amount on the sides as on the back.
 
     mudsill_top = mudsill_size[0]
     post_half = post_size[0] / scalar(2)
-    side_board_plane_x = (post_inset - post_half + mudsill_size[1]) / scalar(2)
+    side_board_plane_x = post_inset
     side_opening_y = (post_size[1], base_length - post_size[1])
     side_opening_top = post_back_height - side_girt_size[0] / scalar(2)
     back_board_plane_y = base_length - post_size[1] / scalar(2)
