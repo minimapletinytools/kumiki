@@ -1,5 +1,7 @@
 ---
 // The joint catalog, in each language (pages/joints.astro, pages/ja/joints.astro).
+import mortiseDrawing from '../../../docs/assets/joint-drawings/mortise-and-tenon.svg?url';
+import bridleDrawing from '../../../docs/assets/joint-drawings/tongue-and-fork.svg?url';
 import Layout from '../layouts/Layout.astro';
 import { type Lang, localePath, strings } from '../i18n';
 
@@ -17,7 +19,8 @@ const data = [
       {
         jp: '枘差し / Hozo-sashi',
         fn: 'cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers',
-        href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/#kumiki.joints.workshop.mixed.cut_mortise_and_tenon_joint',
+        drawing: { src: mortiseDrawing, alt: s.mortiseDrawing },
       },
       {
         jp: '車知栓仕口 / Shachi-sen',
@@ -88,7 +91,8 @@ const data = [
       {
         jp: '組手 / Kumite',
         fn: 'cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers',
-        href: 'https://kumiki.build/docs/reference/joints/workshop/corner/',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/corner/#kumiki.joints.workshop.corner.cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers',
+        drawing: { src: bridleDrawing, alt: s.bridleDrawing },
       },
       {
         jp: '渡り腮 / Watari-ago',
@@ -143,6 +147,11 @@ const categories = data.map((cat) => {
                     <span class="jp">{j.jp}</span>
                   </div>
                   <code>{j.fn}</code>
+                  {j.drawing && (
+                    <a class="dimensioned-joint" href={j.drawing.src}>
+                      <img class="plate" src={j.drawing.src} alt={j.drawing.alt} width="1120" height="428" loading="lazy" />
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
@@ -280,6 +289,8 @@ const categories = data.map((cat) => {
     color: var(--ink-soft);
     word-break: break-all;
   }
+  .dimensioned-joint { display: block; margin-top: 0.75rem; cursor: zoom-in; }
+  .dimensioned-joint img { height: auto; }
   .cat-media {
     display: grid;
     gap: 1rem;

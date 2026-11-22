@@ -382,6 +382,11 @@ def cut_mortise_and_tenon_joint(
     wedge_parameters sizes the wedge and saw kerf on a rectangular tenon.
     Flared walls run from the shoulder to mortise_depth, or through the receiver
     when depth is omitted.
+
+    The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
+    The receiving timber is sectioned through the mortise to expose its floor.
+
+    [![Tenon length and cross section, with a cutaway showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber

@@ -164,6 +164,12 @@ def cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     Convenience wrapper around `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`. Timbers must be plane-aligned
     and non-parallel.
 
+    The basic pattern uses 4 × 5 in stock with a centered tongue. Stock thickness in the
+    drawing is measured normal to the plane of the corner. Each fork cheek takes half the
+    thickness left after cutting the slot.
+
+    [![Tongue thickness and the cheek of its mating fork](../../../assets/joint-drawings/tongue-and-fork.svg)](../../../assets/joint-drawings/tongue-and-fork.svg)
+
     Args:
         arrangement: Corner joint arrangement where timber1 is tongue and timber2 is fork.
         tongue_thickness: Tongue thickness along shared plane normal. None defaults to 1/3
@@ -952,6 +958,11 @@ def cut_basic_mortise_and_tenon_joint(
 
     Start with 3/4 of the butt's in-plane size and 1/3 of the smaller transverse
     timber dimension; reduce both to fit the receiving face. The shoulder follows that entry face.
+
+    The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
+    The receiving timber is sectioned through the mortise to expose its floor.
+
+    [![Tenon length and cross section, with a cutaway showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     from .mixed import cut_mortise_and_tenon_joint
     size, length, face = _basic_tenon_dimensions(arrangement)
