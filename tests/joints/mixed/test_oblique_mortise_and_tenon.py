@@ -145,3 +145,29 @@ def test_the_reach_behind_the_shoulder_stays_small(f1, f2):
     needed = float(TENON_WIDTH) / 2 * math.sqrt(1 - sin_face ** 2) / sin_face
     assert float(-tenon.start_distance) >= needed - 1e-9
     assert float(-tenon.start_distance) <= 2 * needed + float(TENON_WIDTH)
+
+
+def test_merge_tenons_on_a_sloping_shoulder():
+    arrangement, _ = _brace_joint(*BRACES["26.6 degrees"])
+    brace = arrangement.butt_timber
+    parts = [
+        cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+            arrangement, tenon_length=inches(length), tenon_width_relative_to_joint=inches(0.5),
+            tenon_height_relative_to_joint=inches(0.5), tenon_position=create_v2(0, inches(y)),
+            bore_mortise_perpendicular_to_face=bored, mortise_depth=MORTISE_DEPTH,
+            relief=None, inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief)
+        for y, length, bored in [(-0.75, 2, False), (0.75, 3, True)]
+    ]
+    joint = merge_mortise_and_tenon_joints(parts)
+    merged_cut = joint.cuttings[brace.ticket.path]
+    ends = [part.cuttings[brace.ticket.path].maybe_bottom_end_cut_distance_from_bottom for part in parts]
+    assert merged_cut.maybe_bottom_end_cut_distance_from_bottom == min(end for end in ends if end is not None)
+    freedom = merged_cut.assembly_freedom
+    assert freedom is not None and len(freedom.translations) == 1
+    assert freedom.translations[0].freed_after == inches(3)
+    assert _overlap(arrangement, joint)[1] == 0
+    finished = CutTimber(brace, cuts=[merged_cut]).render_timber_with_cuts_csg_local()
+    for part in parts:
+        prism = _labelled(part, "tenon")
+        point = prism.transform.local_to_global(create_v3(0, 0, inches(0.25)))
+        assert finished.contains_point(point)

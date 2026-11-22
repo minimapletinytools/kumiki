@@ -134,6 +134,37 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(k
     )
 
 
+TWIN_TENON = kiwari(
+    notched=kiwari.flag(True, about="Flare the sides of the shared shoulder housing."),
+)
+
+
+@pattern("mixed/mortise_and_tenon/twin_tenon", name={"en": "Twin tenon", "ja": "二枚枘"}, kiwari=TWIN_TENON)
+def twin_tenon(k: Optional[Kiwari] = None) -> Joint:
+    """Merge two stopped tenons and cut their shared inset housing with straight or flared sides."""
+    k = TWIN_TENON.resolve(k)
+    arrangement = create_canonical_example_butt_joint_timbers(
+        timber_size=create_v2(inches(4), inches(6)), timber_length=inches(16),
+    )
+    tenons = [
+        cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement,
+            tenon_position=create_v2(0, offset),
+            tenon_width_relative_to_joint=inches(1),
+            tenon_height_relative_to_joint=inches(5, 2),
+            tenon_length=inches(2),
+            mortise_depth=inches(9, 4),
+            mortise_shoulder_inset=inches(1),
+            relief=None,
+            inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
+        )
+        for offset in (inches(-3, 2), inches(3, 2))
+    ]
+    return merge_mortise_and_tenon_joints(
+        tenons, relief=ButtJointNotchReliefConfig() if k.flag("notched") else None,
+    )
+
+
 ANGLED_TENON = kiwari(
     width=kiwari.length(inches(2), minimum=inches(1, 4)),
     height=kiwari.length(inches(2), minimum=inches(1, 4)),

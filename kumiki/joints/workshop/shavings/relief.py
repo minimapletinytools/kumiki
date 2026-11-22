@@ -34,6 +34,7 @@ from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, Tim
 from kumiki.timber_shavings import (
     are_timbers_plane_aligned,
     get_perfect_support_distance_from_centerline,
+    get_rough_support_distance,
 )
 
 
@@ -1105,11 +1106,15 @@ def _intersect_2d_lines(p1: V2, d1: V2, p2: V2, d2: V2) -> V2:
 def chop_butt_joint_shoulder_notch_relief_4sided(
     arrangement: ButtJointTimberArrangement,
     mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
+    *,
+    shoulder_plane: Optional[Plane] = None,
 ) -> ShoulderReliefCSGGeometry | None:
     """
     Compute the shoulder notch on the receiving timber AND the matching relief cut on the
     butting timber, for arrangements where the butt timber may approach the shoulder at a
     compound angle (not necessarily plane-aligned with the receiving timber).
+
+    shoulder_plane, when supplied, is in world coordinates with its normal toward the tenon timber.
 
     The notch is a single 4-sided frustum
     (a ``ConvexPolygonSimpleLoft``) rather than a union of a straight prism plus 2 tilted
@@ -1136,27 +1141,26 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     Returns ``None`` when no notch is required (shoulder sits at or past the receiving
     timber's rough entry face) -- see ``does_shoulder_plane_need_notching``.
     """
-    if not does_shoulder_plane_need_notching(
-        arrangement,
-        mortise_shoulder_distance_from_centerline_or_centerplane,
-    ):
-        return None
-
     receiving_timber = arrangement.receiving_timber
     butt_timber = arrangement.butt_timber
 
-    # Shoulder plane, with normal pointing TOWARD the tenon (i.e. the direction the
-    # notch/frustum extends into the receiving timber -- the material between the inset
-    # shoulder and the receiving timber's own entry face). The located helper already
-    # uses this convention directly.
-    from kumiki.joints.workshop.shavings.build_a_butt import (
-        locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
-    )
-    shoulder_plane_towards_tenon = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-        arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
-    )
-    n_depth = safe_normalize_vector(shoulder_plane_towards_tenon.normal)
-    shoulder_plane = Plane(normal=n_depth, point=shoulder_plane_towards_tenon.point)
+    if shoulder_plane is not None and are_timbers_plane_aligned(receiving_timber, butt_timber):
+        point_local = receiving_timber.transform.global_to_local(shoulder_plane.point)
+        normal_local = receiving_timber.transform.global_to_local_direction(shoulder_plane.normal)
+        inset = get_rough_support_distance(receiving_timber, point_local, normal_local)
+        if not safe_compare(inset, 0, Comparison.GT):
+            return None
+    elif not does_shoulder_plane_need_notching(arrangement, mortise_shoulder_distance_from_centerline_or_centerplane):
+        return None
+
+    if shoulder_plane is None:
+        from kumiki.joints.workshop.shavings.build_a_butt import (
+            locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+        )
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
+        )
+    n_depth = safe_normalize_vector(shoulder_plane.normal)
 
     butt_length_dir = safe_normalize_vector(butt_timber.get_length_direction_global())
 

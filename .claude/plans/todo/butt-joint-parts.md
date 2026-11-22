@@ -66,5 +66,4 @@ parts anywhere (nothing adds material to it), so that field can probably go.
 
 ## Related
 
-- `multi-mortise-and-tenon.md` needs the same core: one shoulder cut minus the union of several tenons.
-  Doing step 3 first makes it a list of tenon pieces.
+- [Several tenons on one timber end](../archive/multi-mortise-and-tenon.md) uses one shoulder cut that spares every tenon.
