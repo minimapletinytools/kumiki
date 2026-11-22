@@ -181,11 +181,7 @@ DONE-add a tool allowing you to open drawings in a project. maybe look ta the cu
 
 
 
-
-
-
-
-
+-save options button should say "option saved" next ot it when you click it, greyed out if no chages, maybe add reset option?
 -refresh seems slow again, check perf on web?
 
 DRAWING NEXT TODO
