@@ -45,11 +45,11 @@ def detach_coplanar_cuts(base: trimesh.Trimesh, cutters: Sequence[trimesh.Trimes
 
 
 def _bodies(cutter: trimesh.Trimesh) -> list[trimesh.Trimesh]:
-    """Return a closed cutter's separate bodies, or the cutter itself."""
+    """Return a closed cutter's separate bodies, or the cutter itself if any is open or flat."""
     if len(cutter.faces) == 0 or not cutter.is_watertight:
         return [cutter]
     parts = cutter.split(only_watertight=False)
-    if len(parts) > 1 and all(part.is_watertight for part in parts):
+    if len(parts) > 1 and all(part.is_watertight and _volume(part) > 0 for part in parts):
         return list(parts)
     return [cutter]
 
