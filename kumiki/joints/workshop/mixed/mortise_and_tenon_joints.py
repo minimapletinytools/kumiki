@@ -7,7 +7,8 @@ corner, and tusked variants.
 from __future__ import annotations
 
 import warnings
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from math import isfinite
 from enum import Enum
 from typing import List, Optional, Union
 
@@ -27,6 +28,7 @@ from kumiki.csg.cutcsg import (
     Cylinder,
     CylinderAxisFeature,
     Datum,
+    PlaneFeature,
     FeatureOverride,
     FeatureProperties,
     measured_against,
@@ -42,7 +44,6 @@ from kumiki.measuring import (
     Space,
 )
 from ..shavings import *
-from ..shavings.tenon_wedge import WedgeOrientation, WedgeParameters, flared_mortise, lay_out_tenon_wedge
 from ..shavings.relief import (
     warn_if_arrangement_timbers_imperfect,
     chop_shoulder_notch_on_timber_face,
@@ -80,6 +81,127 @@ def _union_into_cut(existing: CutCSG, additions: List[CutCSG], label: CutCSGLabe
     if isinstance(existing, SolidUnion) and existing.label == label:
         return SolidUnion(children=list(existing.children) + list(additions), label=label)
     return SolidUnion(children=[existing] + list(additions), label=label)
+
+
+class WedgeOrientation(Enum):
+    SPREAD_X = "spread_x"
+    SPREAD_Y = "spread_y"
+
+
+@dataclass(frozen=True)
+class WedgeParameters:
+    """Place one wedge from the tenon tip toward its shoulder.
+
+    wedge_position is signed from the tenon center along the timber's X or Y axis.
+    wedge_angle is the included angle in radians. mortise_side_angle is the outward
+    angle per spread wall from shoulder to mortise bottom. tenon_kerf_size is the
+    saw cut width. Zero leaves only the layout datums. A longer wedge projects past
+    the tenon tip by its excess length. For an oblique face bore, the kerf depth
+    is measured at the wedge centerline on the trimmed tenon.
+    """
+    wedge_orientation: WedgeOrientation = WedgeOrientation.SPREAD_X
+    wedge_position: Numeric = 0
+    wedge_length: Numeric | None = None
+    wedge_angle: Numeric = degrees(5)
+    mortise_side_angle: Numeric = 0
+    tenon_kerf_size: Numeric = 0
+
+
+@dataclass(frozen=True)
+class _TenonWedgeLayout:
+    accessory: Wedge
+    kerf_global: RectangularPrism | None
+    kerf_datums: tuple[PlaneFeature, PlaneFeature]
+
+
+def _lay_out_tenon_wedge(params: WedgeParameters, shoulder_global: Transform, size: V2,
+                        tenon_length: Numeric, mortise_depth: Numeric | None,
+                        spread_global: V3, crop_planes: list[HalfSpace], inward_global: V3) -> _TenonWedgeLayout:
+    """Lay out the wedge along the kerf centerline between the shoulder and the trimmed tip."""
+    kerf = params.tenon_kerf_size
+    if not isinstance(params.wedge_orientation, WedgeOrientation):
+        raise ValueError("wedge_orientation must be SPREAD_X or SPREAD_Y")
+    if not 0 < params.wedge_angle < pi or not 0 <= params.mortise_side_angle < pi / 2:
+        raise ValueError("wedge_angle must be between 0 and pi and mortise_side_angle in [0, pi/2)")
+    if not isfinite(kerf) or kerf < 0 or not isfinite(params.wedge_position):
+        raise ValueError("tenon_kerf_size must be nonnegative and wedge_position and kerf size finite")
+
+    outward = shoulder_global.local_to_global_direction(create_v3(0, 0, 1))
+    offset = params.wedge_position * spread_global
+    origin = shoulder_global.position + offset
+    tip = tenon_length
+    start = 0
+    if crop_planes:
+        start = -safe_dot_product(inward_global, offset) / safe_dot_product(inward_global, outward)
+        for plane in crop_planes:
+            advance = safe_dot_product(plane.normal, outward)
+            if advance > 0:
+                tip = min(tip, (plane.offset - safe_dot_product(plane.normal, origin)) / advance)
+    available = tip - start
+    length = available if params.wedge_length is None else params.wedge_length
+    if not (isfinite(length) and isfinite(available) and min(length, available) > 0):
+        raise ValueError("The wedge and tenon at its position must have positive finite length")
+    if mortise_depth is not None and (not isfinite(mortise_depth) or
+                                      (not crop_planes and mortise_depth < max(tenon_length, length))):
+        raise ValueError("mortise_depth must accommodate the tenon and seated wedge")
+
+    index = 0 if params.wedge_orientation is WedgeOrientation.SPREAD_X else 1
+    depth = min(length, available)
+    root = tip - depth
+    taper = tan(params.wedge_angle / 2)
+    if abs(params.wedge_position) + max(kerf / 2, depth * taper) >= size[index] / 2:
+        raise ValueError("The kerf and inserted wedge must fit between the tenon cheeks")
+
+    across = size[1 - index]
+    wedge = Wedge(
+        transform=Transform(origin + outward * (root + length), Orientation.from_z_and_x(-outward, spread_global)),
+        length=length, base_width=2 * length * taper, tip_width=0, height=across,
+        assembly_freedom=AssemblyFreedom.translation(outward, depth) if mortise_depth is None else None,
+        assembly_ordering=Ordering(0, -1) if mortise_depth is None else Ordering(),
+    )
+    slot = RectangularPrism(
+        size=create_v2(kerf, across), transform=Transform(origin, Orientation.from_z_and_x(outward, spread_global)),
+        start_distance=root, end_distance=tenon_length, label=CutCSGLabel("tenon_kerf"),
+    ) if kerf > 0 else None
+    direction = shoulder_global.global_to_local_direction(spread_global)
+    return _TenonWedgeLayout(wedge, slot, (
+        PlaneFeature("kerf_center", normal=(direction[0], direction[1], direction[2]), offset=params.wedge_position),
+        PlaneFeature("kerf_root", normal=(0, 0, 1), offset=root),
+    ))
+
+
+def _flared_mortise(side_angle: Numeric, spread: int, size: V2, shoulder_global: Transform, inward_global: V3,
+                   start: Numeric, depth: Numeric | None) -> CutCSG:
+    """Intersect the four mortise walls with the entry and optional blind bottom.
+
+    Rotate each spread wall about its intersection with the shoulder plane.
+    An open-ended cut continues through the receiving timber.
+    """
+    inward = shoulder_global.global_to_local_direction(inward_global)
+    along = create_v3(0, 0, 1)
+
+    def plane(normal: V3, point: V3, name: str, opposite: str | None = None) -> HalfSpace:
+        normal_global = shoulder_global.local_to_global_direction(normal)
+        props = measured_against(FeatureProperties(), opposite) if opposite else FeatureProperties()
+        return HalfSpace(normal=normal_global, offset=safe_dot_product(normal_global, shoulder_global.local_to_global(point)),
+                         feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, props)])
+
+    cut: CutCSG = plane(along, start * along, "mortise_entry")
+    if depth is not None:
+        cut = Intersection(cut, plane(-along, depth * along, "mortise_bottom"))
+    for index, (axis, positive, negative) in enumerate((
+        (create_v3(1, 0, 0), "mortise_right", "mortise_left"),
+        (create_v3(0, 1, 0), "mortise_front", "mortise_back"),
+    )):
+        for sign, name, opposite in ((1, positive, negative), (-1, negative, positive)):
+            normal = -sign * axis
+            point = sign * size[index] / 2 * axis
+            if index == spread:
+                point = point - along * (safe_dot_product(inward, point) / inward[2])
+                into_wall = safe_normalize_vector(inward - axis * safe_dot_product(inward, axis))
+                normal = normal * cos(side_angle) + into_wall * sin(side_angle)
+            cut = Intersection(cut, plane(normal, point, name, opposite))
+    return replace(cut, label=CutCSGLabel("mortise_hole"))
 
 
 class InsetShoulderReliefStyle(Enum):
@@ -223,17 +345,58 @@ def cut_mortise_and_tenon_joint(
         else max(tenon_size[0], tenon_size[1]) * sin_from_normal / sin_from_face
     )
 
+    mortise_transform = tenon_base_transform
+    mortise_size = tenon_size
+    spread_index = int(wedge_parameters is not None and wedge_parameters.wedge_orientation is WedgeOrientation.SPREAD_Y)
+    tenon_crop_planes: list[HalfSpace] = []
+    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not is_square
+    if do_lengthwise_cropping:
+        assert mortise_depth is not None
+        mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+            -tenon_end_direction
+        ).to.face()
+        mortise_face_direction = mortise_timber.get_face_direction_global(mortise_face)
+
+        mortise_oblique_end = mortise_timber.get_closest_oriented_end_face_from_global_direction(tenon_end_direction)
+        joint_angle_axis_face = tenon_timber.get_closest_oriented_long_face_from_global_direction(mortise_timber.get_face_direction_global(mortise_oblique_end))
+        joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
+
+        mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
+        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_from_face / scalar(2)
+
+        mortise_hole_end_crop_global = HalfSpace(
+            normal=mortise_hole_length_oblique_direction,
+            offset=end_crop_distance + safe_dot_product(mortise_hole_length_oblique_direction, marking_origin_global),
+            label=CutCSGLabel("tenon_crop_to_mortise_length"),
+        )
+
+        mortise_depth_crop_global = HalfSpace(
+            normal=-mortise_face_direction,
+            offset=mortise_depth - safe_dot_product(mortise_face_direction, get_center_point_on_face_global(mortise_face, mortise_timber)),
+            label=CutCSGLabel("tenon_crop_to_mortise_depth"),
+        )
+
+        tenon_crop_planes = [mortise_hole_end_crop_global, mortise_depth_crop_global]
+
+        mortise_transform = Transform(marking_origin_global, Orientation.from_z_and_y(
+            z_direction=-mortise_face_normal, y_direction=mortise_hole_length_oblique_direction))
+        mortise_size = create_v2(tenon_size[1 - joint_angle_axis_index],
+                                 tenon_size[joint_angle_axis_index] / sin_from_face)
+        # Bore Y lies along the receiver, the axis stretched by the oblique entrance.
+        spread_index = 1 if spread_index == joint_angle_axis_index else 0
+
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
     wedge_layout = None
     if wedge_parameters is not None:
-        if use_round_tenon or (bore_mortise_perpendicular_to_face and not is_square):
-            raise ValueError("Wedging requires a rectangular tenon with the mortise bored along the tenon axis")
+        if use_round_tenon:
+            raise ValueError("Wedging requires a rectangular tenon")
         spread_global = (tenon_timber.get_width_direction_global()
                          if wedge_parameters.wedge_orientation is WedgeOrientation.SPREAD_X
                          else tenon_timber.get_height_direction_global())
-        wedge_layout = lay_out_tenon_wedge(wedge_parameters, tenon_base_transform, tenon_size,
-                                           tenon_length, mortise_depth, spread_global)
+        wedge_layout = _lay_out_tenon_wedge(wedge_parameters, tenon_base_transform, tenon_size,
+                                           tenon_length, mortise_depth, spread_global,
+                                           tenon_crop_planes, -shoulder_plane.normal)
 
     if use_round_tenon:
         tenon_radius = tenon_size[0] / scalar(2)
@@ -266,36 +429,6 @@ def cut_mortise_and_tenon_joint(
             label=CutCSGLabel("tenon"),
         )
 
-    tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
-    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not is_square
-    if do_lengthwise_cropping:
-        assert mortise_depth is not None
-        mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
-            -tenon_end_direction
-        ).to.face()
-        mortise_face_direction = mortise_timber.get_face_direction_global(mortise_face)
-
-        mortise_oblique_end = mortise_timber.get_closest_oriented_end_face_from_global_direction(tenon_end_direction)
-        joint_angle_axis_face = tenon_timber.get_closest_oriented_long_face_from_global_direction(mortise_timber.get_face_direction_global(mortise_oblique_end))
-        joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
-
-        mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
-        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_from_face / scalar(2)
-
-        mortise_hole_end_crop_global = HalfSpace(
-            normal=mortise_hole_length_oblique_direction,
-            offset=end_crop_distance + safe_dot_product(mortise_hole_length_oblique_direction, marking_origin_global),
-            label=CutCSGLabel("tenon_crop_to_mortise_length"),
-        )
-
-        mortise_depth_crop_global = HalfSpace(
-            normal=-mortise_face_direction,
-            offset=mortise_depth - safe_dot_product(mortise_face_direction, get_center_point_on_face_global(mortise_face, mortise_timber)),
-            label=CutCSGLabel("tenon_crop_to_mortise_depth"),
-        )
-
-        tenon_prism_cropping_csgs = [mortise_hole_end_crop_global, mortise_depth_crop_global]
-
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
@@ -313,10 +446,10 @@ def cut_mortise_and_tenon_joint(
 
     tenon_prism_cropped = (
         tenon_prism_global
-        if tenon_prism_cropping_csgs is None
+        if not tenon_crop_planes
         else Difference(
             base=tenon_prism_global,
-            subtract=tenon_prism_cropping_csgs,
+            subtract=list(tenon_crop_planes),
             label=CutCSGLabel("tenon_cropped"),
         )
     )
@@ -325,67 +458,20 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_local = adopt_csg(None, tenon_timber.transform, shoulder_half_space_global)
 
     mortise_hole_prism_global: CutCSG
-    if wedge_parameters is not None and wedge_parameters.mortise_side_angle > 0:
-        mortise_hole_prism_global = flared_mortise(wedge_parameters, tenon_size, tenon_base_transform,
-                                                   -shoulder_plane.normal, -back_extension, mortise_depth)
-    elif do_lengthwise_cropping:
-        if use_round_tenon:
-            mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = safe_normalize_vector(tenon_end_direction)
-            mortise_hole_prism_global = Cylinder(
-                axis_direction=axis_direction_global,
-                radius=mortise_radius,
-                position=marking_space.transform.position,
-                start_distance=-back_extension,
-                end_distance=mortise_depth,
-                label=CutCSGLabel("mortise_hole"),
-            )
-        else:
-            opp_index = 1 if joint_angle_axis_index == 0 else 0
-            mortise_hole_size = create_v2(
-                tenon_size[opp_index],
-                tenon_size[joint_angle_axis_index] / sin_from_face,
-            )
-
-            mortise_hole_orientation = Orientation.from_z_and_y(
-                z_direction=-mortise_face_normal,
-                y_direction=mortise_hole_length_oblique_direction,
-            )
-
-            mortise_hole_transform = Transform(
-                position=marking_space.transform.position,
-                orientation=mortise_hole_orientation,
-            )
-
-            mortise_hole_prism_global = RectangularPrism(
-                size=mortise_hole_size,
-                transform=mortise_hole_transform,
-                start_distance=-back_extension,
-                end_distance=mortise_depth,
-                feature_overrides=_mortise_walls(),
-                label=CutCSGLabel("mortise_hole"),
-            )
+    if use_round_tenon:
+        mortise_hole_prism_global = Cylinder(
+            axis_direction=tenon_end_direction, radius=tenon_size[0] / 2, position=marking_origin_global,
+            start_distance=-back_extension, end_distance=mortise_depth, label=CutCSGLabel("mortise_hole"),
+        )
+    elif wedge_parameters is not None and wedge_parameters.mortise_side_angle > 0:
+        mortise_hole_prism_global = _flared_mortise(
+            wedge_parameters.mortise_side_angle, spread_index, mortise_size, mortise_transform,
+            -shoulder_plane.normal, -back_extension, mortise_depth)
     else:
-        if use_round_tenon:
-            mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = safe_normalize_vector(tenon_end_direction)
-            mortise_hole_prism_global = Cylinder(
-                axis_direction=axis_direction_global,
-                radius=mortise_radius,
-                position=marking_space.transform.position,
-                start_distance=-back_extension,
-                end_distance=mortise_depth,
-                label=CutCSGLabel("mortise_hole"),
-            )
-        else:
-            mortise_hole_prism_global = RectangularPrism(
-                size=tenon_size,
-                transform=marking_space.transform,
-                start_distance=-back_extension,
-                end_distance=mortise_depth,
-                feature_overrides=_mortise_walls(),
-                label=CutCSGLabel("mortise_hole"),
-            )
+        mortise_hole_prism_global = RectangularPrism(
+            size=mortise_size, transform=mortise_transform, start_distance=-back_extension, end_distance=mortise_depth,
+            feature_overrides=_mortise_walls(), label=CutCSGLabel("mortise_hole"),
+        )
 
     if isinstance(relief, ButtJointNotchReliefConfig):
         assert relief.notch_from == NotchFrom.Shoulder, (
@@ -530,7 +616,18 @@ def cut_mortise_and_tenon_joint(
 
     joint_accessories: dict[str, Accessory] = {}
     if wedge_layout is not None:
-        joint_accessories["wedge"] = wedge_layout.accessory
+        wedge = wedge_layout.accessory
+        if do_lengthwise_cropping:
+            if not mortise_hole_prism_global.contains_point(wedge.transform.position):
+                raise ValueError("The seated wedge head extends beyond the face-bored mortise")
+            # Bevel the wedge edges to the bore walls and floor, keeping its drive axis along the tenon.
+            pocket = Intersection(mortise_hole_prism_global, shoulder_relief_bound_global)
+            bore_local = adopt_csg(None, wedge.transform, pocket)
+            joint_accessories["wedge"] = CSGAccessory(
+                ticket=wedge.ticket, transform=wedge.transform,
+                positive_csg=Intersection(wedge.get_csg_local(), bore_local))
+        else:
+            joint_accessories["wedge"] = wedge
     if peg_parameters is not None:
         peg_results = compute_peg_positions(
             arrangement=arrangement,

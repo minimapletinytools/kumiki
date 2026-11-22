@@ -1,11 +1,11 @@
 from dataclasses import replace
-from math import tan
+from math import cos, sin, tan
 
 import pytest
 
-from kumiki import (CutTimber, Orientation, PegShape, SimplePegParameters, TimberEnd, Transform,
+from kumiki import (CSGAccessory, CutTimber, Orientation, PegShape, SimplePegParameters, TimberEnd, TimberLongFace, Transform,
                     Wedge, WedgeOrientation, WedgeParameters, create_v2, create_v3,
-                    cut_mortise_and_tenon_joint_on_face_aligned_timbers, degrees, mm)
+                    cut_mortise_and_tenon_joint, cut_mortise_and_tenon_joint_on_face_aligned_timbers, degrees, mm)
 from kumiki.csg.triangles import triangulate_cutcsg
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 
@@ -123,23 +123,17 @@ def test_round_tenons_reject_a_wedge(arrangement):
 
 
 def test_oblique_mortise_walls_pivot_on_the_shoulder(arrangement):
-    from kumiki import TimberLongFace, cut_mortise_and_tenon_joint
-
     # Turn the receiver about its center. The tenon still enters along +Y.
     pose = Transform(create_v3(0, 0, 0), Orientation.from_angle_axis(degrees(30), create_v3(0, 0, 1)))
     receiver = replace(arrangement.receiving_timber, transform=pose * arrangement.receiving_timber.transform)
     arrangement = replace(arrangement, receiving_timber=receiver)
 
-    def cut(perpendicular=False):
-        return cut_mortise_and_tenon_joint(
-            arrangement, tenon_size=create_v2(mm(24), mm(36)), tenon_length=mm(40), mortise_depth=mm(50),
-            set_mortise_shoulder_parallel_to_face=TimberLongFace.FRONT,
-            mortise_shoulder_distance_from_centerline_or_centerplane=mm(40),
-            wedge_parameters=WedgeParameters(WedgeOrientation.SPREAD_Y, mortise_side_angle=degrees(5)),
-            bore_mortise_perpendicular_to_face=perpendicular,
-        )
-
-    joint = cut()
+    joint = cut_mortise_and_tenon_joint(
+        arrangement, tenon_size=create_v2(mm(24), mm(36)), tenon_length=mm(40), mortise_depth=mm(50),
+        set_mortise_shoulder_parallel_to_face=TimberLongFace.FRONT,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mm(40),
+        wedge_parameters=WedgeParameters(WedgeOrientation.SPREAD_Y, mortise_side_angle=degrees(5)),
+    )
     solid = _finished(joint, receiver)
     # For each cheek, find its own intersection with the receiver's entrance plane.
     for sign in (-1, 1):
@@ -151,5 +145,61 @@ def test_oblique_mortise_walls_pivot_on_the_shoulder(arrangement):
             for offset, wood in ((-.03, False), (.03, True)):
                 p = create_v3(edge + sign * mm(offset), entry_y + delta, 0)
                 assert solid.contains_point(receiver.transform.global_to_local(p)) == wood
-    with pytest.raises(ValueError, match="along the tenon axis"):
-        cut(perpendicular=True)
+
+
+@pytest.mark.parametrize("angle_deg", [30, -55])
+@pytest.mark.parametrize("orientation", list(WedgeOrientation))
+@pytest.mark.parametrize("depth_mm,flare_deg", [(20, 0), (20, 5), (58, 5)])
+def test_face_bored_wedged_joint(arrangement, angle_deg, orientation, depth_mm, flare_deg):
+    angle = degrees(angle_deg)
+    pose = Transform(create_v3(0, 0, 0), Orientation.from_angle_axis(angle, create_v3(0, 0, 1)))
+    receiver = replace(arrangement.receiving_timber, transform=pose * arrangement.receiving_timber.transform)
+    arrangement = replace(arrangement, receiving_timber=receiver)
+    joint = cut_mortise_and_tenon_joint(
+        arrangement, tenon_size=create_v2(mm(24), mm(36)), tenon_length=mm(70), mortise_depth=mm(depth_mm),
+        set_mortise_shoulder_parallel_to_face=TimberLongFace.FRONT,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mm(40), bore_mortise_perpendicular_to_face=True,
+        wedge_parameters=WedgeParameters(orientation, wedge_position=mm(2), wedge_length=mm(10),
+                                         mortise_side_angle=degrees(flare_deg), tenon_kerf_size=mm(1)),
+    )
+    entry = create_v3(0, -mm(40) / cos(angle), 0)
+    inward = -receiver.get_height_direction_global()
+    tangent = receiver.get_length_direction_global()
+    up = create_v3(0, 0, 1)
+    spread_vertical = orientation is WedgeOrientation.SPREAD_X
+    stock = _finished(joint, receiver)
+
+    def has_stock(p):
+        return stock.contains_point(receiver.transform.global_to_local(p))
+
+    for station in (mm(.1), mm(depth_mm / 2), mm(depth_mm - .1)):
+        center = entry + inward * station
+        flare = station * tan(degrees(flare_deg))
+        for axis, half_width, expands in ((tangent, mm(18) / cos(angle), not spread_vertical),
+                                          (up, mm(12), spread_vertical)):
+            edge = half_width + (flare if expands else 0)
+            for sign in (-1, 1):
+                assert not has_stock(center + sign * axis * (edge - mm(.03)))
+                assert has_stock(center + sign * axis * (edge + mm(.03)))
+    assert has_stock(entry + inward * mm(depth_mm + .1))
+
+    # Intersect the offset wedge axis with the end wall and floor independently.
+    offset = (up if spread_vertical else create_v3(1, 0, 0)) * mm(2)
+    wall_station = (mm(18) / cos(angle) - (1 if angle > 0 else -1) * tangent.dot(offset)) / abs(sin(angle))
+    floor_station = (mm(depth_mm) - inward.dot(offset)) / cos(angle)
+    head = entry + offset + create_v3(0, min(wall_station, floor_station, mm(70)), 0)
+    wedge = joint.jointAccessories["wedge"]
+    assert isinstance(wedge, CSGAccessory)
+    assert (wedge.transform.position - head).norm() == pytest.approx(0)
+    mesh = triangulate_cutcsg(wedge.get_csg_local()).mesh
+    assert mesh.is_watertight and mesh.volume > 0
+    for vertex in mesh.vertices:
+        point = wedge.transform.local_to_global(create_v3(*vertex))
+        depth = (point - entry).dot(inward)
+        assert -mm(.001) <= depth <= mm(depth_mm + .001)
+        extra = depth * tan(degrees(flare_deg))
+        assert abs((point - entry).dot(tangent)) <= mm(18) / cos(angle) + (0 if spread_vertical else extra) + mm(.001)
+    timber = arrangement.butt_timber
+    tenon = _finished(joint, timber)
+    for behind_head, intact in ((9.9, False), (10.1, True)):
+        assert tenon.contains_point(timber.transform.global_to_local(head - create_v3(0, mm(behind_head), 0))) == intact

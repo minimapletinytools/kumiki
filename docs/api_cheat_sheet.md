@@ -82,6 +82,7 @@ joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
 ```
 
 The wedge has a 5° included angle by default. A zero-width kerf leaves center and depth references.
+With `bore_mortise_perpendicular_to_face=True`, the flare follows the face-normal bore. The kerf depth is measured along the tenon at the wedge centerline, from its trimmed end.
 The kerf stops at the shorter of the wedge and tenon lengths. Any excess wedge length projects beyond the tenon tip.
 [See the adjustable blind wedged tenon](../patterns/mixed/mortise_and_tenon_joints_patterns.py).
 
