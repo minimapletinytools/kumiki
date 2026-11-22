@@ -67,6 +67,25 @@ with `TimberEnd.TOP`, then call `edge.restore_joint(joint)` before assembling th
 The shoulder spans the edge, and the blank must already reach the tenon tip.
 [See the off-center board-edge tenon example](../patterns/mixed/mortise_and_tenon_joints_patterns.py).
 
+For a blind wedged tenon, pass `wedge_parameters` to the rectangular mortise-and-tenon cutter.
+This example cuts a 2 mm kerf 30 mm back from the tip and flares the two X walls from the shoulder through the full 50 mm mortise.
+
+```python
+joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+    arrangement, tenon_width_relative_to_joint=mm(40), tenon_height_relative_to_joint=mm(25),
+    tenon_length=mm(40), mortise_depth=mm(50),
+    wedge_parameters=WedgeParameters(
+        wedge_orientation=WedgeOrientation.SPREAD_X, wedge_position=mm(4),
+        wedge_length=mm(30), tenon_kerf_size=mm(2), mortise_side_angle=degrees(5),
+    ),
+)
+```
+
+The wedge has a 5° included angle by default. A zero-width kerf leaves center and depth references.
+With `bore_mortise_perpendicular_to_face=True`, the flare follows the face-normal bore. The kerf depth is measured along the tenon at the wedge centerline, from its trimmed end.
+The kerf stops at the shorter of the wedge and tenon lengths. Any excess wedge length projects beyond the tenon tip.
+[See the adjustable blind wedged tenon](../patterns/mixed/mortise_and_tenon_joints_patterns.py).
+
 ### Arrangements
 
 Most joint functions take an arrangement naming the timbers in the joint and the "orientation" of the joint.

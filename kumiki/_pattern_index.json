@@ -4602,7 +4602,8 @@
           "round_plane_aligned",
           "front_entry",
           "top_entry",
-          "board_edge"
+          "board_edge",
+          "blind_wedged"
         ],
         "patterns": [
           {
@@ -4721,11 +4722,20 @@
             "path": "mixed/mortise_and_tenon/board_edge",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "names": {
+              "en": "Blind wedged tenon",
+              "ja": "\u5730\u7344\u6798"
+            },
+            "path": "mixed/mortise_and_tenon/blind_wedged",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "mixed/mortise_and_tenon_joints_patterns.py",
-      "sha256": "f48f08662261251d11f3f650deeacb8ba0388b2515605fa56097b08c7ea0c06d",
+      "sha256": "48c1cd2c128c404c35b830a187b1808dd48146a11b977c00f0d62140b2e23ba3",
       "title": {
         "en": "Mortise and tenon joints",
         "ja": "\u6798\u5dee\u3057"
@@ -6108,7 +6118,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T23:35:39.277477+00:00",
+  "generated_at": "2026-11-21T23:53:14.124388+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
