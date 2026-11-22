@@ -30,7 +30,11 @@ from kumiki.csg.cutcsg import (
     Difference,
     Intersection,
     HalfSpace,
+    FeatureOverride,
+    FeatureProperties,
     adopt_csg,
+    measured_against,
+    side_key,
 )
 from kumiki.construction import (
     Transform,
@@ -392,6 +396,16 @@ def _lateral_positive_dovetail_face(butt_timber_face: TimberFace, front_face_on_
     )
 
 
+#: The trapezoid's sides run point n to point n+1: the left flank, the wide face, the right flank. Each
+#: flank's angle is measured from the wide face.
+_SLIDING_DOVETAIL_FACES = (
+    FeatureOverride(side_key(0), "dovetail_left_flank", measured_against(FeatureProperties(), "dovetail_wide_face")),
+    FeatureOverride(side_key(1), "dovetail_wide_face",
+                    measured_against(FeatureProperties(), "dovetail_left_flank", "dovetail_right_flank")),
+    FeatureOverride(side_key(2), "dovetail_right_flank", measured_against(FeatureProperties(), "dovetail_wide_face")),
+)
+
+
 def _dovetail_trapezoid_points(
     dovetail_small_width: Numeric,
     dovetail_depth: Numeric,
@@ -531,6 +545,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
             transform=profile_transform,
             start_distance=s_start,
             end_distance=s_end,
+            feature_overrides=_SLIDING_DOVETAIL_FACES,
             label=CutCSGLabel(label),
         )
         assert extrusion.is_valid(), f"dovetail trapezoid profile is not a valid convex polygon (label={label})"

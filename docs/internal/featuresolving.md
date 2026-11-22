@@ -159,14 +159,15 @@ Picks dimensions one at a time until every target is solved.
 - Take the targets' rows, with everything already known projected out.
 - Repeat while any target is unsolved:
   - Sort the remaining candidates by the policy's preferences, compared one after another (by
-    default `PREFERENCE_ORDER`: angles first, angles from the timber, declared pairs, preferred datums,
+    default `PREFERENCE_ORDER`: angles first, declared pairs, angles from the timber, preferred datums,
     fewer face ends, from a reference face, perfect faces over rough ones, declared over derived, from
     something already solved, then shortest).
-  - **Declared pairs**: a feature whose `FeatureMarkingSpec.mark_relative_to` names another wants to be
-    measured against it: the nearest feature of that name in the timber's tree, or one coincident
-    with it. Two features naming each other (a tenon's cheeks, a mortise's walls) are a symmetric
-    pair; one naming the other (a tenon's tip, its shoulder) is one-way. A pair is only preferred: a
-    redundant one is not added.
+  - **Declared pairs**: a feature whose `FeatureMarkingSpec.mark_relative_to` names others wants to be
+    measured against them: for each name, the nearest feature of that name in the timber's tree, or
+    one coincident with it. Two features naming each other (a tenon's cheeks, a mortise's walls, a
+    dovetail's flank and its wide face) are a symmetric pair; one naming the other (a tenon's tip, its
+    shoulder) is one-way. A pair is only preferred: a redundant one is not added. Pairs rank above
+    angles from the timber, so a dovetail's flank angle is taken from its wide face.
   - **Preferred datums**: `FeatureProperties.datum` -- `PREFERRED` (shoulders), `NEUTRAL`, `AVOID` (a
     tenon's tip, measured to its shoulder and from nothing else) -- ranks the ends of a measurement
     within one member. Between members both ends count as neutral, so a shoulder doesn't draw

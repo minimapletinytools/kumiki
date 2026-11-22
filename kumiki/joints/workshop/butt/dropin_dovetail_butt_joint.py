@@ -38,6 +38,7 @@ from kumiki.csg.cutcsg import (
     SolidUnion,
     START_CAP,
     adopt_csg,
+    measured_against,
     side_key,
 )
 from ..shavings.shavings import (
@@ -176,9 +177,11 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     dovetail_prism_csg = replace(
         dovetail_profile_csg,
         feature_overrides=[
-            FeatureOverride(side_key(1), "dovetail_right", _DOVETAIL_FACE),
-            FeatureOverride(side_key(2), "dovetail_front", _DOVETAIL_FACE),
-            FeatureOverride(side_key(3), "dovetail_left", _DOVETAIL_FACE),
+            # Each cheek's angle is measured from the wide face.
+            FeatureOverride(side_key(1), "dovetail_right", measured_against(_DOVETAIL_FACE, "dovetail_front")),
+            FeatureOverride(side_key(2), "dovetail_front",
+                            measured_against(_DOVETAIL_FACE, "dovetail_right", "dovetail_left")),
+            FeatureOverride(side_key(3), "dovetail_left", measured_against(_DOVETAIL_FACE, "dovetail_front")),
             FeatureOverride(START_CAP, "dovetail_bot", _DOVETAIL_FACE),
         ],
     )
@@ -212,7 +215,14 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
 
     # The plain prism, not the named copy above: the walls this cuts are the
     # receiving timber's surfaces, and a socket wall is not a face of the tail.
-    dovetail_socket_csg = adopt_csg(dovetail_timber.transform, receiving_timber.transform, dovetail_profile_csg)
+    # They are named only so each cheek's angle is measured from the wide wall.
+    socket_profile_csg = replace(dovetail_profile_csg, feature_overrides=[
+        FeatureOverride(side_key(1), "socket_right", measured_against(FeatureProperties(), "socket_front")),
+        FeatureOverride(side_key(2), "socket_front",
+                        measured_against(FeatureProperties(), "socket_right", "socket_left")),
+        FeatureOverride(side_key(3), "socket_left", measured_against(FeatureProperties(), "socket_front")),
+    ])
+    dovetail_socket_csg = adopt_csg(dovetail_timber.transform, receiving_timber.transform, socket_profile_csg)
 
     if dovetail_timber_end == TimberEnd.TOP:
         dovetail_end_local_z = dovetail_timber.length - shoulder_distance_from_end + dovetail_length
