@@ -18,14 +18,17 @@ ANGLED = [
 
 
 def _sliver_count(mesh) -> int:
-    """Count faces with an opposite-facing face under them less than a micron away."""
+    """Count faces with an opposite-facing face under them 1e-12 m to a micron away.
+
+    Smaller gaps are rounding in the last digits, left where two cutters that are not convex touch.
+    """
     normals, triangles_ = mesh.face_normals, mesh.triangles
     centers = triangles_.mean(axis=1)
     offsets = np.einsum("ij,ij->i", normals, centers)
     count = 0
     for i in range(len(normals)):
         gaps = np.abs(offsets + offsets[i])
-        for j in np.flatnonzero((normals @ normals[i] < -0.999999) & (gaps < 1e-6) & (gaps > 0)):
+        for j in np.flatnonzero((normals @ normals[i] < -0.999999) & (gaps < 1e-6) & (gaps > 1e-12)):
             a, b, c = triangles_[j]
             point = centers[i] - normals[j] * (normals[j] @ centers[i] - offsets[j])
             v0, v1, v2 = b - a, c - a, point - a
@@ -63,3 +66,22 @@ def test_angled_cuts_leave_no_slivers(source, path, monkeypatch):
     assert sum(_sliver_count(mesh) for mesh in plain) > 0
     for mesh, plain_mesh in zip(detached, plain):
         assert mesh.volume == pytest.approx(plain_mesh.volume, rel=1e-6)
+
+
+def test_a_timber_open_past_its_end_cut_meshes_only_that_far(monkeypatch):
+    source, path = ANGLED[0]
+    spec = importlib.util.spec_from_file_location("coplanar_ends", PATTERNS / source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    pattern = next(pattern for pattern in module_patterns(module)[0] if pattern.path == path)
+    for cut in pattern.raise_at().cut_timbers:
+        csg = cut.render_timber_with_cuts_csg_local()
+        assert csg.base.start_distance is None
+        base = triangles.triangulate_cutcsg(triangles._end_at_end_cuts(csg.base, csg.subtract)).mesh
+        assert base.extents.max() < 2.0
+
+    near = _meshes(source, path)
+    monkeypatch.setattr(triangles, "TRIANGLES_END_OPEN_BASE_AT_END_CUTS", False)
+    for mesh, far_mesh in zip(near, _meshes(source, path)):
+        assert mesh.volume == pytest.approx(far_mesh.volume, rel=1e-9)
