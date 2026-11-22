@@ -1130,7 +1130,8 @@ export const MeasuringMixin = (Base) => class extends Base {
         // wrong units beside it.
         if (value.unit === 'angle') {
             this._drawAngle(into, viewport, pageRect, from, to,
-                            status.formA, status.formB, value,
+                            status.formA, status.formB, KigumiMeasurements.formatMeasureLabel(
+                                measure.label, `${value.value.toFixed(1)}\u00b0`),
                             { ...options, rays: measure.angle || null });
             return;
         }
@@ -1201,7 +1202,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         text.setAttribute('y', layout.label.y);
         text.setAttribute('class', `dim-label${extra}`);
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
-        text.textContent = this.fmt(value.value);
+        text.textContent = KigumiMeasurements.formatMeasureLabel(measure.label, this.fmt(value.value));
         into.appendChild(text);
     }
 
@@ -1247,7 +1248,7 @@ export const MeasuringMixin = (Base) => class extends Base {
      * At the corner rather than between them, because that is where an angle
      * is: the same two faces read as nothing at all anywhere else on the sheet.
      */
-    _drawAngle(into, viewport, pageRect, from, to, formA, formB, value, options = {}) {
+    _drawAngle(into, viewport, pageRect, from, to, formA, formB, label, options = {}) {
         const rays = options.rays || null;
         const drawn = rays
             ? this._angleArcInItsOwnPlane(viewport, pageRect, rays)
@@ -1278,7 +1279,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         text.setAttribute('x', drawn.label.x);
         text.setAttribute('y', drawn.label.y);
         text.setAttribute('class', `dim-label${options.className ? ` ${options.className}` : ''}`);
-        text.textContent = `${value.value.toFixed(1)}\u00b0`;
+        text.textContent = label;
         into.appendChild(text);
     }
 

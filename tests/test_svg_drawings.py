@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from kumiki import CutTimber, Timber, TimberFeature, TimberTicket, Transform, create_v2, create_v3
-from kumiki.csg.cutcsg import Cylinder, Difference, RectangularPrism
+from kumiki.csg.cutcsg import Cylinder, Difference, RectangularPrism, SolidUnion
 from kumiki.csg.pathcsg import ArcSegment, FancyPath, PathExtrusion, StraightSegment
 from kumiki.drawings.svg import DrawingSolid, DrawingStyles, render_svg_view
 from kumiki.measuring import locate_face
@@ -65,6 +65,15 @@ def test_extruded_arc_has_smooth_outline_and_two_corners_at_its_flat_side():
     assert _arcs(_view({'moulding': solid}), 'moulding')
     corners = list(solid.generators(np.array([0., 0., 1.])))
     assert {tuple(np.round(edge[1][:2], 6)) for edge in corners} == {(-1., 0.), (1., 0.)}
+
+
+def test_partially_flush_faces_only_draw_the_exposed_crease():
+    long = _box(width=1, height=1, x=.5, y=.5)
+    short = _box(width=1, height=.5, x=1.5, y=.25)
+    member = DrawingSolid(SolidUnion(children=[long, short]), Transform.identity())
+    along_y = [(min(a[1], b[1]), max(a[1], b[1])) for _, a, b in member.lines
+               if np.allclose([a[0], b[0], a[2], b[2]], 1)]
+    assert np.asarray(along_y) == pytest.approx(np.array([[.5, 1.]]))
 
 
 def test_reference_arris_centerline_ptw_and_two_independently_colored_faces():
@@ -133,7 +142,7 @@ def test_nearer_ordinary_arris_hides_the_overlapping_part_of_a_blue_arris():
     segments = path.attrib['d'].replace('M', '').replace('L', '').split()
     assert list(map(float, segments)) == pytest.approx([60, 50, 60, 40, 60, 20, 60, 10], abs=1e-5)
 
-@pytest.mark.parametrize('mode', ['none', 'noOverlay', 'overlay'])
+@pytest.mark.parametrize('mode', ['none', 'noOverlay', 'overlay', 'xray'])
 def test_inherit_viewer_materials_and_edge_mode_on_a_blind_bore(mode):
     bore = Cylinder(axis_direction=create_v3(0, 0, 1), radius=1, start_distance=.5, end_distance=2)
     members = {'beam': DrawingSolid(Difference(_box(), [bore]), Transform.identity())}
@@ -147,3 +156,8 @@ def test_inherit_viewer_materials_and_edge_mode_on_a_blind_bore(mode):
     assert edges.get('stroke-opacity') == '0.4'
     assert bool(edges.findall('{*}path')) == (mode != 'none')
     assert bool(_arcs(view, 'beam')) == (mode == 'overlay')
+    hidden = edges.find("{*}g[@class='xray-edges']")
+    assert (hidden is not None) == (mode == 'xray')
+    if hidden is not None:
+        assert hidden.get('stroke-dasharray')
+        assert any(' A' in p.attrib['d'] for p in hidden.findall('{*}path'))

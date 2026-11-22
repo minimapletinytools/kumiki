@@ -1,5 +1,5 @@
 const {
-    dimensionLayout, DEGENERATE_PIXELS,
+    dimensionLayout, DEGENERATE_PIXELS, formatMeasureLabel,
 } = require('../webview/measurements.js');
 
 describe('dimensionLayout', () => {
@@ -715,4 +715,12 @@ describe('the runner settles what a measurement comes to', () => {
         expect(status.drawable).toBe(false);
         expect(status.reason).toBe('not-settled');
     });
+});
+
+test.each([
+    [undefined, '25mm', '25mm'],
+    ['lap_depth', '25mm', 'lap_depth'],
+    ['slope = {value}', '30°', 'slope = 30°'],
+])('formats measurement label %s', (label, value, expected) => {
+    expect(formatMeasureLabel(label, value)).toBe(expected);
 });

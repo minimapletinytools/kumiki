@@ -122,6 +122,7 @@ class MeasureWire(TypedDict, total=False):
     a: AnchorWire
     b: AnchorWire
     measureId: Optional[str]
+    label: Optional[str]
     # A name ("perpendicular_distance") in files from before kinds were structured.
     kind: Union[MeasureKindWire, str, None]
     placement: Optional[PlacementWire]
@@ -2202,7 +2203,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         return None
     first, second, placement = anchors
     plane = getattr(measure, "plane", None)
-    return {
+    wire: MeasureWire = {
         "a": serialize_feature_path(first),
         "b": serialize_feature_path(second),
         "measureId": str(measure.measure_id) if measure.measure_id else None,
@@ -2215,6 +2216,9 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         "plane": plane.as_wire() if plane is not None else None,
         "origin": ORIGIN_CODE,
     }
+    if getattr(measure, "label", None) is not None:
+        wire["label"] = measure.label
+    return wire
 
 
 def merge_measurements(
@@ -2396,8 +2400,11 @@ def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> Measu
         raise ValueError("A measurement request needs both payload.a and payload.b")
     if not whole:
         return MeasureWire(a=a, b=b, measureId=request.get("measureId"))
-    return MeasureWire(a=a, b=b, kind=request.get("kind"), measureId=request.get("measureId"),
-                       plane=request.get("plane"), placement=request.get("placement"))
+    measure = MeasureWire(a=a, b=b, kind=request.get("kind"), measureId=request.get("measureId"),
+                          plane=request.get("plane"), placement=request.get("placement"))
+    if "label" in request:
+        measure["label"] = request["label"]
+    return measure
 
 
 def _viewer_measure_identity(measure: MeasureWire) -> Tuple[Any, str]:
