@@ -60,6 +60,13 @@ Omit placement for an editable placeholder; see [STL timbers](stl_timbers.md).
 
 ## Joints
 
+A `FauxTimber` lets an end-based cutter work across a perfect rectangular board or timber.
+Choose two perpendicular faces of the stock. For a tenon on its right edge, use
+`edge = FauxTimber(board, top=TimberFace.RIGHT, front=TimberFace.FRONT)` as the butt timber
+with `TimberEnd.TOP`, then call `edge.restore_joint(joint)` before assembling the frame.
+The shoulder spans the edge, and the blank must already reach the tenon tip.
+[See the off-center board-edge tenon example](../patterns/mixed/mortise_and_tenon_joints_patterns.py).
+
 ### Arrangements
 
 Most joint functions take an arrangement naming the timbers in the joint and the "orientation" of the joint.
@@ -123,6 +130,15 @@ Basic rectangular and round tenons stop short of the receiving timber’s far si
 The face-aligned basic cross-lap and housing names are deprecated; use the general basics above. Custom-shape cutters and the already-sized free housing and grooved-panel cutters do not need separate basic wrappers.
 
 This is not the complete list of joints. Search patterns to find joints not listed here. (TODO create a complete list of all joints)
+
+| Finger joint example | Parameters |
+|---|---|
+| [Basic box corner](../patterns/basic_joints_patterns.py) | `cut_basic_finger_corner_joint(arrangement)` sizes equal fingers from the average board thickness. |
+| [Basic finger splice](../patterns/basic_joints_patterns.py) | `cut_basic_finger_splice_joint(arrangement, *, splice_point=None)` uses an overlap twice the fitted finger width. |
+| [Box corner](../patterns/corner/finger_corner_joint_patterns.py) | `cut_uniform_finger_corner_joint(arrangement, finger_count=None, *, finger_width=None)` (alias `cut_box_corner_joint`). Depth follows the mating piece. |
+| [Finger splice](../patterns/splice/finger_splice_joint_patterns.py) | `cut_uniform_finger_splice_joint(arrangement, finger_length, finger_count=None, *, finger_width=None, taper_angle=atan(1/8), splice_point=None)`. The point locates the middle of the overlap in world space. Use a zero angle for straight fingers. |
+
+For the explicitly sized cutters, pass either `finger_count` or `finger_width`. Omitting both gives five equal fingers across the two members. Fixed widths start at the arrangement’s front face, where timber 1 keeps the first finger. Any remainder forms the last finger at the opposite face. For a tapered splice, the specified width is measured halfway along the overlap.
 
 ## Creating the frame
 

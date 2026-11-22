@@ -55,6 +55,7 @@ function optionSpecs(themeIds) {
         showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
         // What a drawing's views draw over the timbers: the perfect timber within's faces and
         // its centerplanes, dotted, and the reference features, lit.
+        tintSvgReferenceFaces: { value: false, normalize: bool },
         showDrawingPerfectFaces: { value: true, normalize: bool },
         showDrawingCenterplanes: { value: true, normalize: bool },
         showDrawingReferenceFeatures: { value: true, normalize: bool },
@@ -67,6 +68,7 @@ function optionSpecs(themeIds) {
         edgeMode: { value: 'noOverlay', normalize: oneOf(EDGE_MODES, 'noOverlay') },
         edgeLineVisibilityPercent: { value: 100, normalize: percent(0, 100, 5, 100) },
         edgeLineThicknessPx: { value: 1.5, normalize: range(0.5, 6, 1.5) },
+        renderTimberGrain: { value: false, normalize: bool },
         shadowsEnabled: { value: false, normalize: bool },
         reflectionsEnabled: { value: true, normalize: bool },
         footprintColor: { value: 'orange', normalize: oneOf(FOOTPRINT_COLORS, 'orange') },

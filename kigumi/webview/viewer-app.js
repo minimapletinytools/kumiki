@@ -5,6 +5,7 @@ import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
+import { prepareTimberGrain, showTimberGrain } from './timber-grain.js';
 import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { isKey } from './key-match.js';
@@ -930,7 +931,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
     }
 
-    renderViewports() {
+    renderViewports(afterViewport) {
         if (!this.renderer || !this.scene) {
             return;
         }
@@ -978,6 +979,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.aimViewLight(viewport.camera);
             }
             this.renderer.render(this.scene, viewport.camera);
+            if (afterViewport) afterViewport(viewport, rect);
         }
         // After the scene, so dimensions sit over what they measure.
         this.renderMeasurements();
@@ -1268,6 +1270,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             if (typeof ui[`${system}Precision`] === 'string') {
                 this.setUnitPrecision(ui[`${system}Precision`], system);
             }
+        }
+        if (typeof ui.renderTimberGrain === 'boolean') {
+            this.setRenderTimberGrain(ui.renderTimberGrain);
         }
         if (typeof ui.shadowsEnabled === 'boolean') {
             this.setShadowsEnabled(ui.shadowsEnabled);
@@ -2717,6 +2722,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
             const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed);
 
+            if (memberType === 'timber' && mesh.timberToWorld && !mesh.stlPlacement?.needed) {
+                for (const material of [materialSet.solid, materialSet.reflection]) {
+                    prepareTimberGrain(material, mesh.timberToWorld, key);
+                    showTimberGrain(material, this.renderTimberGrain);
+                }
+            }
             const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
             // EdgesGeometry gives a flat, non-indexed position array (every
             // consecutive pair of vertices is one segment) -- exactly what

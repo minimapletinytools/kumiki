@@ -15,6 +15,7 @@ from typing_extensions import deprecated
 from kumiki.timber import *
 from kumiki.rule import *
 from .corner import (
+    cut_uniform_finger_corner_joint,
     cut_practice_simplified_rice_dumping_joint,
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
@@ -37,6 +38,7 @@ from .mixed import (
     TuskParameters,
 )
 from .splice import (
+    cut_uniform_finger_splice_joint,
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_splice_lap_joint_on_aligned_timbers,
     cut_lapped_gooseneck_joint_on_aligned_timbers,
@@ -80,6 +82,42 @@ def cut_basic_practice_simplified_rice_dumping_joint(arrangement: TriCornerArran
         timber_2_tenon_distance_from_outer_face=depth * 5 / 16,
         tenon_size=create_v2(width / 4, depth * 3 / 16),
     )
+
+
+def _square_finger_count(span: Numeric, thickness: Numeric) -> int:
+    """Return the rounded number of thickness-wide fingers, with at least one per member."""
+    if span <= 0 or thickness <= 0:
+        raise ValueError("Finger joints require positive stock dimensions")
+    return max(2, int(span / thickness + scalar(1, 2)))
+
+
+def cut_basic_finger_corner_joint(arrangement: CornerJointTimberArrangement) -> Joint:
+    """Cut a box corner with equal fingers roughly as wide as the boards' average thickness."""
+    first, second = arrangement.timber1, arrangement.timber2
+    first_face = first.get_closest_oriented_long_face_from_global_direction(second.get_length_direction_global())
+    second_face = second.get_closest_oriented_long_face_from_global_direction(first.get_length_direction_global())
+    span = first.get_size_in_face_normal_axis(first_face.rotate_right())
+    thickness = (first.get_size_in_face_normal_axis(first_face) + second.get_size_in_face_normal_axis(second_face)) / 2
+    return cut_uniform_finger_corner_joint(arrangement, finger_count=_square_finger_count(span, thickness))
+
+
+def cut_basic_finger_splice_joint(
+    arrangement: SpliceJointTimberArrangement, *, splice_point: Optional[V3] = None,
+) -> Joint:
+    """Cut a tapered splice with fingers about one board thickness wide and twice that width long.
+
+    Measure finger width halfway along the overlap. Start from the specified front face,
+    or lay out across the wider section axis. splice_point sets the overlap center in world space.
+    """
+    first = arrangement.timber1
+    face = arrangement.front_face_on_timber1
+    if face is None:
+        face = TimberLongFace.RIGHT if first.size[0] > first.size[1] else TimberLongFace.FRONT
+        arrangement = replace(arrangement, front_face_on_timber1=face)
+    span = first.get_size_in_face_normal_axis(face)
+    count = _square_finger_count(span, first.get_size_in_face_normal_axis(face.rotate_right()))
+    return cut_uniform_finger_splice_joint(arrangement, finger_length=2 * span / count, finger_count=count,
+                                          splice_point=splice_point)
 
 
 def cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:

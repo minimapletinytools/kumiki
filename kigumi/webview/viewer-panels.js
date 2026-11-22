@@ -87,6 +87,10 @@ export class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
+                    <input id="timber-grain-toggle" type="checkbox" .checked=${this.app.renderTimberGrain}>
+                    ${t('viewer.options.renderTimberGrain')}
+                </label>
+                <label>
                     ${t('viewer.options.edges.label')}
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'noOverlay'}>
                         <option value="none">${t('viewer.options.edges.none')}</option>
@@ -220,6 +224,10 @@ export class ViewerSettingsPanel {
                     <input id="drawing-reference-features-toggle" type="checkbox" .checked=${this.app.showDrawingReferenceFeatures}>
                     ${t('viewer.options.drawingReferenceFeatures')}
                 </label>
+                <label>
+                    <input id="drawing-svg-face-toggle" type="checkbox" .checked=${this.app.tintSvgReferenceFaces}>
+                    ${t('viewer.options.tintSvgReferenceFaces')}
+                </label>
                 <button
                     id="debug-drawing-btn"
                     type="button"
@@ -318,6 +326,7 @@ export class ViewerSettingsPanel {
                 apply: (el) => app.setEdgeMode(el.value),
                 sync: (el) => { el.value = app.edgeMode || 'noOverlay'; },
             },
+            { id: 'timber-grain-toggle', on: 'change', apply: (el) => app.setRenderTimberGrain(el.checked) },
             { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
             { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
             ...this.app.footprintColorIds.map((colorId) => ({
@@ -347,6 +356,7 @@ export class ViewerSettingsPanel {
                 sync: (el) => { el.checked = app.showDrawingGhosts; },
             },
             ...[
+                ['drawing-svg-face-toggle', 'tintSvgReferenceFaces'],
                 ['drawing-perfect-faces-toggle', 'showDrawingPerfectFaces'],
                 ['drawing-centerplanes-toggle', 'showDrawingCenterplanes'],
                 ['drawing-reference-features-toggle', 'showDrawingReferenceFeatures'],

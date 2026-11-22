@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.9.7
+# Last checked on kumiki 0.9.8
 """
 Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
@@ -11,7 +11,7 @@ from typing import Optional
 from kumiki import Frame, Joint, Kiwari, create_v3, pattern
 from kumiki.construction import ButtJointTimberArrangement, CornerJointTimberArrangement
 from kumiki.kiwari import kiwari
-from kumiki.rule import feet, Orientation, inches, Transform, scalar, create_v2, degrees, Matrix, sqrt, atan
+from kumiki.rule import mm, feet, Orientation, inches, Transform, scalar, create_v2, degrees, Matrix, sqrt, atan
 from kumiki.timber import (
     Board, TimberEdge, TimberShortEdge, Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, create_timber,
@@ -22,6 +22,8 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_mortise_and_tenon_joint,
     cut_basic_round_mortise_and_tenon_joint,
     cut_basic_dovetail_corner_joint,
+    cut_basic_finger_corner_joint,
+    cut_basic_finger_splice_joint,
     cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers,
     cut_basic_practice_roundover_decoration,
     cut_basic_practice_rounded_end_decoration,
@@ -149,6 +151,30 @@ def example_basic_butt_joint(k: Optional[Kiwari]=None, *, position=None) -> Join
     joint = cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement)
 
     return joint
+
+
+FINGER_STOCK = kiwari(
+    width=kiwari.length(mm(84), minimum=mm(1)),
+    thickness=kiwari.length(mm(18), minimum=mm(1)),
+)
+
+
+@pattern("basic_joints/finger_corner_joint", name={"en": "Box corner", "ja": "あられ組み"}, kiwari=FINGER_STOCK)
+def basic_finger_corner(k: Optional[Kiwari] = None) -> Joint:
+    """Cut a box corner sized from the boards."""
+    k = FINGER_STOCK.resolve(k)
+    arrangement = create_canonical_example_right_angle_corner_joint_timbers(
+        timber_size=create_v2(k.length("width"), k.length("thickness")), timber_length=mm(115))
+    return cut_basic_finger_corner_joint(arrangement)
+
+
+@pattern("basic_joints/finger_splice_joint", name={"en": "Finger splice", "ja": "フィンガージョイント"}, kiwari=FINGER_STOCK)
+def basic_finger_splice(k: Optional[Kiwari] = None) -> Joint:
+    """Splice two boards with an overlap sized from the fingers."""
+    k = FINGER_STOCK.resolve(k)
+    arrangement = create_canonical_example_splice_joint_timbers(
+        timber_size=create_v2(k.length("thickness"), k.length("width")), timber_length=mm(100))
+    return cut_basic_finger_splice_joint(replace(arrangement, front_face_on_timber1=TimberLongFace.FRONT))
 
 
 @pattern("basic_joints/butt_splice_joint", name={"en": "Butt splice", "ja": "突き付け継ぎ"})

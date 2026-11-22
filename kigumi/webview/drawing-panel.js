@@ -189,16 +189,18 @@ class DrawingPanel {
         });
         header.appendChild(save);
 
-        const exportPng = document.createElement('button');
-        exportPng.type = 'button';
-        exportPng.className = 'dp-action';
-        exportPng.textContent = t('viewer.layers.drawing.exportPng');
-        exportPng.title = t('viewer.layers.drawing.exportPng.title');
-        exportPng.addEventListener('click', (event) => {
-            event.stopPropagation();
-            this._emit('kigumi-export-drawing-png', {});
-        });
-        header.appendChild(exportPng);
+        for (const [format, label] of [['svg', 'exportSvg'], ['png', 'exportPng']]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'dp-action';
+            button.textContent = t(`viewer.layers.drawing.${label}`);
+            button.title = t(`viewer.layers.drawing.${label}.title`);
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit(`kigumi-export-drawing-${format}`, {});
+            });
+            header.appendChild(button);
+        }
 
         return header;
     }

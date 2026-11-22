@@ -1087,11 +1087,77 @@ class Board(PerfectTimberWithin):
     # TODO: Add board-specific validation and methods
 
 
-# TODO finish
-#@dataclass(frozen=True)
-#class FauxTimber(PerfectTimberWithin):
-#    """proxy class allowing us to pretend rotate timbers to cut joints in in different orientations."""
-    
+@dataclass(frozen=True, init=False)
+class FauxTimber(Board):
+    """Present a perfect rectangular member to a joint with a different top and front.
+
+    Both faces are named on the original stock. Offsets passed to the cutter
+    are in the resulting axes. A shoulder cut spans the full faux cross-section.
+    """
+
+    original: Union[Timber, Board] = field(init=False, repr=False)
+    top: TimberFace = field(init=False)
+
+    def __init__(self, original: Union[Timber, Board], *, top: TimberFace, front: TimberFace):
+        if isinstance(original, FauxTimber) or not isinstance(original, (Board, Timber)) or not original.is_perfect_timber():
+            raise ValueError("FauxTimber requires a perfect rectangular board or timber")
+        if not top.is_perpendicular(front):
+            raise ValueError("The faux top and front must be perpendicular faces")
+
+        length = original.get_size_in_face_normal_axis(top)
+        right_axis = next(face for face in TimberFace if face.is_perpendicular(top) and face.is_perpendicular(front))
+        size = create_v2(original.get_size_in_face_normal_axis(right_axis), original.get_size_in_face_normal_axis(front))
+        direction = original.get_face_direction_global(top)
+        center = original.transform.local_to_global(create_v3(0, 0, original.length / 2))
+        transform = Transform(
+            position=center - direction * (length / 2),
+            orientation=Orientation.from_z_and_y(z_direction=direction, y_direction=original.get_face_direction_global(front)),
+        )
+        object.__setattr__(self, "original", original)
+        object.__setattr__(self, "top", top)
+        super().__init__(length, size, transform, replace(original.ticket, reference_features=()))
+
+    def can_be_extended_for_joints(self) -> bool:
+        """Return whether the faux length runs along the original grain and permits end extension."""
+        return self.top in (TimberFace.TOP, TimberFace.BOTTOM) and self.original.can_be_extended_for_joints()
+
+    def restore_joint(self, joint: 'Joint') -> 'Joint':
+        """Return the joint with every cutting on this view attached to the original member."""
+        if not any(cut.timber is self for cut in joint.cuttings.values()):
+            raise ValueError("The joint has no cutting on this FauxTimber")
+        return replace(joint, cuttings={
+            key: self._restore_cutting(cut) if cut.timber is self else cut
+            for key, cut in joint.cuttings.items()
+        })
+
+    def _restore_cutting(self, cut: 'Cutting') -> 'Cutting':
+        """Express waste and end trims in the original timber's axes."""
+        top = cut.maybe_top_end_cut_distance_from_bottom
+        bottom = cut.maybe_bottom_end_cut_distance_from_bottom
+        waste = cut.negative_csg
+        if self.top == TimberFace.BOTTOM:
+            top, bottom = (self.length - bottom if bottom is not None else None,
+                           self.length - top if top is not None else None)
+        elif self.top != TimberFace.TOP:
+            planes: List[CutCSG] = []
+            for sign, distance, face in ((1, top, self.top), (-1, bottom, self.top.get_opposite_face())):
+                if distance is None:
+                    continue
+                excess = distance - self.length if sign == 1 else -distance
+                if safe_compare(excess, 0, Comparison.GT):
+                    raise ValueError(f"Faux end cut needs {float(excess) * 1000:g} mm more stock on the side")
+                planes.append(HalfSpace(normal=create_v3(0, 0, sign), offset=sign * distance,
+                                        label=CutCSGLabel(f"{face.name.lower()}_side_trim")))
+            if planes:
+                pieces = ([waste] if waste is not None else []) + planes
+                waste = pieces[0] if len(pieces) == 1 else SolidUnion(pieces)
+            top = bottom = None
+
+        return replace(cut, timber=self.original,
+                       negative_csg=adopt_csg(self.transform, self.original.transform, waste) if waste is not None else None,
+                       maybe_top_end_cut_distance_from_bottom=top,
+                       maybe_bottom_end_cut_distance_from_bottom=bottom)
+
 
 # TODO consider renaming to Log LOL
 @dataclass(frozen=True)
