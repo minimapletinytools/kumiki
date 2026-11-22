@@ -6146,9 +6146,31 @@
         "ja": "\u30bf\u30a4\u30cb\u30fc\u30cf\u30a6\u30b9 120"
       },
       "warnings": []
+    },
+    "patterns/structures/wedged_tenon_bench.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "bench",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 52,
+          "name": "bench"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_wedged_tenon_bench",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/wedged_tenon_bench.py",
+      "sha256": "73fe870736a93005cb27685074bf82446d6bede9aa86edbf27f4d0b8a23b72e3",
+      "title": {
+        "en": "Wedged twin-tenon bench",
+        "ja": "\u6954\u7de0\u3081\u306e\u4e8c\u679a\u6798\u306e\u30d9\u30f3\u30c1"
+      },
+      "warnings": []
     }
   },
-  "generated_at": "2026-11-22T16:59:00.117260+00:00",
+  "generated_at": "2026-11-22T19:17:47.286379+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
