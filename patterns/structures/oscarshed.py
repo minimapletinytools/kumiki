@@ -66,27 +66,27 @@ def _boards_in_grooved_frame(
     height: Numeric,
     name: str,
 ) -> Joint:
-    """Return a joint filling an opening with vertical 1x6 boards set into a groove in `frame_timbers`.
+    """Return a joint filling an opening with horizontal 1x6 boards set into a groove in `frame_timbers`.
 
     `start` is the opening's bottom corner where the boards begin, on the boards' centre plane;
-    the boards run up from it and across along `width_direction` (unit, horizontal) for `width`.
-    Full boards fill the opening and the last is ripped to what is left.
+    the boards run along `width_direction` (unit, horizontal) for `width` and stack up for `height`.
+    Full boards stack from the bottom and the top one is ripped to what is left.
     """
     up = create_v3(scalar(0), scalar(0), scalar(1))
-    across = width + 2 * wall_board_groove_depth
-    full_boards = int(across // wall_board_width)
+    stack = height + 2 * wall_board_groove_depth
+    full_boards = int(stack // wall_board_width)
     widths = [wall_board_width] * full_boards
-    if across - full_boards * wall_board_width > 0:
-        widths.append(across - full_boards * wall_board_width)
+    if stack - full_boards * wall_board_width > 0:
+        widths.append(stack - full_boards * wall_board_width)
     boards = []
     offset = -wall_board_groove_depth
     for i, board_width in enumerate(widths, start=1):
         boards.append(Board(
-            length=height + 2 * wall_board_groove_depth,
+            length=width + 2 * wall_board_groove_depth,
             size=create_v2(board_width, wall_board_thickness),
             transform=Transform(
-                position=start + width_direction * (offset + board_width / scalar(2)) - up * wall_board_groove_depth,
-                orientation=Orientation.from_z_and_x(up, width_direction),
+                position=start + up * (offset + board_width / scalar(2)) - width_direction * wall_board_groove_depth,
+                orientation=Orientation.from_z_and_x(width_direction, up),
             ),
             ticket=BoardTicket(path=f"{name} {i}", tags=("board", "1x6")),
         ))
@@ -1086,7 +1086,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # ============================================================================
     # Fill the two sides and the three back bays with 1x6 boards set in grooves
     # ============================================================================
-    # Boards run vertically and sit in a groove cut into the frame around each opening.
+    # Boards run horizontally and sit in a groove cut into the frame around each opening.
     # The side posts and girts (x 3..7") only overlap the side mudsills (x 0..4") by 1",
     # so the side boards sit centred in that overlap. The back boards sit centred in the
     # back wall.
@@ -1259,7 +1259,7 @@ if __name__ == "__main__":
     print(f"  - Outside faces of outer rafters flush with ends of top plates")
     print(f"  - Stickout: 12 inches on both ends (symmetric)")
     print(f"  - Top plates have housed joints (rafter pockets) for each rafter")
-    print(f"Wall boards: 1x6 (3/4\" x 5-1/2\"), vertical, in 1/2\" grooves")
+    print(f"Wall boards: 1x6 (3/4\" x 5-1/2\"), horizontal, in 1/2\" grooves")
     print(f"  - Fill both sides and the three back bays; the last board in each is ripped to fit")
     print("="*60)
 
