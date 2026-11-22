@@ -294,7 +294,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
 
     Args:
         boards: Panel of boards to be fitted into the grooves.
-        frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges.
+        frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges. The function will do its best to guess which side the grooves go based on the relative position of the boards and frame timbers.
     """
     arrangement_check(boards.check_parallal_coplanar_and_same_thickness(), boards)
 
