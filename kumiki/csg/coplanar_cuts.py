@@ -100,7 +100,7 @@ def _sweep_into_neighbours(bodies: list[trimesh.Trimesh], convex: list[bool]) ->
 def _overlap(first: trimesh.Trimesh, second: trimesh.Trimesh) -> bool:
     """Return whether two closed meshes share any volume."""
     shared = trimesh.boolean.intersection([first, second], engine="manifold")
-    return len(shared.faces) > 0 and abs(shared.volume) > 1e-9 * min(first.volume, second.volume)
+    return len(shared.faces) > 0 and abs(_volume(shared)) > 1e-9 * min(_volume(first), _volume(second))
 
 
 def _depth_inside(points: np.ndarray, direction: np.ndarray, body: trimesh.Trimesh) -> float:
@@ -158,10 +158,16 @@ def _planes(mesh: trimesh.Trimesh) -> tuple[np.ndarray, np.ndarray]:
 
 def _is_convex(mesh: trimesh.Trimesh) -> bool:
     """Return whether a closed mesh has every vertex behind every face's plane."""
-    if len(mesh.faces) == 0 or not mesh.is_watertight or mesh.volume <= 0:
+    if len(mesh.faces) == 0 or not mesh.is_watertight or _volume(mesh) <= 0:
         return False
     normals, offsets = _planes(mesh)
     return bool((mesh.vertices @ normals.T - offsets <= _PLANE_GAP).all())
+
+
+def _volume(mesh: trimesh.Trimesh) -> float:
+    """Return a closed mesh's signed volume; 0 for a flat one."""
+    triangles = mesh.triangles
+    return float(np.einsum("ij,ij->i", triangles[:, 0], np.cross(triangles[:, 1], triangles[:, 2])).sum() / 6.0)
 
 
 def _diagonal(mesh: trimesh.Trimesh) -> float:
