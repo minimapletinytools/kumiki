@@ -56,13 +56,24 @@
     "github": "View on GitHub",
     "community": "Join the community",
     "also": "Kigumi {version} for <a href=\"{macArm}\">Mac (Apple silicon)</a>, <a href=\"{macIntel}\">Mac (Intel)</a> and <a href=\"{windows}\">Windows</a>, or as a <a href=\"{marketplace}\">VS Code extension</a>. Free and open source.",
-    "heroAlt": "A tiny house frame designed in Kumiki",
-    "titleBlock": {
-      "frame": "Frame",
-      "frameValue": "Tiny house",
-      "source": "Source",
-      "joints": "Joints",
-      "jointsValue": "Dovetails, mortise and tenon, laps"
+    "slideshow": {
+      "label": "Inside Kigumi",
+      "previous": "Previous screenshot",
+      "next": "Next screenshot",
+      "play": "Play slideshow",
+      "pause": "Pause slideshow",
+      "workspace": {
+        "caption": "Tiny house in Kigumi",
+        "alt": "A tiny-house frame in the 3D viewport, with the timber tree on the left and the agent panel on the right"
+      },
+      "joint": {
+        "caption": "Inside a wedged tenon",
+        "alt": "A transparent mortised timber reveals the tenon and its two wedges"
+      },
+      "drawing": {
+        "caption": "Crosspiece shop drawing",
+        "alt": "Kigumi shows dimensioned faces of a crosspiece alongside a 3D view of its tenon and peg hole"
+      }
     },
     "featuresTitle": "How it works",
     "featuresLabel": "What Kumiki does",
@@ -91,8 +102,8 @@
           "Layers, tags and per-member visibility for picking a frame apart",
           "X-ray and section views for reading a joint from the inside"
         ],
-        "imageAlt": "X-ray view of a double sawhorse, showing the joinery inside the timbers",
-        "secondAlt": "A coffee table frame rendered in the viewer"
+        "imageAlt": "A dovetailed sawhorse beside the Kigumi controls for its length, height and joinery",
+        "secondAlt": "X-ray view of a double sawhorse, showing the joinery inside the timbers"
       },
       "joinery": {
         "label": "Parametric joinery",

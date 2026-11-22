@@ -1,0 +1,160 @@
+---
+import { type Lang, strings } from '../i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = strings(lang).home.slideshow;
+const photos = import.meta.env.BASE_URL.replace(/\/$/, '') + '/photos/';
+const slides = [
+  { file: 'kigumi-tiny-house-workspace.webp', ...s.workspace },
+  { file: 'kigumi-wedged-tenon.webp', ...s.joint },
+  { file: 'kigumi-crosspiece-drawing.webp', ...s.drawing },
+];
+---
+<section class="slideshow" aria-label={s.label}>
+  <div class="slides" aria-live="off">
+    {slides.map(({ file, caption, alt }, i) => (
+      <figure hidden={i !== 0}>
+        <a href={photos + file}>
+          <img src={photos + file} alt={alt} width="1440" height="920"
+            loading={i === 0 ? 'eager' : 'lazy'} fetchpriority={i === 0 ? 'high' : 'auto'} />
+        </a>
+        <figcaption>
+          <span class="count">{i + 1} / {slides.length}</span>
+          {caption}
+        </figcaption>
+      </figure>
+    ))}
+  </div>
+  <div class="controls" hidden>
+    <button type="button" data-back aria-label={s.previous} title={s.previous}>‹</button>
+    <button type="button" data-play={s.play} data-pause={s.pause} aria-label={s.play} title={s.play}>
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path class="play" d="M4 2.5 13 8l-9 5.5z"/>
+        <path class="pause" d="M3 3h3.5v10H3zm6.5 0H13v10H9.5z"/>
+      </svg>
+    </button>
+    <button type="button" data-forward aria-label={s.next} title={s.next}>›</button>
+  </div>
+</section>
+
+<script>
+  const root = document.querySelector<HTMLElement>('.slideshow')!;
+  const slides = root.querySelector<HTMLElement>('.slides')!;
+  const frames = Array.from(slides.querySelectorAll('figure'));
+  const controls = root.querySelector<HTMLElement>('.controls')!;
+  const toggle = controls.querySelector<HTMLButtonElement>('[data-play]')!;
+  const motion = matchMedia('(prefers-reduced-motion: reduce)');
+  let current = 0;
+  let playing = !motion.matches;
+  let visible = false;
+  let hovered = false;
+  let timer: number;
+
+  function schedule() {
+    window.clearTimeout(timer);
+    if (playing && visible && !document.hidden && !hovered) {
+      timer = window.setTimeout(() => step(1), 7000);
+    }
+  }
+
+  function setPlaying(value: boolean) {
+    playing = value;
+    toggle.dataset.playing = String(value);
+    toggle.title = value ? toggle.dataset.pause! : toggle.dataset.play!;
+    toggle.setAttribute('aria-label', toggle.title);
+    slides.setAttribute('aria-live', value ? 'off' : 'polite');
+    schedule();
+  }
+
+  function step(delta: number) {
+    frames[current].hidden = true;
+    current = (current + delta + frames.length) % frames.length;
+    frames[current].hidden = false;
+    schedule();
+  }
+
+  function browse(delta: number) {
+    setPlaying(false);
+    step(delta);
+  }
+
+  controls.querySelector('[data-back]')!.addEventListener('click', () => browse(-1));
+  controls.querySelector('[data-forward]')!.addEventListener('click', () => browse(1));
+  toggle.addEventListener('click', () => {
+    hovered = false;
+    setPlaying(!playing);
+  });
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const onImage = slides.contains(document.activeElement);
+    browse(event.key === 'ArrowLeft' ? -1 : 1);
+    if (onImage) frames[current].querySelector('a')!.focus();
+  });
+  root.addEventListener('focusin', (event) => {
+    if ((event.target as Element).matches(':focus-visible')) setPlaying(false);
+  });
+  root.addEventListener('pointerenter', (event) => { hovered = event.pointerType === 'mouse'; schedule(); });
+  root.addEventListener('pointerleave', () => { hovered = false; schedule(); });
+  document.addEventListener('visibilitychange', schedule);
+  motion.addEventListener('change', () => { if (motion.matches) setPlaying(false); });
+  new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    schedule();
+  }, { threshold: 0.5 }).observe(root);
+
+  setPlaying(playing);
+  controls.hidden = false;
+</script>
+
+<style>
+  .slideshow {
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--sheet);
+  }
+  figure { margin: 0; }
+  figure a { display: block; cursor: zoom-in; }
+  figure a:focus-visible { outline-offset: -3px; }
+  img { width: 100%; height: auto; display: block; }
+  figcaption {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 3.25rem;
+    padding: 0.4rem 0.85rem;
+    border-top: 1px solid var(--rule-strong);
+    font-size: 0.9rem;
+  }
+  .slideshow:has(.controls:not([hidden])) figcaption { padding-right: 8.5rem; }
+  .count { white-space: nowrap; font: 0.75rem var(--mono, monospace); color: var(--ink-soft); }
+  .controls:not([hidden]) {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    height: 3.25rem;
+    display: flex;
+    align-items: center;
+    padding-inline: 0.25rem;
+  }
+  button {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: 1.5rem/1 var(--sans, sans-serif);
+    cursor: pointer;
+  }
+  button:hover, button:focus-visible { background: var(--accent-tint); }
+  svg { width: 0.9rem; fill: currentColor; }
+  .pause, [data-playing="true"] .play { display: none; }
+  [data-playing="true"] .pause { display: block; }
+</style>

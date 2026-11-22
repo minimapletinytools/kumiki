@@ -56,13 +56,24 @@
     "github": "GitHub で見る",
     "community": "コミュニティに参加",
     "also": "Kigumi {version}：<a href=\"{macArm}\">Mac（Apple シリコン）</a>、<a href=\"{macIntel}\">Mac（Intel）</a>、<a href=\"{windows}\">Windows</a>、または <a href=\"{marketplace}\">VS Code 拡張機能</a>。無料のオープンソースです。",
-    "heroAlt": "Kumiki で設計したタイニーハウスの架構",
-    "titleBlock": {
-      "frame": "架構",
-      "frameValue": "タイニーハウス",
-      "source": "ソース",
-      "joints": "継手・仕口",
-      "jointsValue": "蟻、枘、相欠き"
+    "slideshow": {
+      "label": "Kigumi の画面",
+      "previous": "前の画像",
+      "next": "次の画像",
+      "play": "スライドショーを再生",
+      "pause": "スライドショーを一時停止",
+      "workspace": {
+        "caption": "Kigumi で見るタイニーハウス",
+        "alt": "中央にタイニーハウスの立体架構、左に部材ツリー、右にエージェントパネルが並ぶ画面"
+      },
+      "joint": {
+        "caption": "楔締めの枘の内部",
+        "alt": "枘穴のある材を透過表示し、枘とそこに打ち込んだ2本の楔を見せた図"
+      },
+      "drawing": {
+        "caption": "横材の加工図",
+        "alt": "横材の各面に寸法を入れた図と、枘と栓穴が見える立体図を並べた Kigumi の画面"
+      }
     },
     "featuresTitle": "しくみ",
     "featuresLabel": "Kumiki でできること",
@@ -91,8 +102,8 @@
           "レイヤー、タグ、部材ごとの表示切り替えで架構を分解して見られる",
           "X 線表示と断面表示で継手を内側から読める"
         ],
-        "imageAlt": "二連の馬（作業台）の X 線表示。材の中の継手が見える",
-        "secondAlt": "ビューアで表示したコーヒーテーブルの架構"
+        "imageAlt": "蟻組みの馬（作業台）と、長さ、高さ、仕口を調整する Kigumi の設定欄",
+        "secondAlt": "二連の馬（作業台）の X 線表示。材の中の継手が見える"
       },
       "joinery": {
         "label": "パラメトリックな継手・仕口",
