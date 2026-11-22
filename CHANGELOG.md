@@ -9,6 +9,45 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kumiki 0.9.9 / kigumi 0.9.12] - 2026-11-21
+
+### kumiki
+
+#### Added
+- Finger joints: `cut_uniform_finger_corner_joint` / `cut_uniform_finger_splice_joint` for box corners and end splices, sized by finger count or width, and `cut_basic_finger_corner_joint` / `cut_basic_finger_splice_joint` sized from the board section.
+- `cut_dovetail_corner_joint` supports corners at any angle, not only square ones.
+- `FauxTimber`: cut joints on rectangular stock that has been reoriented.
+- Wedged mortise and tenons: a sized kerf with flared mortise walls, paired wedges (`paired_edge_inset`), how far a wedge stands proud (`wedge_extra_length`), and wedges that spread along the receiving timber's grain by default. New pattern: through wedged tenon.
+- SVG export of measured drawing sheets, keeping cylinders and arcs as true curves.
+- Generated drawings place their dimensions clear of the work and of each other.
+- A feature can prefer several measurement partners. Every dovetail's flanks are measured from its wide face.
+- Oscar's shed has 1x6 board walls on its sides and back.
+
+#### Changed
+- `measured_against(properties, *partners, datum=...)` takes any number of partners, and `datum` is keyword-only. `FeatureMarkingSpec.mark_relative_to` is a tuple.
+  - Migration: `measured_against(props, "shoulder", Datum.AVOID)` becomes `measured_against(props, "shoulder", datum=Datum.AVOID)`.
+
+#### Fixed
+- Cuts whose faces coincide with the timber's, or each other's, at an angle no longer leave thin slivers or flaps in the mesh (for example the angled dovetail corner).
+- A timber left open past its end cut is meshed only as far as the cut needs, not 100 m.
+- Restored timber end cuts are checked against the finished solid.
+
+### kigumi
+
+#### Added
+- Optional wood grain on timbers.
+- Export a measured drawing sheet as SVG; the viewer's drawing settings apply to the export.
+- Agent: a drawings tool lists a frame's drawings and opens one.
+
+#### Changed
+- Themes: Workshop (the new default, in the headless renderer's colours), Forest Mist, Dusk and Slate Night. Cream, Sky, Warm White, Linen, Bloom, Tide and Sunbeam are gone; a saved choice of one falls back to Workshop. Dropdowns and buttons in the options panel follow the theme.
+- The options panel is reorganized, and timbers' reference edges and adjacent faces can be highlighted.
+- Agent: `describe_panel` lists the panels; `list_panels` is gone.
+- Needs kumiki 0.9.9 or later.
+
+#### Fixed
+- Picking a face two cuts share near one cut's edge; a tilted drawing view springs back after a trackpad scroll or gizmo drag.
+
 ## [kumiki 0.9.8 / kigumi 0.9.11] - 2026-11-19
 
 ### kumiki
