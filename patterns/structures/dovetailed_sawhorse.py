@@ -48,11 +48,11 @@ SAWHORSE = kiwari(
     leg_distance=kiwari.length(inches(22), about="Centre to centre along the beam, where the legs meet its top"),
     leg_y_splay_angle=kiwari.angle(
         optional=True, about="How far the legs lean out toward the beam's ends. "
-                             "By default, atan of the leg's thickness over the beam's height"),
+                             "By default, the default leg_side_splay angle is used here too"),
     leg_side_splay=kiwari.ratio(
         optional=True, parts=("rise", "run"), minimum=1,
         about="How far the legs splay out to the side; the slope is determined by the rise and run, at least 1:1. "
-              "By default, the board thickness and beam height are used to determine this"),
+              "By default, the board thickness and beam height are used, so that the splay angle is  atan of the leg's thickness over the beam's height"),
     beam_size=kiwari.point2(create_v2(inches(2), inches(15, 4)), about="Across and tall"),
     leg_size=kiwari.point2(create_v2(inches(13, 2), inches(3, 4)), about="Width and thickness"),
     sawhorse_height=kiwari.length(inches(30), about="Floor to the top of the beam"),
