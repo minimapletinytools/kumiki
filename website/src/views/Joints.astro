@@ -20,7 +20,7 @@ const data = [
         jp: '枘差し / Hozo-sashi',
         fn: 'cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers',
         href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/#kumiki.joints.workshop.mixed.cut_mortise_and_tenon_joint',
-        drawing: { src: mortiseDrawing, alt: s.mortiseDrawing },
+        drawing: { src: mortiseDrawing, alt: s.mortiseDrawing, height: 856 },
       },
       {
         jp: '車知栓仕口 / Shachi-sen',
@@ -92,7 +92,7 @@ const data = [
         jp: '組手 / Kumite',
         fn: 'cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers',
         href: 'https://kumiki.build/docs/reference/joints/workshop/corner/#kumiki.joints.workshop.corner.cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers',
-        drawing: { src: bridleDrawing, alt: s.bridleDrawing },
+        drawing: { src: bridleDrawing, alt: s.bridleDrawing, height: 428 },
       },
       {
         jp: '渡り腮 / Watari-ago',
@@ -149,7 +149,7 @@ const categories = data.map((cat) => {
                   <code>{j.fn}</code>
                   {j.drawing && (
                     <a class="dimensioned-joint" href={j.drawing.src}>
-                      <img class="plate" src={j.drawing.src} alt={j.drawing.alt} width="1120" height="428" loading="lazy" />
+                      <img class="plate" src={j.drawing.src} alt={j.drawing.alt} width="1120" height={j.drawing.height} loading="lazy" />
                     </a>
                   )}
                 </li>

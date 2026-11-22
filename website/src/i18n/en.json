@@ -274,7 +274,7 @@
     "kicker": "Parametric joinery",
     "heading": "Traditional joints that recut themselves when the timbers change",
     "lead": "In Kumiki, a joint is a function of the timbers it connects—not a boolean box you draw by hand. Change a timber’s cross-section, move a post, or steepen a roof pitch, and every shoulder, housing, tenon, wedge and peg hole is recomputed from the geometry.",
-    "mortiseDrawing": "Tenon length and cross section beside an X-ray view showing mortise depth",
+    "mortiseDrawing": "An offset tenon on 4 × 5 in stock, with end and X-ray plan views showing tenon position, mortise depth, tip clearance, and peg position",
     "bridleDrawing": "Centered tongue thickness and the formula for one fork cheek",
     "categoriesLabel": "Joint categories",
     "categories": {

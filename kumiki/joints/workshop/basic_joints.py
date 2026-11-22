@@ -959,10 +959,10 @@ def cut_basic_mortise_and_tenon_joint(
     Start with 3/4 of the butt's in-plane size and 1/3 of the smaller transverse
     timber dimension; reduce both to fit the receiving face. The shoulder follows that entry face.
 
-    The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
-    The X-ray view shows the floor through the intact receiving timber.
+    The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
+    and round peg and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon length and cross section, with an X-ray view showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and tip clearance, and peg layout](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     from .mixed import cut_mortise_and_tenon_joint
     size, length, face = _basic_tenon_dimensions(arrangement)

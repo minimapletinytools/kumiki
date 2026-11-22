@@ -29,6 +29,7 @@ from kumiki.csg.cutcsg import (
     CylinderAxisFeature,
     Datum,
     PlaneFeature,
+    MidplaneFeature,
     FeatureOverride,
     FeatureProperties,
     measured_against,
@@ -383,10 +384,10 @@ def cut_mortise_and_tenon_joint(
     Flared walls run from the shoulder to mortise_depth, or through the receiver
     when depth is omitted.
 
-    The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
-    The X-ray view shows the floor through the intact receiving timber.
+    The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
+    and round peg and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon length and cross section, with an X-ray view showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and tip clearance, and peg layout](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
@@ -582,7 +583,11 @@ def cut_mortise_and_tenon_joint(
             transform=marking_space.transform,
             start_distance=-back_extension,
             end_distance=tenon_length,
-            extra_features=tuple(datum for layout in wedge_layouts.values() for datum in layout.kerf_datums),
+            extra_features=(
+                *(datum for layout in wedge_layouts.values() for datum in layout.kerf_datums),
+                MidplaneFeature("tenon_centerplane_left_right", between=("tenon_right", "tenon_left")),
+                MidplaneFeature("tenon_centerplane_front_back", between=("tenon_front", "tenon_back")),
+            ),
             feature_overrides=[
                 # Cheek to cheek is the tenon's thickness; tip to shoulder its length, and the tip
                 # is measured from nothing else.

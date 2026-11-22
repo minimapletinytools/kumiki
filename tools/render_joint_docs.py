@@ -1,17 +1,21 @@
 """Render the pilot joint reference figures. Run with python -m tools.render_joint_docs."""
 
+from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
 
-from kumiki import CutTimber, Frame, Measure
+from kumiki import CutTimber, Frame, Measure, PegShape, create_v2, mm
 from kumiki.csg.feature_paths import find_feature
 from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 from kumiki.drawings.svg import DrawingSolid, render_svg_view
-from kumiki.geometry import Plane
+from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+from kumiki.geometry import Line, Plane, intersect_line_plane, intersect_planes
+from kumiki.joints.workshop.basic_joints import _basic_peg, _basic_tenon_dimensions
+from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint
 from kumiki.rule import as_ndarray, format_length
-from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint, example_basic_tongue_and_fork_joint
+from patterns.basic_joints_patterns import example_basic_tongue_and_fork_joint
 
 
 OUT = Path(__file__).resolve().parents[1] / "docs/assets/joint-drawings"
@@ -20,11 +24,13 @@ WIDTH, HEIGHT = 560, 380
 FIELD_WIDTH = 0.34
 BACK_RIGHT = (1, 1, 1)
 FRONT_LEFT = (-1, -1, 1)
+TENON_END = (0, 1, 0)
+MORTISE_PLAN = (0, 0, 1)
 STOCK = ("timber (rough, extended)",)
 
 
-def face(cut, path, name):
-    """Return the named face on this pattern's cut timber."""
+def feature(cut, path, name):
+    """Return the named feature on this pattern's cut timber."""
     handle = find_feature(cut, path, name)
     if handle is None:
         raise ValueError(f"{cut.timber.ticket.path}: missing {path}/{name}")
@@ -62,6 +68,8 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
     """Draw the true edge length with witness lines offset in sheet pixels."""
     a, b = sorted((project(end) for end in ends), key=lambda pt: (round(pt[0], 4), -pt[1]))
     run = b - a
+    if np.linalg.norm(run) < 1e-6:
+        return
     along = run / np.linalg.norm(run)
     normal = np.array([along[1], -along[0]])
     group = ET.SubElement(view, 'g', fill='#244f6b', stroke='#244f6b')
@@ -79,27 +87,30 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
     if caption_at is not None:
         x, y = caption_at
         angle = 0
-        line((a + b) / 2 + offset * normal, np.array([x, y - 15]))
+        bar_center = (a + b) / 2 + offset * normal
+        line(bar_center, np.array([x, y + 5 if y < bar_center[1] else y - 15]))
     text = ET.SubElement(group, 'text', transform=f'translate({x:.2f} {y:.2f}) rotate({angle:.2f})',
                          attrib={'text-anchor': 'middle', 'font-size': '15', 'stroke': 'white',
                                  'stroke-width': '4', 'paint-order': 'stroke', 'stroke-linejoin': 'round'})
     text.text = measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
 
 
-def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False):
-    """Draw a cut member at a preset isometric angle with optional X-ray edges."""
+def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1)):
+    """Draw a cut member at a preset angle with optional X-ray edges."""
     transform = cut.timber.transform
     root = cut.render_timber_with_cuts_csg_local()
     solid = DrawingSolid(root, transform)
     toward = np.array(preset) / np.linalg.norm(preset)
-    right = np.cross([0, 0, 1], toward)
+    right = np.cross(up_hint, toward)
     right /= np.linalg.norm(right)
     up = np.cross(toward, right)
     camera = dict(center=center, right=right, up=up, width=FIELD_WIDTH, height=FIELD_WIDTH * HEIGHT / WIDTH)
     appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=0.28 if xray else 1, edgeOpacity=1, width=1.5)
     view = render_svg_view({title: solid}, set(), camera, WIDTH, HEIGHT, appearances={title: appearance},
                            edge_mode='xray' if xray else 'noOverlay')
-    view.attrib.update(x=str(slot * WIDTH), y='47', width=str(WIDTH), height=str(HEIGHT), overflow='hidden')
+    row, column = divmod(slot, 2)
+    top = row * (HEIGHT + 48)
+    view.attrib.update(x=str(column * WIDTH), y=str(top + 47), width=str(WIDTH), height=str(HEIGHT), overflow='hidden')
     sheet.append(view)
 
     def project(point):
@@ -107,12 +118,13 @@ def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xra
 
     for measure, offset, caption_at in dimensions:
         annotate(view, measure, dimension_edge(solid, measure, toward), project, offset, caption_at)
-    ET.SubElement(sheet, 'text', x=str(slot * WIDTH + 19), y='31', fill='#463a2c',
+    ET.SubElement(sheet, 'text', x=str(column * WIDTH + 19), y=str(top + 31), fill='#463a2c',
                   attrib={'font-size': '20', 'font-weight': '600'}).text = title
+    return view, project
 
 
-def sheet(title, description):
-    root = ET.Element('svg', xmlns='http://www.w3.org/2000/svg', viewBox=f'0 0 {2*WIDTH} {HEIGHT+48}',
+def sheet(title, description, rows=1):
+    root = ET.Element('svg', xmlns='http://www.w3.org/2000/svg', viewBox=f'0 0 {2*WIDTH} {rows*(HEIGHT+48)}',
                       attrib={'font-family': 'system-ui, sans-serif', 'role': 'img'})
     ET.SubElement(root, 'title').text = title
     ET.SubElement(root, 'desc').text = description
@@ -121,30 +133,131 @@ def sheet(title, description):
 
 
 def save(root, name):
-    ET.SubElement(root, 'path', d=f'M0 46H{2*WIDTH} M{WIDTH} 0v{HEIGHT+48}', stroke='#d1c8b8')
+    height = int(root.get('viewBox').split()[-1])
+    rules = []
+    for y in range(0, height, HEIGHT + 48):
+        if y:
+            rules.append(f'M0 {y}H{2*WIDTH}')
+        rules.append(f'M0 {y+46}H{2*WIDTH}')
+    rules.append(f'M{WIDTH} 0v{height}')
+    ET.SubElement(root, 'path', d=' '.join(rules), stroke='#d1c8b8')
     ET.indent(root)
     ET.ElementTree(root).write(OUT / name, encoding='utf-8', xml_declaration=True)
 
 
+def pegged_example():
+    """Offset the basic pattern's tenon and peg, leaving clearance behind the tip."""
+    arrangement = create_canonical_example_butt_joint_timbers()
+    size, length, entry_face = _basic_tenon_dimensions(arrangement)
+    arrangement, peg = _basic_peg(arrangement, size, length)
+    peg = replace(peg, shape=PegShape.ROUND, peg_positions=[(peg.peg_positions[0][0], mm(26))])
+    return cut_mortise_and_tenon_joint(
+        arrangement, tenon_size=size, tenon_length=length, tenon_position=create_v2(mm(20), mm(10)),
+        mortise_depth=length + mm(16), peg_parameters=peg, set_mortise_shoulder_parallel_to_face=entry_face,
+        mortise_shoulder_distance_from_centerline_or_centerplane=arrangement.receiving_timber.get_size_in_face_normal_axis(entry_face) / 2,
+    )
+
+
+def plane_of(handle):
+    """Return a named feature's world plane."""
+    plane = world_geometry(handle)
+    if not isinstance(plane, Plane):
+        raise ValueError(f"{handle.feature.name} must locate a plane")
+    return plane
+
+
+def crossing(axis, plane):
+    """Return the world point where a layout axis pierces a face."""
+    point = intersect_line_plane(axis, plane)
+    if point is None:
+        raise ValueError("The layout axis must cross the face")
+    return as_ndarray(point.position)
+
+
+def guide(view, project, a, b, color):
+    """Draw a dash-dot construction line through two points on the model."""
+    p, q = project(a), project(b)
+    ET.SubElement(view, 'line', x1=f'{p[0]:.2f}', y1=f'{p[1]:.2f}', x2=f'{q[0]:.2f}', y2=f'{q[1]:.2f}',
+                  stroke=color, attrib={'stroke-dasharray': '8 3 2 3', 'stroke-width': '1.4'})
+
+
 def mortise_and_tenon(joint):
+    """Draw the square-shouldered pilot with a round peg in tenon position space."""
     frame = Frame.from_joints([joint])
     cuts = {ct.timber.ticket.path: ct for ct in frame.cut_timbers}
     tenon, socket = cuts['butt_timber'], cuts['receiving_timber']
-    waste = ('tenon_waste',)
+
+    pegged = 'peg_0' in joint.jointAccessories
+    waste = ('tenon_cut', 'tenon_waste') if pegged else ('tenon_waste',)
+    mortise = ('mortise_cut', 'mortise_hole') if pegged else ('mortise_hole',)
 
     def cheek(name):
-        return face(tenon, (*waste, 'tenon'), 'tenon_' + name)
+        return feature(tenon, (*waste, 'tenon'), 'tenon_' + name)
 
-    root = sheet('Stopped mortise and tenon', 'Tenon dimensions in timber-local axes and an X-ray view of the stopped mortise.')
+    tip = cheek('top')
+    shoulder = feature(tenon, (*waste, 'shoulder'), 'shoulder')
+    floor = feature(socket, mortise, 'mortise_bottom')
+    sizes = [Measure(cheek(a), cheek(b), label=f'tenon_size[{i}]')
+             for i, (a, b) in enumerate((('right', 'left'), ('front', 'back')))]
+    tenon_size = [np.ptp(face_stations(size)[1]) for size in sizes]
+    root = sheet('Stopped mortise and tenon', 'End and plan views locate the tenon relative to the stock and show the assembled tip inside the mortise.', rows=2)
     panel(root, 0, 'Tenon', tenon, BACK_RIGHT, (0, -0.025, 0), [
-        (Measure(cheek('top'), face(tenon, (*waste, 'shoulder'), 'shoulder'), label='tenon_length'), 25, None),
-        (Measure(cheek('right'), cheek('left'), label='tenon_size[0]'), 26, (196, 338)),
-        (Measure(cheek('front'), cheek('back'), label='tenon_size[1]'), -76, None),
+        (Measure(tip, shoulder, label='tenon_length'), 56, None),
+        (sizes[0], 26, (196, 338)),
+        (sizes[1], -76, None),
     ])
     panel(root, 1, 'Mortise · X-ray', socket, FRONT_LEFT, (0.015, -0.01, 0), [
-        (Measure(face(socket, STOCK, 'rptw.front'), face(socket, ('mortise_hole',), 'mortise_bottom'),
-                 label='mortise_depth'), 34, None),
+        (Measure(shoulder, floor, label='mortise_depth'), 34, None),
     ], xray=True)
+
+    names = ('centerplane_left_right', 'centerplane_front_back')
+    stock_planes = [feature(tenon, STOCK, 'ptw.' + n) for n in names]
+    tenon_planes = [cheek(n) for n in names]
+    stock_axis = intersect_planes(*(plane_of(h) for h in stock_planes))
+    tenon_axis = intersect_planes(*(plane_of(h) for h in tenon_planes))
+    stock_center = crossing(stock_axis, plane_of(tip))
+    tenon_center = crossing(tenon_axis, plane_of(tip))
+    local_x, local_y = (as_ndarray(plane_of(h).normal) for h in tenon_planes)
+    view, project = panel(root, 2, 'Tenon position · end view', tenon, TENON_END, stock_center, [], up_hint=local_y)
+    for x, color, label in ((120, '#756a5a', 'Stock center'), (295, '#346979', 'Tenon center')):
+        ET.SubElement(view, 'line', x1=str(x), x2=str(x + 30), y1='343', y2='343', stroke=color,
+                      attrib={'stroke-dasharray': '8 3 2 3', 'stroke-width': '1.4'})
+        ET.SubElement(view, 'text', x=str(x + 36), y='348', fill=color, attrib={'font-size': '15'}).text = label
+    for i, direction in enumerate((local_x, local_y)):
+        for point, span, color in ((stock_center, tenon.timber.size, '#756a5a'),
+                                   (tenon_center, tenon_size, '#346979')):
+            radius = float(span[i]) / 2 + 0.008
+            guide(view, project, point - radius * direction, point + radius * direction, color)
+        foot = tenon_center - direction * ((tenon_center - stock_center) @ direction)
+        annotate(view, Measure(stock_planes[i], tenon_planes[i], label=f'tenon_position[{i}]'),
+                 [foot, tenon_center], project, (119, -90)[i], ((298, 30), (462, 230))[i])
+
+    title = 'Peg and tip clearance · mortise plan' if pegged else 'Tip clearance · mortise plan'
+    view, project = panel(root, 3, title, socket, MORTISE_PLAN, (0, 0, 0), [], xray=True, up_hint=(0, 1, 0))
+    mouth_point = crossing(tenon_axis, plane_of(shoulder))
+    tip_point = crossing(tenon_axis, plane_of(tip))
+    floor_point = crossing(tenon_axis, plane_of(floor))
+    half_width = tenon_size[1] / 2
+    guide(view, project, tip_point - local_y * half_width, tip_point + local_y * half_width, '#346979')
+    guide(view, project, mouth_point, floor_point, '#346979')
+    tip_left = project(tip_point - local_y * half_width)
+    ET.SubElement(view, 'text', x=f'{tip_left[0] - 8:.2f}', y=f'{tip_left[1] + 5:.2f}', fill='#346979',
+                  attrib={'text-anchor': 'end', 'font-size': '15'}).text = 'Tenon tip'
+    annotate(view, Measure(tip, floor, label='mortise_depth − tenon_length'), [tip_point, floor_point],
+             project, -108, (415, 50))
+
+    if not pegged:
+        return root
+    bore = feature(socket, ('mortise_cut', 'peg_hole_0'), 'peg_hole_axis')
+    bore_axis = world_geometry(bore)
+    if not isinstance(bore_axis, Line):
+        raise ValueError("The peg layout requires a round bore")
+    peg_point = crossing(bore_axis, plane_of(tenon_planes[0]))
+    lateral_offset = local_y * ((peg_point - mouth_point) @ local_y)
+    annotate(view, Measure(shoulder, bore, label='peg_positions[0][0]'),
+             [mouth_point + lateral_offset, peg_point], project, 163, (141, 345))
+    annotate(view, Measure(tenon_planes[1], bore, label='peg_positions[0][1]'),
+             [peg_point - lateral_offset, peg_point], project, -68, (348, 345))
     return root
 
 
@@ -154,11 +267,11 @@ def tongue_and_fork(joint):
     tongue, fork = cuts['timber1'], cuts['timber2']
 
     def cheek(name):
-        return face(tongue, ('tongue_waste', 'tongue'), 'tongue_' + name)
+        return feature(tongue, ('tongue_waste', 'tongue'), 'tongue_' + name)
 
-    upper = Measure(face(fork, ('fork_slot',), 'side.3'), face(fork, STOCK, 'rptw.right'),
+    upper = Measure(feature(fork, ('fork_slot',), 'side.3'), feature(fork, STOCK, 'rptw.right'),
                     label='(stock thickness − tongue_thickness) / 2')
-    lower = Measure(face(fork, ('fork_slot',), 'side.1'), face(fork, STOCK, 'rptw.left'))
+    lower = Measure(feature(fork, ('fork_slot',), 'side.1'), feature(fork, STOCK, 'rptw.left'))
     if not np.isclose(np.ptp(face_stations(upper)[1]), np.ptp(face_stations(lower)[1])):
         raise ValueError("The half-thickness formula requires a centered fork slot")
 
@@ -173,5 +286,5 @@ def tongue_and_fork(joint):
 
 
 if __name__ == '__main__':
-    save(mortise_and_tenon(example_basic_mortise_and_tenon_joint()), 'mortise-and-tenon.svg')
+    save(mortise_and_tenon(pegged_example()), 'mortise-and-tenon.svg')
     save(tongue_and_fork(example_basic_tongue_and_fork_joint()), 'tongue-and-fork.svg')
