@@ -56,6 +56,7 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
           </a>
           {tryKigumi && <a class="btn btn-secondary" href={`${base}/try/`}>{s.tryInBrowser}</a>}
         </div>
+        <a class="btn btn-secondary btn-sm github" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">{s.github}</a>
         <p class="also" set:html={fill(s.also, { version: kigumiVersion, ...appDownloads, marketplace })} />
       </div>
       <figure class="sheet">
@@ -66,6 +67,11 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
           <div><span>{s.titleBlock.joints}</span>{s.titleBlock.jointsValue}</div>
         </figcaption>
       </figure>
+      <p class="community">
+        {s.community}
+        <a href="https://discord.gg/cQhUG7WJ8" target="_blank" rel="noreferrer">Discord</a>
+        <a href="https://github.com/minimapletinytools/kumiki/discussions" target="_blank" rel="noreferrer">GitHub Discussions</a>
+      </p>
     </section>
   </div>
 
@@ -338,6 +344,20 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
   .hero h1:lang(ja) { max-width: 11em; }
   .tagline { margin-top: 1.4rem; font-size: 1.12rem; color: var(--ink-soft); max-width: 34rem; }
   .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+  .github { margin-top: 0.75rem; }
+  /* Spans both hero columns, under the render. */
+  .community {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 1.5rem;
+    margin: 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-soft);
+  }
+  .community a { font-weight: 500; }
   .also { margin-top: 1.1rem; font-size: 0.9rem; color: var(--ink-faint); max-width: 32rem; }
 
   /* The hero render as a drawing sheet, with a title block along the bottom. */
