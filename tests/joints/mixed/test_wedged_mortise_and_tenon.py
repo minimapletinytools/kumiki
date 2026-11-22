@@ -107,12 +107,38 @@ def test_wedge_and_peg_survive_the_same_joint(arrangement):
 
 
 @pytest.mark.parametrize("options", [
-    {"wedge_position": mm(12)}, {"wedge_length": mm(52)}, {"wedge_length": 0},
+    {"wedge_position": mm(18)}, {"wedge_length": mm(52)}, {"wedge_length": 0},
     {"tenon_kerf_size": mm(-1)}, {"wedge_angle": 0}, {"mortise_side_angle": degrees(90)},
+    {"wedge_extra_length": mm(-1)}, {"wedge_extra_length": float("nan")},
+    {"wedge_extra_length": float("inf")}, {"wedge_extra_length": mm(11)},
+    {"paired_edge_inset": 0}, {"paired_edge_inset": mm(18)}, {"paired_edge_inset": mm(17.99)},
+    {"paired_edge_inset": mm(5), "wedge_position": mm(1)},
 ])
 def test_invalid_wedge_dimensions(arrangement, options):
     with pytest.raises(ValueError):
         _cut(arrangement, WedgeParameters(**options))
+
+
+@pytest.mark.parametrize("roll", [0, 90])
+@pytest.mark.parametrize("length,extra,depth", [(30, 10, 50), (46, 0, 40), (30, 15, None)])
+def test_wedge_projection_and_default_spread(arrangement, roll, length, extra, depth):
+    timber = arrangement.butt_timber
+    rotation = Transform(create_v3(0, 0, 0), Orientation.from_angle_axis(degrees(roll), timber.get_length_direction_global()))
+    timber = replace(timber, transform=rotation * timber.transform)
+    arrangement = replace(arrangement, butt_timber=timber,
+                          front_face_on_butt_timber=TimberLongFace.FRONT if roll else TimberLongFace.RIGHT)
+    joint = _cut(arrangement, WedgeParameters(wedge_length=mm(length), wedge_extra_length=mm(extra), tenon_kerf_size=mm(2)),
+                 depth=None if depth is None else mm(depth))
+    wedge = joint.jointAccessories["wedge"]
+    assert isinstance(wedge, Wedge)
+    grain = arrangement.receiving_timber.get_length_direction_global()
+    assert abs(wedge.transform.local_to_global_direction(create_v3(1, 0, 0)).dot(grain)) == pytest.approx(1)
+    assert wedge.transform.position[1] == pytest.approx(mm(extra))
+    inserted = min(length, 40)
+    assert wedge.length == pytest.approx(mm(inserted + extra))
+    solid = _finished(joint, timber)
+    for y, wood in [(-inserted + .1, False), (-inserted - .1, True)]:
+        assert solid.contains_point(timber.transform.global_to_local(create_v3(0, mm(y), 0))) == wood
 
 
 def test_round_tenons_reject_a_wedge(arrangement):
@@ -120,6 +146,65 @@ def test_round_tenons_reject_a_wedge(arrangement):
         cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement, tenon_length=mm(40), tenon_width_relative_to_joint=mm(24),
             tenon_height_relative_to_joint=mm(24), wedge_parameters=WedgeParameters(), use_round_tenon=True)
+
+
+def test_blind_pattern_has_two_kerfs_and_two_bottomed_wedges():
+    from patterns.mixed.mortise_and_tenon_joints_patterns import blind_wedged_tenon
+
+    joint = blind_wedged_tenon()
+    timber = joint.cuttings["butt_timber"].timber
+    tenon = _finished(joint, timber)
+    assert set(joint.jointAccessories) == {"wedge_0", "wedge_1"}
+    for i, sign in enumerate((-1, 1)):
+        x = sign * mm(20 - 9.525)
+        wedge = joint.jointAccessories[f"wedge_{i}"]
+        assert isinstance(wedge, Wedge)
+        assert tuple(wedge.transform.position) == pytest.approx((x, mm(15), 0))
+        for y, wood in [(-25.1, True), (-24.9, False), (4.9, False)]:
+            assert tenon.contains_point(timber.transform.global_to_local(create_v3(x, mm(y), 0))) == wood
+        datum = timber.transform.global_to_local(create_v3(x, mm(-25), 0))
+        assert {f"kerf_center_{i}", f"kerf_root_{i}"} <= {hit.feature.name for hit in tenon.find_all_features(datum)}
+    assert tenon.contains_point(timber.transform.global_to_local(create_v3(0, 0, 0)))
+
+
+@pytest.mark.parametrize("angle_deg,flare_deg", [(10, 0), (30, 4), (35, 0), (35, 8)])
+def test_angled_blind_pattern_seats_both_wedges_in_the_cropped_pocket(angle_deg, flare_deg):
+    from patterns.mixed.mortise_and_tenon_joints_patterns import ANGLED_BLIND_WEDGE, angled_blind_wedged_tenon
+
+    angle, flare = degrees(angle_deg), degrees(flare_deg)
+    joint = angled_blind_wedged_tenon(ANGLED_BLIND_WEDGE.resolve({"approach_angle": angle, "mortise_side_angle": flare}))
+    receiver = joint.cuttings["receiving_timber"].timber
+    timber = joint.cuttings["butt_timber"].timber
+    tenon = _finished(joint, timber)
+    inward = -receiver.get_height_direction_global()
+    tangent = receiver.get_length_direction_global()
+    along = timber.get_length_direction_global()
+    entry = create_v3(0, -mm(40) / cos(angle), 0)
+    assert set(joint.jointAccessories) == {"wedge_0", "wedge_1"}
+    for i, sign in enumerate((-1, 1)):
+        wedge = joint.jointAccessories[f"wedge_{i}"]
+        assert isinstance(wedge, CSGAccessory)
+        head = wedge.transform.position
+        assert head[0] == pytest.approx(sign * mm(28 - 9.525))
+        depth = (head - entry).dot(inward)
+        end_gap = mm(28) / cos(angle) + depth * tan(flare) - (head - entry).dot(tangent)
+        assert min(mm(45) - depth, end_gap) == pytest.approx(0)
+        mesh = triangulate_cutcsg(wedge.get_csg_local()).mesh
+        assert mesh.is_watertight and mesh.volume > 0
+        for v in mesh.vertices:
+            p = wedge.transform.local_to_global(create_v3(*v)) - entry
+            assert p.dot(inward) <= mm(45.001)
+            assert abs(p.dot(tangent)) <= mm(28) / cos(angle) + p.dot(inward) * tan(flare) + mm(.001)
+
+        # Intersect a line beside the kerf with both pocket stops independently.
+        offset = create_v3(head[0] + mm(2), 0, 0)
+        end_normal = tangent - tan(flare) * inward
+        floor_station = (mm(45) - offset.dot(inward)) / along.dot(inward)
+        end_station = (mm(28) / cos(angle) - offset.dot(end_normal)) / along.dot(end_normal)
+        tip = entry + offset + along * (min(floor_station, end_station) - mm(10))
+        for delta, wood in [(-.1, True), (.1, False)]:
+            assert tenon.contains_point(timber.transform.global_to_local(tip + along * mm(delta))) == wood
+        assert not tenon.contains_point(timber.transform.global_to_local(head - along * mm(11)))
 
 
 def test_oblique_mortise_walls_pivot_on_the_shoulder(arrangement):

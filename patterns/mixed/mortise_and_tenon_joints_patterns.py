@@ -665,7 +665,8 @@ def example_board_edge_tenon(k: Optional[Kiwari] = None) -> Joint:
 
 BLIND_WEDGE = kiwari(
     orientation=kiwari.choice(WedgeOrientation, WedgeOrientation.SPREAD_Y),
-    position=kiwari.length(mm(4)), kerf_size=kiwari.length(mm(2), minimum=0),
+    edge_inset=kiwari.length(inches(3, 8), about="Distance from each tenon cheek to its kerf centerline"),
+    kerf_size=kiwari.length(mm(2), minimum=0),
     wedge_length=kiwari.length(mm(30), optional=True), wedge_angle=kiwari.angle(degrees(8)),
     mortise_side_angle=kiwari.angle(degrees(5)),
 )
@@ -677,12 +678,73 @@ def blind_wedged_tenon(k: Optional[Kiwari] = None) -> Joint:
     k = BLIND_WEDGE.resolve(k)
     arrangement = create_canonical_example_butt_joint_timbers(timber_size=create_v2(mm(54), mm(70)),
                                                               timber_length=mm(150))
+    tenon_length = mm(40)
+    extra_depth = mm(10)
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement, tenon_width_relative_to_joint=mm(40), tenon_height_relative_to_joint=mm(25),
-        tenon_length=mm(40), mortise_depth=mm(50),
+        tenon_length=tenon_length, mortise_depth=tenon_length + extra_depth,
         wedge_parameters=WedgeParameters(
-            wedge_orientation=k.choice("orientation"), wedge_position=k.length("position"),
-            wedge_angle=k.angle("wedge_angle"), wedge_length=k.length("wedge_length"),
+            wedge_orientation=k.choice("orientation"), paired_edge_inset=k.length("edge_inset"),
+            wedge_angle=k.angle("wedge_angle"), wedge_length=k.length("wedge_length"), wedge_extra_length=extra_depth,
             tenon_kerf_size=k.length("kerf_size"), mortise_side_angle=k.angle("mortise_side_angle"),
+        ),
+    )
+
+
+THROUGH_WEDGE = kiwari(
+    stickout=kiwari.length(mm(6), minimum=0, maximum=mm(20)),
+    wedge_length=kiwari.length(mm(35), minimum=mm(15), maximum=mm(55)),
+    orientation=kiwari.choice(WedgeOrientation, WedgeOrientation.SPREAD_Y),
+)
+
+
+@pattern("mixed/mortise_and_tenon/through_wedged", name={"en": "Through wedged tenon", "ja": "楔締めの通し枘"}, kiwari=THROUGH_WEDGE)
+def through_wedged_tenon(k: Optional[Kiwari] = None) -> Joint:
+    """Seat a centered wedge in the exposed end of a through tenon."""
+    k = THROUGH_WEDGE.resolve(k)
+    stock_size = create_v2(mm(54), mm(70))
+    arrangement = create_canonical_example_butt_joint_timbers(timber_size=stock_size, timber_length=mm(220))
+    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement, tenon_width_relative_to_joint=mm(40), tenon_height_relative_to_joint=mm(32),
+        tenon_length=stock_size[1] + k.length("stickout"), mortise_depth=None,
+        wedge_parameters=WedgeParameters(
+            wedge_orientation=k.choice("orientation"), wedge_length=k.length("wedge_length"),
+            wedge_angle=degrees(8), tenon_kerf_size=mm(2), mortise_side_angle=degrees(2),
+        ),
+    )
+
+
+ANGLED_BLIND_WEDGE = kiwari(
+    edge_inset=kiwari.length(inches(3, 8), about="Distance from each tenon cheek to its kerf centerline"),
+    approach_angle=kiwari.angle(degrees(30), minimum=degrees(10), maximum=degrees(35),
+                               about="Angle between the tenon and the receiving face normal"),
+    mortise_side_angle=kiwari.angle(degrees(4), minimum=0, maximum=degrees(8)),
+)
+
+
+@pattern("mixed/mortise_and_tenon/angled_blind_wedged",
+         name={"en": "Angled blind wedged tenon", "ja": "斜めの地獄枘"}, kiwari=ANGLED_BLIND_WEDGE)
+def angled_blind_wedged_tenon(k: Optional[Kiwari] = None) -> Joint:
+    """Fit an oblique tenon into a flared blind mortise bored square to the receiving face."""
+    k = ANGLED_BLIND_WEDGE.resolve(k)
+    arrangement = create_canonical_example_butt_joint_timbers(timber_size=create_v2(mm(60), mm(80)),
+                                                              timber_length=mm(220))
+    angle = k.angle("approach_angle")
+    rotation = Transform(create_v3(0, 0, 0), Orientation.from_angle_axis(angle, create_v3(0, 0, 1)))
+    receiver = arrangement.receiving_timber
+    arrangement = replace(arrangement, receiving_timber=replace(receiver, transform=rotation * receiver.transform))
+    mortise_depth = mm(45)
+    extra_depth = mm(10)
+    tenon_width = mm(56)
+    # Start with stock reaching the far corner, then crop each cheek to the oblique pocket.
+    tenon_length = mortise_depth / cos(angle) + tenon_width / 2 * tan(angle)
+    return cut_mortise_and_tenon_joint(
+        arrangement, tenon_size=create_v2(mm(24), tenon_width), tenon_length=tenon_length, mortise_depth=mortise_depth,
+        set_mortise_shoulder_parallel_to_face=TimberLongFace.FRONT,
+        mortise_shoulder_distance_from_centerline_or_centerplane=receiver.size[1] / 2,
+        bore_mortise_perpendicular_to_face=True,
+        wedge_parameters=WedgeParameters(
+            paired_edge_inset=k.length("edge_inset"), wedge_length=mm(18), wedge_extra_length=extra_depth,
+            wedge_angle=degrees(8), tenon_kerf_size=mm(2), mortise_side_angle=k.angle("mortise_side_angle"),
         ),
     )
