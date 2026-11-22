@@ -7,7 +7,7 @@ engine then leaves a sliver between them. Both steps here enlarge a cutter only 
 removed anyway, so base - cutters is the same solid:
 
 - a cutter face lying in a face of the convex base is swept straight out past the base;
-- a cutter face lying against a face of another convex cutter is swept partway into that cutter.
+- a cutter face lying against a face of a convex cutter is swept partway into that cutter.
 
 A plane tolerance decides which faces coincide; it never moves geometry by that amount.
 Turn it off with `triangles.TRIANGLES_DETACH_COPLANAR_CUTS`.
@@ -39,8 +39,9 @@ def detach_coplanar_cuts(base: trimesh.Trimesh, cutters: Sequence[trimesh.Trimes
     reach = _diagonal(base) + max((_diagonal(cutter) for cutter in cutters if len(cutter.faces)), default=0.0)
     bodies = [body for cutter in cutters for body in _bodies(cutter)]
     convex = [_is_convex(body) for body in bodies]
-    bodies = [_sweep_out_of(base, body, reach) if is_convex else body for body, is_convex in zip(bodies, convex)]
-    return _sweep_into_neighbours(bodies, convex)
+    # Into neighbours first: a body swept out past the base no longer fits inside its neighbours.
+    bodies = _sweep_into_neighbours(bodies, convex)
+    return [_sweep_out_of(base, body, reach) if is_convex else body for body, is_convex in zip(bodies, convex)]
 
 
 def _bodies(cutter: trimesh.Trimesh) -> list[trimesh.Trimesh]:
@@ -68,10 +69,14 @@ def _sweep_out_of(base: trimesh.Trimesh, cutter: trimesh.Trimesh, reach: float) 
 
 
 def _sweep_into_neighbours(bodies: list[trimesh.Trimesh], convex: list[bool]) -> list[trimesh.Trimesh]:
-    """Sweep each face of a convex body lying against another convex body partway into it."""
+    """Sweep each face of a body lying against a convex body partway into it.
+
+    A body that is not convex is swept only into a neighbour it touches without overlapping, so the
+    swept part cannot run into the rest of it.
+    """
     for i in range(len(bodies)):
         for j in range(len(bodies)):
-            if i == j or not (convex[i] and convex[j]):
+            if i == j or not convex[j] or not bodies[i].is_watertight:
                 continue
             for _ in range(len(bodies[j].faces) + 1):
                 normals, offsets = _planes(bodies[i])
@@ -83,13 +88,19 @@ def _sweep_into_neighbours(bodies: list[trimesh.Trimesh], convex: list[bool]) ->
                     patch = _patch(normals, offsets, int(face))
                     points = bodies[i].vertices[np.unique(bodies[i].faces[patch])]
                     depth = _NEIGHBOUR_DEPTH_SHARE * _depth_inside(points, normals[face], bodies[j])
-                    if depth > 1e3 * _PLANE_GAP:
+                    if depth > 1e3 * _PLANE_GAP and (convex[i] or not _overlap(bodies[i], bodies[j])):
                         bodies[i] = _sweep(bodies[i], patch, normals[face], depth)
                         swept = True
                         break
                 if not swept:
                     break
     return bodies
+
+
+def _overlap(first: trimesh.Trimesh, second: trimesh.Trimesh) -> bool:
+    """Return whether two closed meshes share any volume."""
+    shared = trimesh.boolean.intersection([first, second], engine="manifold")
+    return len(shared.faces) > 0 and abs(shared.volume) > 1e-9 * min(first.volume, second.volume)
 
 
 def _depth_inside(points: np.ndarray, direction: np.ndarray, body: trimesh.Trimesh) -> float:
@@ -146,11 +157,11 @@ def _planes(mesh: trimesh.Trimesh) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _is_convex(mesh: trimesh.Trimesh) -> bool:
-    """Return whether a closed mesh fills its own convex hull."""
-    if len(mesh.faces) == 0 or not mesh.is_watertight:
+    """Return whether a closed mesh has every vertex behind every face's plane."""
+    if len(mesh.faces) == 0 or not mesh.is_watertight or mesh.volume <= 0:
         return False
-    hull = mesh.convex_hull.volume
-    return hull > 0 and abs(hull - mesh.volume) <= 1e-9 * hull
+    normals, offsets = _planes(mesh)
+    return bool((mesh.vertices @ normals.T - offsets <= _PLANE_GAP).all())
 
 
 def _diagonal(mesh: trimesh.Trimesh) -> float:

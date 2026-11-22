@@ -8,7 +8,7 @@ model and trimesh. All SymPy-to-float conversion happens here.
 from __future__ import annotations
 
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -37,6 +37,8 @@ from ..user_warnings import warn_user
 TRIANGLES_FLOAT_DIGITS = 8
 # Before a difference, move cutter faces off the faces they coincide with (see coplanar_cuts).
 TRIANGLES_DETACH_COPLANAR_CUTS = True
+# Mesh a timber left open at an end only as far as its end cut needs (see _end_at_end_cuts).
+TRIANGLES_END_OPEN_BASE_AT_END_CUTS = True
 # A half space or open-ended prism is meshed as a box sized to the solid it cuts (see _Reach):
 # manifold's tolerance grows with a solid's size, so one big box loses fine cuts.
 # This size is only for one meshed with nothing to cut.
@@ -254,8 +256,61 @@ def _mesh_difference(csg: Difference) -> TriangleMesh:
             vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64)
         )
         return TriangleMesh(mesh=empty, face_sources=tuple())
-    base = triangulate_cutcsg(csg.base).mesh
+    base_csg = csg.base
+    if TRIANGLES_END_OPEN_BASE_AT_END_CUTS and isinstance(base_csg, RectangularPrism):
+        base_csg = _end_at_end_cuts(base_csg, csg.subtract)
+    base = triangulate_cutcsg(base_csg).mesh
     return _within(_reach_of(base), _mesh_difference_cuts, csg, base)
+
+
+def _end_at_end_cuts(prism: RectangularPrism, cuts: Sequence[CutCSG]) -> RectangularPrism:
+    """Return `prism` with each open end closed past the half space in `cuts` that removes it.
+
+    Ad hoc fix for one issue: a timber with an end cut is modelled running to infinity at that end,
+    so without this its mesh is 100 m long, every cutter is sized to match, and the booleans lose
+    precision at that scale. A better fix would bound the timber in the model itself.
+    Nothing past the end cut survives, so the closed prism leaves the same solid. Ends with no
+    such half space stay open.
+    """
+    if prism.start_distance is not None and prism.end_distance is not None:
+        return prism
+    matrix = _transform_to_numpy(prism.transform)
+    origin, axis = matrix[:3, 3], matrix[:3, 2]
+    half_x, half_y = _numeric_to_float(prism.size[0]) / 2.0, _numeric_to_float(prism.size[1]) / 2.0
+    edges = [origin + sx * half_x * matrix[:3, 0] + sy * half_y * matrix[:3, 1]
+             for sx in (-1, 1) for sy in (-1, 1)]
+    # The cap sits this far past the end cut, so it never touches the cut plane.
+    clearance = float(np.hypot(half_x, half_y))
+    top: Optional[float] = None
+    bottom: Optional[float] = None
+    for cut in _half_spaces(cuts):
+        normal = _vector3_to_numpy(cut.normal)
+        rate = float(normal @ axis)
+        if abs(rate) <= TRIANGLES_RAY_EPSILON:
+            continue
+        # Where the cut plane crosses each long edge, as a distance along the axis.
+        crossings = [(_numeric_to_float(cut.offset) - float(normal @ point)) / rate for point in edges]
+        if rate > 0:
+            top = min(top, max(crossings)) if top is not None else max(crossings)
+        else:
+            bottom = max(bottom, min(crossings)) if bottom is not None else min(crossings)
+    start, end = prism.start_distance, prism.end_distance
+    if start is None and bottom is not None and (end is None or bottom < _numeric_to_float(end)):
+        start = bottom - clearance
+    if end is None and top is not None and (start is None or top > _numeric_to_float(start)):
+        end = top + clearance
+    if start is prism.start_distance and end is prism.end_distance:
+        return prism
+    return replace(prism, start_distance=start, end_distance=end)
+
+
+def _half_spaces(cuts: Sequence[CutCSG]) -> Iterable[HalfSpace]:
+    """Yield the half spaces in `cuts`, looking inside unions."""
+    for cut in cuts:
+        if isinstance(cut, HalfSpace):
+            yield cut
+        elif isinstance(cut, SolidUnion):
+            yield from _half_spaces(cut.children)
 
 
 def _mesh_difference_cuts(csg: Difference, base: trimesh.Trimesh) -> TriangleMesh:
