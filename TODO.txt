@@ -1,119 +1,3 @@
-:: 11/18/2026 mobile
-
-portrait mode only, 3d view takes up most the space
-
-1 menu button at the top, it shows you the frame name, kiwari pop up if there is kiwari, options popup,  list of drawings,
-
-if you opne ad rowing then the menu button at the otop just bocems a back to 3d button.
-
-1 menu button at the top right, which shows a  list of frames in your porjec t(shows "..more" button if there are more than 5 frames, which opens a pop up), a button to open example frames, a button to open patterns, ifnalyl an option to cclose the frame
-
-if no frame is ope,n it shows the project frames, and the close project/new project stuff if no project is open.
-
-only 1 file open at once
-if you open a read only file/pattern, it just has a big "back" button next to the menu button to go back to your last open file.
-measuring not support, but viewing measurements is
-no timber list
-no source view
-
-
-Agent chat is at the bottom, normally it's just a box to tye, but if you cilck on it, then it expands a bit (not all theway so youc an stll cilck above it to shirkn it)
-
-
-:: 11/18/2026
-
- rice dumpling joint or Zongjiao Joint (粽角榫)
-
- cut_rice_dumping_joint(arrangement: TriCornerArrangement, timber1_miter_thickness, timber_1_tenon_distance_from_outer_faces, timber_2_tenon_distance_from_outer_face, tenon_size)
-
-assert face aligned
-assert that all timebrs share an outside edge that meets at a point
-
-tenon size is (X,Y) where Y is measured in the perpendicular axis to the outer face of the timber it is on and it is  closest to
-
-:: 11/18/2026
-FAIL  DOES NOT ASSEMBLY
-(alias cut_mitsudomoe_joint)
-def cut_rock_paper_scissor_joint_on_face_aligned_timbers(arrangement: TriCornerArrangement, tenon_position_from_outside, tenon_width, tenon_height, tenon_length, mortise_extra_depth)
-
-assert face aligned
-assert that all timebrs share an outside edge that meets at a point
-
-there are 3 timbers, start from timber 1, p
-measure tenon_position_from_outside edge of first timber towards the second timber, then go tenon_width further, and the ntenon_height inwards and then extrude by tenon_length to create the tenon, the mortise is similar except extendn by mortise_extra_depth and cut into timber 2, repeat 2-3 and 3-1
-
-cut the 3 way miters in the corner
-
--o the fidnal joint is timber MINUS (miter half plane PLUS mortise MINUS tenon )
-
-the maybe end cuts is just the corner point for all 3 timbers
-
-:: 11/15/2026 sharing spec
-
-we want to add cloud accounts and sharing as per usual edit/comment/view permission type sharing. You can share indiivdual files or groups of files.
-
-We will add a new "Shared" section to the file browser, which shows up as either a new tree or new section in the tree view. Nothing shows upin the file browser portion of the tree view (actually we might turn that into a separate collapsible row panel)
-
-you can share individual files or entire project workspaces
-shared frames have a "copy to project workspace" button, if you have no project open, it will pop up and offer you to create a new project or say you must open a project to copy. 
-
-ok that's basically the final version of what I want, but for now I want a simplified version:
-
-a publicable shareable URL version with no owners. So you can right click on your frame and click "share publicly" it gives a pop up to confirm you want to dot hat and if you do share it it gives you a URL
-
-opening the URL opens kumiki and opens the shared frame in red only mode. you can view shared frames even when you have no project oppen. acutalyl as part of that, you sshould be able to view structures and patterns in the latest version of kumiki in the no project open state as well. this hides the center view no project open screen so we need make suer the agent tells the user that they have no project oepen when they try to create new projects or indicate  somewhere in the sidebar that you need to create a new porject to edit frames.
-
-you can also paste the URL soemwhere in the webb app standalone viewer to add it to the saherd section / open it.
-
-what changes are needed to implement this in a way that's forward compatible with the full sharing thing we want
-
-
-:: 11/12/2026
-
-Lets do a big refactor on all the patterns and joints
-
-1. go through all the joints and review their doc strings. Look for missing information and places to make them more consistent.
-DO NOT modify anything that was clearyl written by my and not by an agent without discussing with me first and only if what I wrote is INCORRECT
-we are willing to tolerate some missing information since the source is always avalible.
-
-2. make sure every joint has a cut_basic variation
-
-3. update the joint list in api_cheat_sheet. reformat the joint table so that it has the full signature of the cut basic variation as its first collumn, and then the second column should have a BRIEf description of when to use the joint. Keep it simple or omit it. You can ask me for my opinion too
-
-4. do the mega pattern update. Patterns are intended for 2 purposes, as a source reference for the agent, and as a visual reference for humans who want to see what a joint looks like and how it can be configured.
-
-- do not use combined folder / example + variants, only do plain folders and variants
-- the folder structure should match the joint folder structure, except joints with many variants get their own folders.
-- basic joints get their own exmaples organized under basic joints (we already have this, but not every basic joint has a pattern)
-- when do decide to create multiple variants vs using kiwari
-  - prefere kiwari for: size, position, notching, peg shape, 
-  - use multilpe variants for different timber configuration angles, face/plane aligned and other variants, configuration that would be considered different joint, ege half blidn vs plain dovetail, through mortise vs stopped mortise, angled mortise and tenon vs 90 degree morntise and tenon, configuration that would be confusing to describe with kiwari, ask me if you are uncertain.
-- not seevral patterns I created were for development purposes only so don't be afraid to delete them
-- if there was a face/plan aligned variant of the method, then make the pattern angled, otherwise just keep everything axis aligend and face aligned.
--udpate agent authoring instructions on the format for pattern
-
-
-
-----
-example mega refactor
-
-    -list examples in cheatsheet
-    -move onlypoop into hidden structures or move hidden structers into only poop
-    -multiple frames can be non-hidden, but make the structure in there nicer.
-    -do a comment pass on the frames, add preamble to each one explaining what its for 
-    -add section on each frame file explaining what concepts it demonstrates well, both in simple and broad detail, some examples:
-      -standard "timber frame structure" shape
-      -non-square construction
-      -simple example
-      -face aligned and axis aligned construction
-      -angled braces
-      -rafters (differentiate by style)
-      -small structure
-      -medium structure
-      -kiwari parameters (and what sort of stuff gets parameterized, e.g. structural, or sizing)
-      -furniture
-      -saw horse
-    -udpate agent authoring instructions on the format for examples
 
 :: 11/11/2026
 screw joints
@@ -134,87 +18,44 @@ how to do therad CSG hehe?? probably just smiluate it?or add spiral but don't al
 build me a monitor stand, it should have a 6x10 inch base that's 1.75 inches thick, it should have a vertical post in the middle back of the base to hold the mointor up. dovetailed to the top of the post should be a wooden block that matches VESA mounting dimensions.
 
 
-
-:: 11/09/2026 new video script
-
-In this video I'll walk you through how to install and use the latest verison of kumiki.
-
-Kumiki is a programmatic CAD tool for timber framing and woodworking. 
-
-What that means is designs are written as programs which allows better parameteriaztion, mroe flexibility, and of course agents write code much better than can use programs which is what many existing CAD programs do to enable agentic functions.
-
-kumiki is contains dozens of joints wit more being added later, and the latest version introduces support for genrating plans and drawings as well. 
-
-Kumiki work stogether with the kigumi viewer app, and the new version ships as an easy to install standalone app. Go to the release page and download the latest version for your OS.
-
-Install the app and open it. For agentic programming, you'll want to connect your AI agent. I'll go ahead and use the Claude app for this and I'll show the setup in 2 different ways.
-
-For the easy setup, open kigumi options > enable the MCP server for agents, and click the URL and token copy button
-
-In claude, open a new coding session. Make sure the coding session is NOT a cloud session.
-
-Then ask the agent "pls connect to the MCP <paste>"
-
-once connected ask the agent to create a new project and you'll be off to the races.
-
-So what's happening under the hood is that kigumi works with project worskpaces on your computer--afolder containing all your project files. You can create this folder yourself and open it in kigumi ( file > open folder) and you can open the same project in your claude coding session.
-
-Regardless, you'll still want to connect to the MCP as it exposes additional agentic automation functionality.
-
-Once you're set up, you can now prompt the agent to make a project.  The latest models have gotten really good with 3d reasoning and will actually do pretty good with a vague prompt. So let's go ahead and try that
-
-"build me birdhouse, it should have 5 sides held together with dovetail joints. the bottom should be held in with grooves, have a single slanted roof held onto the side picees with mortise and tenon joints"
-
-(text only: please let me know in the comments about the joinery crime I just committed here)
-
-the results are pretty good. To be fair, you miht be acused of AI slop if you post this as is online. Teh AI Agent still isn' tamaving at woodworking and even less so with timebr framing, so you'll likely get better results if you walk your agent through one member at a time. 
-
-Making odification is easy. For eaxmple, I'll select one of the faces and ask the agent to make just my selected face largere. The agent will know which face is selected if you connected the kigumi MCP. if not, you can hit this copy for AI button instead and psate it into your prompt.
-
-
-
-
-
-:: 11/08/2026 wood kanji prompt
-
 create a new structure, this should be of the "wood" kanji character. the verlctical0 stroke isa 4x4, the two horizontal beams are 4x5s (so slightly wider in vertical axkis) and the 2 side strokes should be 4x4s. join the side storkes to the center with morties and tenon joints with 1 round peg, join the horizontal beams (2 of them) with a double butt joint using square pegs. then see if you can make a decortaive cut on the strokes to give them a curved appearance on the top side of them.
 
 
 :: 11/3/2026 dovetail sawhores video script (actually the non-kumiki one)
 
-In this video I'll show you how to make this dovetail sawhorse designed by _____
+In this video I'll show you how to make this dovetail sawhorse designed by Paul Discoe
 
-I've made many sawhorses in the past and I think this one might just be the best.
+I've made many sawhorses in the past and I think this design might just be my favorite.
 
-The dovetail design is simple, strong, and the angle legs resist racking better than the vertical legs in a more typical design. 
-
-Did I also mention they stack?
+The dovetail design is simple, strong, and the angle legs resist racking better than the vertical legs in a more typical design.  And they stack!
 
 But I think my favorite part of this design is that it's such a simple application of advanced joinery and can only be easily done with hand tools. 
 
 (the dimensions I chose are somewhat arbitary so I won't justify them, you can and should adjust them to fit your own needs)
 
-We'll start with 1x6 stock for the legs and a 2x4 stock for the beam. You can rip a 4x6 in half to make the leg stock. Note the exact dimensions here aren't so important so long as a few relations stay correct.
+We'll start with 1x6 stock for the legs and a 2x4 stock for the beam. You can rip a 2x6 in half to make the leg stock.
 
 With multiple double or triple angle bevels, the hardest part of this design will be in the marking, so follow along carefully:
 
-Begin by finding the center of the beam and marking outwards by ___ inches on both sides, drafting a vertical line which will mark where the inside dovetail cut lies on the beam.
+Begin by finding the center of the beam and marking outwards by 9 inches on both sides, drawing a vertical line which will mark where the inside dovetail cut lies on the beam.
 
-next measure out from this line by ___ inches and from this point, mark a ___ degree line angled downward which will mark where the outside dovetail cut line on the beam.
+(sorry friends, somehow I got in the habit of using imperial measurement)
 
-mark a line from the top of the beam downards by 3.75 which will locate where the legs leave the beam. This measurement determines the lateral splay angle of the legs. Since I cut my beam to exactly 3.75 the bottom arris is my mark.
+next measure out from this line by 4.25 inches and from this point, mark a ___ degree line angled downward which will mark where the outside dovetail cut line on the beam.
+
+mark a line from the top of the beam downards by 3.75 which will locate where the legs leave the beam. This measurement determines the lateral splay angle of the legs. Since I cut my beam to exactly 3.75 the bottom edge is my mark.
 
 From the top of the beam, mark inwards by .75"
 
-(not great that I'm using both sides of a raw board as reference edges but it's easier and mostly ok in this case! Make sure the beam is flat-ish and the one for the matching pair is identical)
+(not great that I'm using both sides of the board as reference edges but it's easier and mostly ok in this case! Make sure the beam is flat-ish and the one for the matching pair is identical)
 
 (if you want the sides of your legs to be exactly flush with the sides of the beam at the top where the dovetail is deepest, you need to mark inwards by the board thickness * 1/cos(splay angle). I don't care about this so I'm just using the exact board thickness)
 
-(I'll actually be making several marks that break the usual rules for marking. Sometimes it matters, sometimes it doesn't!)
+(I'll actually be making several marks that break the usual rules for marking but only when it doesn't matter)
 
 from the dovetail cut marks on the top of the beam, draw a 10 degree angled line to this line.
 
-Lets go ahead and cut the dovetail notch now. This will serve as a visual guide for understand how we mark the legs to match
+Lets go ahead and cut the dovetail notch now. We will use this to scribe the angles onto the leg.
 
 Using a fine saw, make the 2 cross cuts on the side being careful not to go past the line. I like use the tip of the saw to scrape the inside to deepen the cut without risking gonig past the edges.
 
@@ -234,42 +75,52 @@ marking the legs is tricky as it must match the multi-angle bevels we marked on 
 
 Our legs are splayed 15 degrees in both directions so our marking will be based on this.
 
-First draw a ___ degree line on the flat face making sure to measure from the square edge (duh)
+First draw a 75 degree line on the flat face making sure to measure from the square edge.
 
-from this line, draw a 20 degree line outwards
+Now take your angle script and measure the angle between the top of the beam at the bed of the dovetail with the scribe right up against the the dovetail.
 
-(it's not exactly 15 and 20 degrees, but it's close enough, moreover we will do contact fitting to get it the rest of the way there so it doesn't matter so much))
+(you colud also do this with a piece of paper if you dont't have an angle scribe that fits well)
 
-cut through both these lines to form a flat face that matches the top of the beam
+Scribe this angle onto the leg
 
-From this edge, mark a parallel line downwards on the flat back face 3 7/8". then mark a perpendicular line to the oblique corner of this line to mark the inside edge of the inner dovetail
+----
+If you don't like scribing or trig, another way to get these measurements is to model this sawhores in a CAD program. Kumiki is a programmatic CAd program meaning it's especially suited for an AI agent to make your design. Just describe what you want in human words and iterate with the agent until you have what you like. And what you see here took about 10 minutes to make and I can pluck out all the measurements straight off the model. But I'll talk about that more in P2 of this video where I eat my own words about hand tools and 3d print router templates to make this same pair of sawhorses :).
 
-from this corner point, measure to the other side by ____ inches. This mesaurement is determined by measuring the bottom edge of the dovetail cut you made on the beam
-from the top point, measure to the other side by ___ inches.
+(shameless self plug, kumiki the design software I always wanted. It's much better than sketchup :D. Check out my other videos to learn more)
+----
+
+cut through both these lines to form a flat face that matches the top of the beam when the leg is seated in the dovetail
+
+From the pointy edge on the reference side, measure inward by ___ inches
+
+from this corner point, measure to the other side by ____ inches. This mesaurement is determined by measuring the length of the bottom of your dovetail where it intersects the top of the
+
+then take your angle scribe and measure the inside edge of the dovetail and the top of the beam for both the inner and outer dovetails. Make sure the scribe is parallel with the beam or you'll get the wrong angle.
 
 Now make the asme 10 degree marks on the top end of the board to complete the markings
 
-Cut along this lines using a hand saw
+Cut along this lines using a hand saw.
 
-now were ready to do the final transfer fit
+And there's no need to worry if you messed up your measurements because we're going to do the final transfer fit now.
 
-I use a carpenter pencil to mark up the insides of the dovetails on the beam
+I use a soft lead pencil such as this carpenter's pencil to mark up the insides of the dovetails on the beam
 
 insert the leg and give a few firm taps at the bottom
 
 remove the leg and pair away where theere are makrs keeping in mind that only the bottom triangle actually inserts but you'll still want to pair away the top half of the triangle to keep the faces flat (or not)
 
-keep going until you're happy with your fit :)
+As you get closer to a final fit, remove less and less. After a few passes I switch to a scraper and file to take off even less material. Keep at it until you're happy with your fit :). 
 
-repeat this process for the other 4 legs. Remember to mark the legs with their matching dovetails on the beam.
+repeat this process for the other 4 legs. Since each leg is its own contact fitting, mark the legs with their matching dovetails on the beam.
 
-With all 4 legs done' we're ready to make the bottom cuts on the legs. tap the leg in FIRMLY and use a pencil to mark where the leg leaves the beam
+With all 4 legs done' we're ready to make the bottom cuts on the legs. tap the leg in FIRMLY and use a pencil to mark where the leg leaves the beam.
+Also lay your angle scribe on the SIDE of the leg and scribe the angle from here to the bottom of the beam.
 
 remove the leg, and measure a parallel line downward from this line by about 27" for a 30" tall sawhorse.
 
 (27 3/16 if you want to be closer to exactly 30")
 
-Once again, make the 20 degree mark to complete the bevel. make sure you angle it in the right direction!
+Then mark a line down the side using the angle you scribed earlier, complete the bevel. make sure you angle it in the right direction!
 
 Cut the bottom of the leg and repeat for the other 3 legs.
 
@@ -281,40 +132,16 @@ check that the marks you drew on the legs line up with the beam, and then cut of
 
 Optionally, come through with a plane to finish the top of the sawhorse.
 
+Last but not least, do that all over again to make a matching pair.
+
+I hope you enjoyed this video. 
+
+In part 2 of this video, I'll make this same pair of sawhorses using design I made in kumiki, a programmatic CAD software. The designs are parametric and also generate 3d printed router templates to make each of the dovetail cuts quickly using a router. You won't want to miss it.
+
+(I just do woodworking for fun. I'm a software engineer professional at least until AI takes my job. kumiki is the woodworking CAD software I always wanted so of course I made it myself and now I want to share it with everyone. Please check out the next video!)
 
 
 
-::: 7/29 board notes
-
-board related joints
-DONE-dovetail_corner_joint
-DONE-Half-blind dovetail corenr joint
-DONE-sliding dovetail (maybe you want tapered variants)
-  -the tricky thing about this is th edovetail can be on edge or end...
--you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
--multi morise and tenon
-  -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
--wooden hinge joint :O
--reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
--reinforced_edge_joint
--reinforced_corner_butt_joint
--reinforce_corner_miter_joint
--route-a-corner/edge
-  -corner
-    -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
-    -drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
-  -Breadboard end (this is an end to edge dado joint)
-  -shiplap
-  -cleat joint (not really a joint)
-  -dado_joint (edge to face)
--blind housed dovetail
--splined miter joint
--bridge joint(just tongue nad fork)
--haunched tenon lol ugh
--finger corner joint (or box joint)
--finger splice joint 
--make some placeholders for the 
--rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
 
 
@@ -343,80 +170,92 @@ DONE-measuring panel changes:
   -smeasurement panel should just say "measurements" maybe witha rule emoji, it does'nt need to say whole frame anymore or whatever
   -measurements viewport and member list collapsed by defalutn
   -you should be able to click on a viewport in the list view and it will highlight the viewport (i.e. select it I guess)
+IGNORE-weird gray bar at the top of the no project oepen screen? (it's the tab browser thingy)
+DONE-add mobile version
+  DONE-example patterns > still broke
+  -clicking on folder opens teh whole pattern set kinda weird
+  -instead of "new frame" it can say "ask the agent to make a new frame" that takes you to the agent panel
+DONE-add https://www.finewoodworking.com/2011/01/22/3-way-miter-joint-chinese-style?srsltid=AYCX9vLtnozNPny8Bt-ULXTuR5GmlBbureZQtygEiNwhCTnWiM_3kZEc (rice dumping join) and do roblox cube or osemting lol
+DONE-the web browser file browser should also show json files for saved drawings
+DONE-add a tool allowing you to open drawings in a project. maybe look ta the current set of tools and see if you can do some cleanup since we have a bunch of tool salerady
 
--add mobile version
 
--do skills pass
+
+
+
+
+
+
+-refresh seems slow again, check perf on web?
+
+DRAWING NEXT TODO
+  -refine centerline, refreence edge and PTW highlighting in drawings view
+  -add option to color refreences arris/face differently maybe,  (should match the svg export colors I guess)
+  -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
+  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
+    -either add it as a separate menu after a divider
+    -get rid of it in 2d drawing view
+    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
+  -angle anchor dragging (You sholud be able to flip sides by dragging as well)
+
+DRAWING DOCS EXPREMIENT
+  -add optinoal labels to measurements (label only, label and measure, measure only (default))
+  -ask the agent to document each joint  by rendering as SVG with measurements
+    -attempt to measure anything that has a 1-1 correspondence with a dfunction argument
+    -some stuff amy not, in which case you can put a formula in the label instead
+    -better missing a parameter than an incorrectly labeled one
+
+
+SKILLS PASS
   -do review rule pass
   -do test update pass
   -see if we can have more specific authoring guidlenes
   -see if we can have mor egeneral authoring ugdilenise
 
--add https://www.finewoodworking.com/2011/01/22/3-way-miter-joint-chinese-style?srsltid=AYCX9vLtnozNPny8Bt-ULXTuR5GmlBbureZQtygEiNwhCTnWiM_3kZEc (rice dumping join) and do roblox cube or osemting lol
 
 
 
--weird gray bar at the top of the no project oepen screen?
-
-
-
--refine centerline, refreence edge and PTW highlighting in drawings view
--add option to color refreences arris/face differently maybe
--add legend to drawings view
--add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
--if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
-  -either add it as a separate menu after a divider
-  -get rid of it in 2d drawing view
-  -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
--update shed example to include board
-
-
--maybe do drawing prettifier pass
+AUTODRAWNING  
+  DONE-spread out mesaurements
+  DONE-dovetails need measuring preferences for its angles (ideally either to shoulder or to the dovetali flat, but easier just to go to the dovetali flat)
   -viewport optimization?
-  -spread out mesaurements
   -smarter about which features to place measurements
 
 
 
 
--improve agent panel visual clarity
-  -maybe do highligh tutorial tips thingy
-  -add buttno that says "prompt below"
-  -summary should be highlighted
--make sure trackpad scrolling in agent panel is working
--remove undo prompt or allow undo for the undo
--add some jokes into the ouptut
--create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
--add skill to explain to users how things are working ,maybe add an option to toggle "explain how it works"
--refresh seems slow again, check perf on web?
 
 
 
+-AGENT STUFF
+  -maybe replace oauth with popup
+  -improve agent panel visual clarity
+    -maybe do highligh tutorial tips thingy
+    -add buttno that says "prompt below"
+    -summary should be highlighted
+  -make sure trackpad scrolling in agent panel is working
+  -remove undo prompt or allow undo for the undo
+  -add some jokes into the ouptut
+  -create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
+  -add skill to explain to users how things are working ,maybe add an option to toggle "explain how it works"
+  -consider doing multiple agent sessions...
+  -add report crash feature?
+  -add give feedbac/report issue button?
 
-
--add shouder to cross lap joint
-  -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
-  -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
-
-
+  -agent account stuff
+    -do LLC research
+    -setup LLC prob
+    -figure out liability ad data retention risks
+    -consider doing cloud files and sharing 
+    -draft out dream spec for cloud suite and see if we should do any refactors now.
 
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
 
--update wedged half dovtail to support shoulder shapes and peg
-  -see if you can make use of ButtJointCSGParts
-  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
--test agent created drawings
--agent benchmarking examples
--consider doing multiple agent sessions...
--add report crash feature?
--add give feedbac/report issue button?
--agent account stuff
-  -do LLC research
-  -setup LLC prob
-  -figure out liability ad data retention risks
-  -consider doing cloud files and sharing 
-  -draft out dream spec for cloud suite and see if we should do any refactors now.
+
+
+
+
 -you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
   -maybe a singel pattern that shows the main members of a buliding
   -different king post queen post etc styles
@@ -444,7 +283,19 @@ DONE-measuring panel changes:
   -make a new video 
   -msg mods on r/woodworking if they will allow promo
 
-
+-measuring next steps
+  
+  -do the drawing border and meta info stuff
+    -add background border for drawing...
+    -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
+  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
+  -XRAY feature
+    -timber goes into x-ray view when a feature is selected in drawing mode 
+    -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+      -or maybe allow selectino of xrayed features?
+    -figure out xray joints tagging (could be a per joint/direction property)
+      -XRAY_FROM_AXIS (enum face aligned timber directions) 
+      -we can add more sophistitacted filter sin the future
 
 
 
@@ -473,19 +324,6 @@ DONE-measuring panel changes:
 
 
 -MEASURING/DRAWING BACKLOG
-
-  -add viweport support, I think yo uneed it now
-  -do the drawing border and meta info stuff
-    -add background border for drawing...
-    -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
-  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
-  -XRAY feature
-    -timber goes into x-ray view when a feature is selected in drawing mode 
-    -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
-      -or maybe allow selectino of xrayed features?
-    -figure out xray joints tagging (could be a per joint/direction property)
-      -XRAY_FROM_AXIS (enum face aligned timber directions) 
-      -we can add more sophistitacted filter sin the future
   -solver optimization, the expensive part is face_reaches_surface
     -cache solid_bounds
     -add broadphase
@@ -518,13 +356,59 @@ DONE-measuring panel changes:
     -or would it be better just to have folsk make custom joints
   DONE-tapered dovetail joint for that cool sawhores
   DONE-finish dovetail jonit
-  -multi mortise and tenon joint
+  DONE-dovetail_corner_joint
+  DONE-Half-blind dovetail corenr joint
+  DONE-sliding dovetail (maybe you want tapered variants)
+    -the tricky thing about this is th edovetail can be on edge or end...
+  DONE-rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
+  DONE-you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
+  DONE-allow for angled dovetails
+  DONE-cut_finger_corner_joint (alias cut_box_corner_joint)
+  DONE-cut_finger_splice_joint
+  DONE-add wedges to mortise and tenon
+    -wedge praameters;
+      -wedge_orientation
+      -wedge_position (measured from centerline)
+      -wedge_length = None (tenon length by default)
+      -wedge_angle = 5
+      -mortise_side_angle = 0 (careful, must watch out for mortis extra depth)
+
+  -figure out how you want to do board ing rooves...
+    -update shed example to include board
+  -update wedged half dovtail to support shoulder shapes and peg
+    -see if you can make use of ButtJointCSGParts
+    -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
+  -add shouder to cross lap joint
+    -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
+    -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
+
+  
+
+  -multi morise and tenon
+    -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
+  -wooden hinge joint :O
+  -reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
+  -reinforced_edge_joint
+  -reinforced_corner_butt_joint
+  -reinforce_corner_miter_joint
+  -route-a-corner/edge
+    -corner
+      -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
+      -drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
+    -Breadboard end (this is an end to edge dado joint)
+    -shiplap
+    -cleat joint (not really a joint)
+    -dado_joint (edge to face)
+  -blind housed dovetail
+  -splined miter joint
+  -bridge joint(just tongue nad fork)
+  -haunched tenon lol ugh (has the L shape in the tenon)
   -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
   -finish cut_board_in_dado_joint_on_plane_aligned_timbers
   -do router joint stuff
-  -add wedges to mortise and tenon
+  
   -add screw joint
   -do the castle joint 3 way joint thingy that should be easy?
     -may as well do the oscar hsed 3 way joint hingy as well
@@ -2356,26 +2240,226 @@ IGNORE- you need a better system for determining timber orientation after each t
 :: ARCHIVE
 
 
-
-
-
 :: 11/1/2026 kumiki 0.10.0 release
 
-Kumiki is a programmatic CAD application for timber framing and woodwork. 
+Kumiki is a programmatic CAD application for timber framing and woodwork and here's how to use the latest version. Go to kumiki.build to get the app 
 
-Here's what's new for kumiki 0.10.0
+There is now an easy to install and standalone app called kigumi and you can even run it straight out of your browser, but you'll have a better experience with the app.
 
-You can now ask the agent to generate blueprints and plans for you and if you don't like them you can go in and modify things yourself.
+Once you have the app running, the best way to use kumiki is to connect your agent to kigumi MCP but there's also a built-in agent if you prefer that. 
 
-There's a much easier to install standalone app that will set up all your project dependencies for you.
+Let's ask the agent "make a 5 foot long bench out of a 2x8 with 2 1 foot long feet 8 inches away from each end also made from a 2x8. lets join the feet should be join to the top using a sliding dovetail joint. 
 
-With the ne wapp, the UI has also been overhauled to be more compact and intuitive
+The newest agent models are much better at spatial reasoning so you'll find they do pretty well even on rather vague prompts.
 
-the agent interaciton experience has been improved, it can self validate your work and you can also press this handy "copy for ai" to tell the AI what you're looking at
+Our design is done but we'd like to have some plans to make the darn thing
 
-And of course many more joints, patterns and examples have been added
+"please create some plans for the entire bench including drawings for ecah individual piece so I can cut them"
+
+And the generated plans are a little wonky right now, so you can go in a make a few changes and export your plans as a PNG. And you can expect this feature to be improved a lot in the near future!
 
 There's plenty more to come. kumiki is free and open source Please like and subscribe and stay tuned!
+
+
+----
+
+In this video I'll walk you through how to install and use the latest verison of kumiki.
+
+Kumiki is a programmatic CAD tool for timber framing and woodworking. 
+
+What that means is designs are written as programs which can be easily be authored by an AI agent.
+
+Kumiki works together with the kigumi viewer app. Go to kumiki.build to download the kigumi app. You can also try it out straight in your browser!
+
+Now for the best experience you'll want to connect your own AI agent, but you can also login and use the built in agent to get started faster.
+
+Let's ask the agent "make a 5 foot long bench out of a 2x8 with 2 1 foot long feet 8 inches away from each end also made from a 2x8. join the feet to the bench top with a sliding dovetail joint."
+
+If you want to make any changes, you can continue to prompt your agent. But Lets say we're done and want some plans on how to acutally build the structure
+
+plans will show up under the drawings folder on the left. the generated plans are a little wonky right now, so you can go in a make a few changes. Once your done, you can export your plans as a PNG. And you can expect this feature to be improved a lot in the near future!
+
+There's plenty more to come. kumiki is free and open source Please like and subscribe and stay tuned!
+
+----
+
+
+For the easy setup, open kigumi options > enable the MCP server for agents, and click the URL and token copy button
+
+In claude, open a new coding session. Make sure the coding session is NOT a cloud session.
+
+Then ask the agent "pls connect to the MCP <paste>"
+
+once connected ask the agent to create a new project and you'll be off to the races.
+
+So what's happening under the hood is that kigumi works with project worskpaces on your computer--afolder containing all your project files. You can create this folder yourself and open it in kigumi ( file > open folder) and you can open the same project in your claude coding session.
+
+Regardless, you'll still want to connect to the MCP as it exposes additional agentic automation functionality.
+
+
+
+:: 11/21/2026 
+
+
+OPTIONS REVAMP
+
+COMMON
+units
+scale ruler
+
+CONTROLS
+center gizmo
+camera stuff
+
+VISUAL 
+theme
+selected visibility
+unselected visibliity
+edge stuff
+
+> 3D 
+footprint
+shadows
+reflection
+
+
+GEOMETRY
+highlight reference edge (affects both 2d and 3d views, just a single bool)
+color reference faces (affects both 2d and 3d views)
+
+> 3D
+highlight selected feature's CSG
+dissasembly spacing (disassembly spacing should only show if assembly beta option is on)
+
+> DRAWING
+show timbers not in drawing
+show centerplanes lines
+show perfect timber within lines
+
+
+-remove drawing export for now, instead svg drawing export should attempt to inehirt (and reintepret) the existing visaul settings
+-remove debug drawing 4 viewports button
+-"save settings" -> "save options"
+
+:: 11/18/2026 mobile
+
+portrait mode only, 3d view takes up most the space
+
+1 menu button at the top, it shows you the frame name, kiwari pop up if there is kiwari, options popup,  list of drawings,
+
+if you opne ad rowing then the menu button at the otop just bocems a back to 3d button.
+
+1 menu button at the top right, which shows a  list of frames in your porjec t(shows "..more" button if there are more than 5 frames, which opens a pop up), a button to open example frames, a button to open patterns, ifnalyl an option to cclose the frame
+
+if no frame is ope,n it shows the project frames, and the close project/new project stuff if no project is open.
+
+only 1 file open at once
+if you open a read only file/pattern, it just has a big "back" button next to the menu button to go back to your last open file.
+measuring not support, but viewing measurements is
+no timber list
+no source view
+
+
+Agent chat is at the bottom, normally it's just a box to tye, but if you cilck on it, then it expands a bit (not all theway so youc an stll cilck above it to shirkn it)
+
+
+
+:: 11/18/2026
+
+ rice dumpling joint or Zongjiao Joint (粽角榫)
+
+ cut_rice_dumping_joint(arrangement: TriCornerArrangement, timber1_miter_thickness, timber_1_tenon_distance_from_outer_faces, timber_2_tenon_distance_from_outer_face, tenon_size)
+
+assert face aligned
+assert that all timebrs share an outside edge that meets at a point
+
+tenon size is (X,Y) where Y is measured in the perpendicular axis to the outer face of the timber it is on and it is  closest to
+
+:: 11/18/2026
+FAIL  DOES NOT ASSEMBLY
+(alias cut_mitsudomoe_joint)
+def cut_rock_paper_scissor_joint_on_face_aligned_timbers(arrangement: TriCornerArrangement, tenon_position_from_outside, tenon_width, tenon_height, tenon_length, mortise_extra_depth)
+
+assert face aligned
+assert that all timebrs share an outside edge that meets at a point
+
+there are 3 timbers, start from timber 1, p
+measure tenon_position_from_outside edge of first timber towards the second timber, then go tenon_width further, and the ntenon_height inwards and then extrude by tenon_length to create the tenon, the mortise is similar except extendn by mortise_extra_depth and cut into timber 2, repeat 2-3 and 3-1
+
+cut the 3 way miters in the corner
+
+-o the fidnal joint is timber MINUS (miter half plane PLUS mortise MINUS tenon )
+
+the maybe end cuts is just the corner point for all 3 timbers
+
+:: 11/15/2026 sharing spec
+
+we want to add cloud accounts and sharing as per usual edit/comment/view permission type sharing. You can share indiivdual files or groups of files.
+
+We will add a new "Shared" section to the file browser, which shows up as either a new tree or new section in the tree view. Nothing shows upin the file browser portion of the tree view (actually we might turn that into a separate collapsible row panel)
+
+you can share individual files or entire project workspaces
+shared frames have a "copy to project workspace" button, if you have no project open, it will pop up and offer you to create a new project or say you must open a project to copy. 
+
+ok that's basically the final version of what I want, but for now I want a simplified version:
+
+a publicable shareable URL version with no owners. So you can right click on your frame and click "share publicly" it gives a pop up to confirm you want to dot hat and if you do share it it gives you a URL
+
+opening the URL opens kumiki and opens the shared frame in red only mode. you can view shared frames even when you have no project oppen. acutalyl as part of that, you sshould be able to view structures and patterns in the latest version of kumiki in the no project open state as well. this hides the center view no project open screen so we need make suer the agent tells the user that they have no project oepen when they try to create new projects or indicate  somewhere in the sidebar that you need to create a new porject to edit frames.
+
+you can also paste the URL soemwhere in the webb app standalone viewer to add it to the saherd section / open it.
+
+what changes are needed to implement this in a way that's forward compatible with the full sharing thing we want
+
+
+:: 11/12/2026
+
+Lets do a big refactor on all the patterns and joints
+
+1. go through all the joints and review their doc strings. Look for missing information and places to make them more consistent.
+DO NOT modify anything that was clearyl written by my and not by an agent without discussing with me first and only if what I wrote is INCORRECT
+we are willing to tolerate some missing information since the source is always avalible.
+
+2. make sure every joint has a cut_basic variation
+
+3. update the joint list in api_cheat_sheet. reformat the joint table so that it has the full signature of the cut basic variation as its first collumn, and then the second column should have a BRIEf description of when to use the joint. Keep it simple or omit it. You can ask me for my opinion too
+
+4. do the mega pattern update. Patterns are intended for 2 purposes, as a source reference for the agent, and as a visual reference for humans who want to see what a joint looks like and how it can be configured.
+
+- do not use combined folder / example + variants, only do plain folders and variants
+- the folder structure should match the joint folder structure, except joints with many variants get their own folders.
+- basic joints get their own exmaples organized under basic joints (we already have this, but not every basic joint has a pattern)
+- when do decide to create multiple variants vs using kiwari
+  - prefere kiwari for: size, position, notching, peg shape, 
+  - use multilpe variants for different timber configuration angles, face/plane aligned and other variants, configuration that would be considered different joint, ege half blidn vs plain dovetail, through mortise vs stopped mortise, angled mortise and tenon vs 90 degree morntise and tenon, configuration that would be confusing to describe with kiwari, ask me if you are uncertain.
+- not seevral patterns I created were for development purposes only so don't be afraid to delete them
+- if there was a face/plan aligned variant of the method, then make the pattern angled, otherwise just keep everything axis aligend and face aligned.
+-udpate agent authoring instructions on the format for pattern
+
+
+
+----
+example mega refactor
+
+    -list examples in cheatsheet
+    -move onlypoop into hidden structures or move hidden structers into only poop
+    -multiple frames can be non-hidden, but make the structure in there nicer.
+    -do a comment pass on the frames, add preamble to each one explaining what its for 
+    -add section on each frame file explaining what concepts it demonstrates well, both in simple and broad detail, some examples:
+      -standard "timber frame structure" shape
+      -non-square construction
+      -simple example
+      -face aligned and axis aligned construction
+      -angled braces
+      -rafters (differentiate by style)
+      -small structure
+      -medium structure
+      -kiwari parameters (and what sort of stuff gets parameterized, e.g. structural, or sizing)
+      -furniture
+      -saw horse
+    -udpate agent authoring instructions on the format for examples
+
+
 
 :: 10/17/2026 PTW rough measuring notes
 
