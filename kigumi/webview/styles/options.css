@@ -216,6 +216,38 @@
     letter-spacing: 0.02em;
     text-transform: lowercase;
 }
+/* Native controls follow the theme: dark themes get dark dropdown lists and checkboxes. */
+kigumi-app[data-theme="dark"] {
+    color-scheme: dark;
+}
+kigumi-app[data-theme="light"] {
+    color-scheme: light;
+}
+#render-controls select,
+#render-controls button:not(.color-swatch) {
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--hv-control-border-strong);
+    background-color: var(--hv-control-bg-solid);
+    color: var(--hv-text);
+    font: 12px 'Segoe UI', sans-serif;
+}
+#render-controls button:not(.color-swatch) {
+    cursor: pointer;
+}
+#render-controls select:hover,
+#render-controls button:not(.color-swatch):hover:not(:disabled) {
+    background-color: var(--hv-control-bg-solid-hover);
+}
+#render-controls select:focus-visible,
+#render-controls button:not(.color-swatch):focus-visible {
+    outline: 2px solid var(--hv-accent);
+    outline-offset: 1px;
+}
+#render-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 #render-controls label {
     display: inline-flex;
     align-items: center;

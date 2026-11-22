@@ -6079,7 +6079,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1102,
+          "lineno": 1197,
           "name": "example"
         }
       ],
@@ -6088,7 +6088,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/oscarshed.py",
-      "sha256": "421d62144040518026e8e62d021421ac82619038bf44c545da0d019e5332b380",
+      "sha256": "9b40acb058c4fbd75c55c628c83f34160ba127fdc8ccc40b81f612261398f307",
       "title": {
         "en": "Oscar's shed",
         "ja": "\u30aa\u30b9\u30ab\u30fc\u306e\u5c0f\u5c4b"
@@ -6118,7 +6118,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-21T23:53:14.124388+00:00",
+  "generated_at": "2026-11-22T02:04:43.878198+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
