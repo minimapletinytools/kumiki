@@ -88,3 +88,33 @@ def test_a_perfect_reference_is_cropped_to_the_cut_timber(loaded):
     assert round(float(transform.global_to_local(at)[2]), 4) == 0.25
     low, high = along("ptw.centerplane_left_right")
     assert low < 0 and high > 0.5
+
+
+def test_every_generated_length_is_placed(loaded):
+    slot, _ = loaded
+    for drawing in runner.collect_drawings(slot.frame, None):
+        for viewport in drawing["viewports"]:
+            for measure in viewport.get("measurements", []):
+                if (measure["settled"].get("value") or {}).get("unit") == "length":
+                    assert (measure.get("placement") or {}).get("offset") is not None, (drawing["name"], measure)
+
+
+def test_dimensions_are_placed_in_the_views_the_viewer_draws(loaded):
+    # auto_drawings frames each view itself: the runner's cameras must be the same.
+    from kumiki.drawings.auto_drawings import sheet_views
+
+    slot, _ = loaded
+    scenes = {scene["id"]: scene for scene in runner.collect_drawings(slot.frame, None)}
+    checked = 0
+    for drawing in slot.frame.drawings:
+        views = sheet_views(drawing, [slot.frame.cut_timber_of(timber) for timber in drawing.timbers])
+        for viewport in scenes[str(drawing.drawing_id)]["viewports"]:
+            if viewport.get("projection") != "orthographic":
+                continue
+            view, camera = views[viewport["id"]], viewport["camera"]
+            for mine, theirs in ((view.right, camera["right"]), (view.up, camera["up"]),
+                                 (view.target, camera["target"]), (view.rect, viewport["rect"])):
+                assert list(mine) == pytest.approx(list(theirs))
+            assert view.extent == pytest.approx(camera["extent"])
+            checked += 1
+    assert checked
