@@ -1,0 +1,139 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Lapped gooseneck splice</title>
+  <desc>Plan of the projecting head and neck alongside the open socket.</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Gooseneck · plan" fill="#f0dfbf" fill-opacity="1" d="M2497.2706 163.85294 L2497.2706 216.14706 L70.823529 216.14706 Z M70.823529 163.85294 L2497.2706 163.85294 L70.823529 216.14706 Z M175.41176 242.29412 L70.823529 216.14706 L175.41176 216.14706 Z M489.17647 216.14706 L2497.2706 216.14706 L2497.2706 294.58824 Z M489.17647 294.58824 L489.17647 216.14706 L2497.2706 294.58824 Z M2497.2706 85.411765 L2497.2706 163.85294 L489.17647 163.85294 Z M489.17647 85.411765 L2497.2706 85.411765 L489.17647 163.85294 Z M175.41176 137.70588 L175.41176 163.85294 L70.823529 163.85294 Z M489.17647 85.411765 L2497.2706 85.411765 L2497.2706 294.58824 Z M489.17647 85.411765 L2497.2706 294.58824 L489.17647 294.58824 Z M175.41176 163.85294 L489.17647 163.85294 L489.17647 216.14706 Z M175.41176 216.14706 L175.41176 163.85294 L489.17647 216.14706 Z M70.823529 163.85294 L175.41176 163.85294 L175.41176 216.14706 Z M70.823529 216.14706 L70.823529 163.85294 L175.41176 216.14706 Z M175.41176 242.29412 L70.823529 216.14706 L175.41176 216.14706 Z M70.823529 163.85294 L175.41176 137.70588 L175.41176 163.85294 Z M175.41176 163.85294 L175.41176 216.14706 L70.823529 216.14706 Z M70.823529 163.85294 L175.41176 163.85294 L70.823529 216.14706 Z M175.41176 242.29412 L70.823529 216.14706 L175.41176 216.14706 Z M175.41176 137.70588 L175.41176 163.85294 L70.823529 163.85294 Z M175.41176 163.85294 L489.17647 163.85294 L489.17647 216.14706 Z M175.41176 216.14706 L175.41176 163.85294 L489.17647 216.14706 Z M175.41176 216.14706 L175.41176 163.85294 L489.17647 163.85294 Z M175.41176 216.14706 L489.17647 163.85294 L489.17647 216.14706 Z M175.41176 163.85294 L489.17647 163.85294 L489.17647 216.14706 Z M175.41176 216.14706 L175.41176 163.85294 L489.17647 216.14706 Z M70.823529 216.14706 L70.823529 163.85294 L175.41176 137.70588 Z M70.823529 216.14706 L175.41176 137.70588 L175.41176 242.29412 Z M70.823529 163.85294 L175.41176 137.70588 L175.41176 242.29412 Z M70.823529 216.14706 L70.823529 163.85294 L175.41176 242.29412 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Gooseneck · plan" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M175.41176 216.14706 L489.17647 216.14706" />
+        <path data-feature="rptw.right" d="M2497.2706 216.14706 L2497.2706 163.85294" />
+        <path data-feature="rptw.right" d="M489.17647 163.85294 L175.41176 163.85294" />
+        <path data-feature="rptw.right" d="M70.823529 163.85294 L70.823529 216.14706" />
+        <path data-feature="rptw.right" d="M70.823529 216.14706 L175.41176 242.29412" />
+        <path data-feature="rptw.right" d="M175.41176 242.29412 L175.41176 216.14706" />
+        <path data-feature="rptw.right" d="M2497.2706 294.58824 L2497.2706 216.14706" />
+        <path data-feature="rptw.right" d="M489.17647 216.14706 L489.17647 294.58824" />
+        <path data-feature="rptw.right" d="M489.17647 294.58824 L2497.2706 294.58824" />
+        <path data-feature="rptw.right" d="M2497.2706 163.85294 L2497.2706 85.411765" />
+        <path data-feature="rptw.right" d="M2497.2706 85.411765 L489.17647 85.411765" />
+        <path data-feature="rptw.right" d="M489.17647 85.411765 L489.17647 163.85294" />
+        <path data-feature="rptw.right" d="M175.41176 163.85294 L175.41176 137.70588" />
+        <path data-feature="rptw.right" d="M175.41176 137.70588 L70.823529 163.85294" />
+        <path data-feature="rptw.left" d="M489.17647 85.411765 L1195.0588 85.411765" />
+        <path data-feature="rptw.left" d="M1483.6959 294.58824 L489.17647 294.58824" />
+        <path data-feature="rptw.top" d="M2497.2706 85.411765 L2497.2706 294.58824" />
+        <path data-feature="side.0" d="M428.80543 163.85294 L489.17647 163.85294" />
+        <path data-feature="side.0" d="M175.41176 163.85294 L428.80543 163.85294" />
+        <path data-feature="side.2" d="M243.95679 216.14706 L175.41176 216.14706" />
+        <path data-feature="side.2" d="M489.17647 216.14706 L243.95679 216.14706" />
+        <path data-feature="side.0" d="M175.41176 216.14706 L175.41176 221.34559" />
+        <path data-feature="side.0" d="M175.41176 221.34559 L175.41176 242.29412" />
+        <path data-feature="side.1" d="M155.32689 142.7271 L175.41176 137.70588" />
+        <path data-feature="side.1" d="M70.823529 163.85294 L155.32689 142.7271" />
+        <path data-feature="side.2" d="M70.823529 216.14706 L70.823529 174.57466" />
+        <path data-feature="side.2" d="M70.823529 174.57466 L70.823529 163.85294" />
+        <path data-feature="side.3" d="M90.908402 221.16828 L70.823529 216.14706" />
+        <path data-feature="side.3" d="M175.41176 242.29412 L90.908402 221.16828" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="70.82" y1="159.85" x2="70.82" y2="97.85" />
+      <line x1="67.82" y1="104.85" x2="73.82" y2="98.85" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="489.18" y1="159.85" x2="489.18" y2="97.85" />
+      <line x1="486.18" y1="104.85" x2="492.18" y2="98.85" />
+      <line x1="70.82" y1="101.85" x2="489.18" y2="101.85" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 96.85) rotate(0.00)">gooseneck_length</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="70.82" y1="220.15" x2="70.82" y2="295.15" />
+      <line x1="67.82" y1="294.15" x2="73.82" y2="288.15" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="175.41" y1="220.15" x2="175.41" y2="295.15" />
+      <line x1="172.41" y1="294.15" x2="178.41" y2="288.15" />
+      <line x1="70.82" y1="291.15" x2="175.41" y2="291.15" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="123.12" y1="291.15" x2="150.00" y2="327.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(150.00 342.00) rotate(0.00)">gooseneck_head_length</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="171.41" y1="242.29" x2="37.41" y2="242.29" />
+      <line x1="44.41" y1="245.29" x2="38.41" y2="239.29" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="171.41" y1="137.71" x2="37.41" y2="137.71" />
+      <line x1="44.41" y1="140.71" x2="38.41" y2="134.71" />
+      <line x1="41.41" y1="242.29" x2="41.41" y2="137.71" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(36.41 190.00) rotate(-90.00)">gooseneck_large_width</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Gooseneck · plan</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Receiving socket" fill="#f0dfbf" fill-opacity="1" d="M492.62077 141.96479 L270.75562 270.05869 L215.28933 238.03521 Z M437.15448 109.94131 L492.62077 141.96479 L215.28933 238.03521 Z M492.62077 141.96479 L455.64324 120.6158 L511.10953 67.243341 Z M1357.6037 -357.43334 L492.62077 141.96479 L511.10953 67.243341 Z M1690.6926 -549.7423 L1357.6037 -357.43334 L511.10953 67.243341 Z M1635.2263 -581.76578 L1690.6926 -549.7423 L511.10953 67.243341 Z M1542.7825 -635.13824 L1635.2263 -581.76578 L511.10953 67.243341 Z M788.44097 -199.61896 L1542.7825 -635.13824 L511.10953 67.243341 Z M418.66572 13.870881 L788.44097 -199.61896 L511.10953 67.243341 Z M418.66572 13.870881 L474.13201 45.894357 L381.68819 77.917833 Z M344.71067 56.568849 L418.66572 13.870881 L381.68819 77.917833 Z M344.71067 56.568849 L400.17696 88.592325 L178.31181 216.68623 Z M122.84552 184.66275 L344.71067 56.568849 L178.31181 216.68623 Z M1690.6926 -413.1088 L270.75562 406.69219 L122.84552 321.29625 Z M1690.6926 -413.1088 L122.84552 321.29625 L1542.7825 -498.50474 Z M1542.7825 -498.50474 L122.84552 321.29625 L122.84552 184.66275 Z M1542.7825 -498.50474 L122.84552 184.66275 L1542.7825 -635.13824 Z M1690.6926 -549.7423 L1690.6926 -413.1088 L270.75562 406.69219 Z M270.75562 270.05869 L1690.6926 -549.7423 L270.75562 406.69219 Z M270.75562 406.69219 L122.84552 321.29625 L122.84552 252.9795 Z M270.75562 338.37544 L270.75562 406.69219 L122.84552 252.9795 Z M270.75562 270.05869 L270.75562 338.37544 L215.28933 306.35196 Z M215.28933 238.03521 L270.75562 270.05869 L215.28933 306.35196 Z M178.31181 216.68623 L178.31181 285.00298 L122.84552 252.9795 Z M122.84552 184.66275 L178.31181 216.68623 L122.84552 252.9795 Z M1690.6926 -413.1088 L1542.7825 -498.50474 L1542.7825 -635.13824 Z M1690.6926 -413.1088 L1542.7825 -635.13824 L1690.6926 -549.7423 Z M400.17696 156.90907 L437.15448 178.25806 L215.28933 306.35196 Z M400.17696 156.90907 L215.28933 306.35196 L178.31181 285.00298 Z M437.15448 178.25806 L215.28933 306.35196 L215.28933 238.03521 Z M437.15448 109.94131 L437.15448 178.25806 L215.28933 238.03521 Z M400.17696 88.592325 L400.17696 156.90907 L178.31181 285.00298 Z M400.17696 88.592325 L178.31181 285.00298 L178.31181 216.68623 Z M474.13201 114.21111 L511.10953 135.56009 L455.64324 188.93255 Z M474.13201 114.21111 L455.64324 188.93255 L381.68819 146.23458 Z M381.68819 146.23458 L381.68819 77.917833 L400.17696 88.592325 Z M400.17696 156.90907 L381.68819 146.23458 L400.17696 88.592325 Z M455.64324 188.93255 L437.15448 178.25806 L437.15448 109.94131 Z M455.64324 120.6158 L455.64324 188.93255 L437.15448 109.94131 Z M511.10953 135.56009 L455.64324 188.93255 L455.64324 120.6158 Z M511.10953 67.243341 L511.10953 135.56009 L455.64324 120.6158 Z M474.13201 45.894357 L511.10953 67.243341 L511.10953 135.56009 Z M474.13201 45.894357 L511.10953 135.56009 L474.13201 114.21111 Z M474.13201 45.894357 L474.13201 114.21111 L381.68819 146.23458 Z M474.13201 45.894357 L381.68819 146.23458 L381.68819 77.917833 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Receiving socket" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M215.28933 238.03521 L270.75562 270.05869" />
+        <path data-feature="rptw.right" d="M270.75562 270.05869 L492.62077 141.96479" />
+        <path data-feature="rptw.right" d="M455.64324 120.6158 L437.15448 109.94131" />
+        <path data-feature="rptw.right" d="M437.15448 109.94131 L215.28933 238.03521" />
+        <path data-feature="rptw.right" d="M511.10953 67.243341 L455.64324 120.6158" />
+        <path data-feature="rptw.right" d="M492.62077 141.96479 L1357.6037 -357.43334" />
+        <path data-feature="rptw.right" d="M1357.6037 -357.43334 L1690.6926 -549.7423" />
+        <path data-feature="rptw.right" d="M1690.6926 -549.7423 L1635.2263 -581.76578" />
+        <path data-feature="rptw.right" d="M1635.2263 -581.76578 L1542.7825 -635.13824" />
+        <path data-feature="rptw.right" d="M1542.7825 -635.13824 L788.44097 -199.61896" />
+        <path data-feature="rptw.right" d="M788.44097 -199.61896 L418.66572 13.870881" />
+        <path data-feature="rptw.right" d="M474.13201 45.894357 L511.10953 67.243341" />
+        <path data-feature="rptw.right" d="M381.68819 77.917833 L474.13201 45.894357" />
+        <path data-feature="rptw.right" d="M418.66572 13.870881 L344.71067 56.568849" />
+        <path data-feature="rptw.right" d="M178.31181 216.68623 L400.17696 88.592325" />
+        <path data-feature="rptw.right" d="M400.17696 88.592325 L381.68819 77.917833" />
+        <path data-feature="rptw.right" d="M344.71067 56.568849 L122.84552 184.66275" />
+        <path data-feature="rptw.right" d="M122.84552 184.66275 L178.31181 216.68623" />
+        <path data-feature="rptw.left" d="M1690.6926 -413.1088 L270.75562 406.69219" />
+        <path data-feature="rptw.left" d="M270.75562 406.69219 L122.84552 321.29625" />
+        <path data-feature="rptw.front" d="M122.84552 321.29625 L122.84552 184.66275" />
+        <path data-feature="rptw.front" d="M122.84552 184.66275 L1542.7825 -635.13824" />
+        <path data-feature="rptw.back" d="M1690.6926 -413.1088 L1690.6926 -549.7423" />
+        <path data-feature="rptw.back" d="M1690.6926 -549.7423 L270.75562 270.05869" />
+        <path data-feature="rptw.back" d="M270.75562 270.05869 L270.75562 406.69219" />
+        <path data-feature="rptw.top" d="M122.84552 252.9795 L122.84552 321.29625" />
+        <path data-feature="rptw.top" d="M270.75562 406.69219 L270.75562 338.37544" />
+        <path data-feature="rptw.top" d="M215.28933 306.35196 L178.31181 285.00298" />
+        <path data-feature="rptw.top" d="M270.75562 338.37544 L270.75562 270.05869" />
+        <path data-feature="rptw.top" d="M215.28933 238.03521 L215.28933 306.35196" />
+        <path data-feature="rptw.top" d="M178.31181 285.00298 L178.31181 216.68623" />
+        <path data-feature="rptw.top" d="M122.84552 184.66275 L122.84552 252.9795" />
+        <path data-feature="rptw.bottom" d="M1542.7825 -635.13824 L1690.6926 -549.7423" />
+        <path data-feature="cap.0" d="M178.31181 285.00298 L215.28933 263.654" />
+        <path data-feature="side.2" d="M400.17696 88.592325 L400.17696 131.29029" />
+        <path data-feature="side.2" d="M474.13201 102.82498 L474.13201 45.894357" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="174.31" y1="285.00" x2="129.31" y2="285.00" />
+      <line x1="136.31" y1="288.00" x2="130.31" y2="282.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="174.31" y1="216.69" x2="129.31" y2="216.69" />
+      <line x1="136.31" y1="219.69" x2="130.31" y2="213.69" />
+      <line x1="133.31" y1="285.00" x2="133.31" y2="216.69" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="133.31" y1="250.84" x2="84.00" y2="296.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(84.00 311.00) rotate(0.00)">gooseneck_depth</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="180.31" y1="213.22" x2="205.31" y2="169.92" />
+      <line x1="199.21" y1="174.48" x2="207.41" y2="172.29" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="217.29" y1="234.57" x2="242.29" y2="191.27" />
+      <line x1="236.19" y1="195.83" x2="244.39" y2="193.64" />
+      <line x1="203.31" y1="173.38" x2="240.29" y2="194.73" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="221.80" y1="184.06" x2="226.00" y2="90.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(226.00 85.00) rotate(0.00)">gooseneck_small_width</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Receiving socket</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

@@ -498,6 +498,8 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     that width. Scarf length is 4 times that width. An unset front face defaults
     to FRONT.
 
+    [![Kanawa-tsugi scarf length and rebated shoulder with a detail of the dado and stub tenon](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+
     Args:
         arrangement: Splice joint timber arrangement. Timbers must be face-aligned with parallel axes.
 
@@ -649,6 +651,8 @@ def cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
     large_width = 1/2×width, head_length = 1/2×width. For full control, use
     `cut_lapped_gooseneck_joint_on_aligned_timbers` directly.
 
+    [![Lapped gooseneck profile and receiving socket with head, neck, and depth dimensions](../../../assets/joint-drawings/lapped-gooseneck.svg)](../../../assets/joint-drawings/lapped-gooseneck.svg)
+
     Args:
         gooseneck_timber: The timber with the gooseneck feature cut into it.
         receiving_timber: The timber that receives the gooseneck.
@@ -687,7 +691,10 @@ def cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
 def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement, *, receiving_timber_shoulder_inset: Numeric = scalar(0),
 ) -> Joint:
-    """Cut a housed dovetail with length and neck width each half the butt timber's profile width."""
+    """Cut a housed dovetail with length and neck width each half the butt timber's profile width.
+
+    [![Drop-in dovetail flare, neck width and length beside the socket depth and shoulder inset](../../../assets/joint-drawings/drop-in-dovetail.svg)](../../../assets/joint-drawings/drop-in-dovetail.svg)
+    """
     face = arrangement.front_face_on_butt_timber
     assert face is not None, "Set front_face_on_butt_timber to select the drop-in direction"
     width = arrangement.butt_timber.get_size_in_face_normal_axis(face.rotate_right())

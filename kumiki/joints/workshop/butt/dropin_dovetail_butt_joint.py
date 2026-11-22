@@ -76,6 +76,8 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     fits into a matching dovetail socket on another timber. The dovetail shape provides
     mechanical resistance to pulling apart.
 
+    [![Drop-in dovetail flare, neck width and length beside the socket depth and shoulder inset](../../../assets/joint-drawings/drop-in-dovetail.svg)](../../../assets/joint-drawings/drop-in-dovetail.svg)
+
     Args:
         arrangement: Butt joint arrangement where butt_timber is the dovetail timber,
             receiving_timber receives the dovetail socket, butt_timber_end is the cut end,

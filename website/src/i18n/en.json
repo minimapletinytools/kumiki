@@ -276,6 +276,9 @@
     "lead": "In Kumiki, a joint is a function of the timbers it connects—not a boolean box you draw by hand. Change a timber’s cross-section, move a post, or steepen a roof pitch, and every shoulder, housing, tenon, wedge and peg hole is recomputed from the geometry.",
     "mortiseDrawing": "An offset tenon on 4 × 5 in stock, with end and X-ray plan views showing tenon position, mortise depth, tip clearance, and peg position",
     "bridleDrawing": "Centered tongue thickness and the formula for one fork cheek",
+    "dovetailDrawing": "Drop-in dovetail flare, neck width and length beside the socket depth and shoulder inset",
+    "gooseneckDrawing": "Lapped gooseneck profile and receiving socket with head, neck, and depth dimensions",
+    "scarfDrawing": "Kanawa-tsugi scarf length and rebated shoulder with a detail of the dado and stub tenon",
     "categoriesLabel": "Joint categories",
     "categories": {
       "mortise-and-tenon": {

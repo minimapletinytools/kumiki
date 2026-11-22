@@ -7,25 +7,35 @@ from xml.etree import ElementTree as ET
 import numpy as np
 
 from kumiki import CutTimber, Frame, Measure, PegShape, create_v2, mm
-from kumiki.csg.feature_paths import find_feature
+from kumiki.csg.cutcsg import OwnedFeatureHit, SolidUnion, adopt_csg
+from kumiki.csg.feature_paths import FeatureHandle, find_csg_by_labels, find_feature
 from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 from kumiki.drawings.svg import DrawingSolid, render_svg_view
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
-from kumiki.geometry import Line, Plane, intersect_line_plane, intersect_planes
+from kumiki.geometry import Line, Plane, Point, intersect_line_plane, intersect_planes
 from kumiki.joints.workshop.basic_joints import _basic_peg, _basic_tenon_dimensions
 from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint
-from kumiki.rule import as_ndarray, format_length
-from patterns.basic_joints_patterns import example_basic_tongue_and_fork_joint
+from kumiki.rule import as_ndarray, format_angle, format_length
+from patterns.basic_joints_patterns import (
+    example_basic_dropin_dovetail_butt_joint,
+    example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint,
+    example_basic_lapped_gooseneck_joint,
+    example_basic_tongue_and_fork_joint,
+)
 
 
 OUT = Path(__file__).resolve().parents[1] / "docs/assets/joint-drawings"
-# Both basic patterns use the canonical 4 × 5 × 48 inch timbers. All detail windows use the same scale.
+# All basic patterns use the canonical 4 × 5 × 48 inch timbers.
 WIDTH, HEIGHT = 560, 380
 FIELD_WIDTH = 0.34
+SPLICE_OVERVIEW_WIDTH = 0.60
 BACK_RIGHT = (1, 1, 1)
 FRONT_LEFT = (-1, -1, 1)
 TENON_END = (0, 1, 0)
-MORTISE_PLAN = (0, 0, 1)
+PLAN = (0, 0, 1)
+SIDE = (0, -1, 0)
+INK = "#174e8c"
+WITNESS = {"stroke": "#2677bc", "stroke-dasharray": "1 3", "stroke-linecap": "round", "stroke-width": "1.45"}
 STOCK = ("timber (rough, extended)",)
 
 
@@ -64,6 +74,11 @@ def dimension_edge(solid, measure, toward):
     return max(candidates, key=lambda ends: ends.mean(axis=0) @ toward)
 
 
+def line(parent, p, q, style=None):
+    ET.SubElement(parent, 'line', attrib=style or {}, x1=f'{p[0]:.2f}', y1=f'{p[1]:.2f}',
+                  x2=f'{q[0]:.2f}', y2=f'{q[1]:.2f}')
+
+
 def annotate(view, measure, ends, project, offset, caption_at=None):
     """Draw the true edge length with witness lines offset in sheet pixels."""
     a, b = sorted((project(end) for end in ends), key=lambda pt: (round(pt[0], 4), -pt[1]))
@@ -72,30 +87,27 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
         return
     along = run / np.linalg.norm(run)
     normal = np.array([along[1], -along[0]])
-    group = ET.SubElement(view, 'g', fill='#244f6b', stroke='#244f6b')
-
-    def line(p, q):
-        ET.SubElement(group, 'line', x1=f'{p[0]:.2f}', y1=f'{p[1]:.2f}', x2=f'{q[0]:.2f}', y2=f'{q[1]:.2f}')
+    group = ET.SubElement(view, 'g', fill=INK, stroke=INK, attrib={'class': 'dimension', 'stroke-width': '1.3'})
 
     for p in (a, b):
-        line(p + np.sign(offset) * 3 * normal, p + (offset + np.sign(offset) * 4) * normal)
+        line(group, p + np.sign(offset) * 4 * normal, p + (offset + np.sign(offset) * 4) * normal, WITNESS)
         tick = 3 * (along + normal)
-        line(p + offset * normal - tick, p + offset * normal + tick)
-    line(a + offset * normal, b + offset * normal)
+        line(group, p + offset * normal - tick, p + offset * normal + tick)
+    line(group, a + offset * normal, b + offset * normal)
     angle = np.degrees(np.arctan2(run[1], run[0]))
     x, y = (a + b) / 2 + (offset + 5) * normal
     if caption_at is not None:
         x, y = caption_at
         angle = 0
         bar_center = (a + b) / 2 + offset * normal
-        line(bar_center, np.array([x, y + 5 if y < bar_center[1] else y - 15]))
+        line(group, bar_center, np.array([x, y + 5 if y < bar_center[1] else y - 15]), WITNESS)
     text = ET.SubElement(group, 'text', transform=f'translate({x:.2f} {y:.2f}) rotate({angle:.2f})',
                          attrib={'text-anchor': 'middle', 'font-size': '15', 'stroke': 'white',
                                  'stroke-width': '4', 'paint-order': 'stroke', 'stroke-linejoin': 'round'})
     text.text = measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
 
 
-def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1)):
+def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1), field_width=FIELD_WIDTH):
     """Draw a cut member at a preset angle with optional X-ray edges."""
     transform = cut.timber.transform
     root = cut.render_timber_with_cuts_csg_local()
@@ -104,7 +116,7 @@ def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xra
     right = np.cross(up_hint, toward)
     right /= np.linalg.norm(right)
     up = np.cross(toward, right)
-    camera = dict(center=center, right=right, up=up, width=FIELD_WIDTH, height=FIELD_WIDTH * HEIGHT / WIDTH)
+    camera = dict(center=center, right=right, up=up, width=field_width, height=field_width * HEIGHT / WIDTH)
     appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=0.28 if xray else 1, edgeOpacity=1, width=1.5)
     view = render_svg_view({title: solid}, set(), camera, WIDTH, HEIGHT, appearances={title: appearance},
                            edge_mode='xray' if xray else 'noOverlay')
@@ -114,7 +126,7 @@ def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xra
     sheet.append(view)
 
     def project(point):
-        return np.array([WIDTH / 2, HEIGHT / 2]) + (point - center) @ np.stack([right, -up], axis=1) * WIDTH / FIELD_WIDTH
+        return np.array([WIDTH / 2, HEIGHT / 2]) + (point - center) @ np.stack([right, -up], axis=1) * WIDTH / field_width
 
     for measure, offset, caption_at in dimensions:
         annotate(view, measure, dimension_edge(solid, measure, toward), project, offset, caption_at)
@@ -150,7 +162,7 @@ def pegged_example():
     arrangement = create_canonical_example_butt_joint_timbers()
     size, length, entry_face = _basic_tenon_dimensions(arrangement)
     arrangement, peg = _basic_peg(arrangement, size, length)
-    peg = replace(peg, shape=PegShape.ROUND, peg_positions=[(peg.peg_positions[0][0], mm(26))])
+    peg = replace(peg, shape=PegShape.ROUND, size=mm(9), peg_positions=[(peg.peg_positions[0][0], mm(26))])
     return cut_mortise_and_tenon_joint(
         arrangement, tenon_size=size, tenon_length=length, tenon_position=create_v2(mm(20), mm(10)),
         mortise_depth=length + mm(16), peg_parameters=peg, set_mortise_shoulder_parallel_to_face=entry_face,
@@ -233,7 +245,7 @@ def mortise_and_tenon(joint):
                  [foot, tenon_center], project, (119, -90)[i], ((298, 30), (462, 230))[i])
 
     title = 'Peg and tip clearance · mortise plan' if pegged else 'Tip clearance · mortise plan'
-    view, project = panel(root, 3, title, socket, MORTISE_PLAN, (0, 0, 0), [], xray=True, up_hint=(0, 1, 0))
+    view, project = panel(root, 3, title, socket, PLAN, (0, 0, 0), [], xray=True, up_hint=(0, 1, 0))
     mouth_point = crossing(tenon_axis, plane_of(shoulder))
     tip_point = crossing(tenon_axis, plane_of(tip))
     floor_point = crossing(tenon_axis, plane_of(floor))
@@ -285,6 +297,140 @@ def tongue_and_fork(joint):
     return root
 
 
+def point_of(handle):
+    """Return the world position of a named corner."""
+    point = world_geometry(handle)
+    if not isinstance(point, Point):
+        raise ValueError(f"{handle.feature.name} must locate a point")
+    return as_ndarray(point.position)
+
+
+def corner_span(view, project, start, end, label, offset, caption=None):
+    """Dimension a straight span between two profile corners."""
+    annotate(view, Measure(start, end, label=label), [point_of(start), point_of(end)], project, offset, caption)
+
+
+def primitive_features(cut, primitive):
+    """Index a timber-local primitive's declared features by name."""
+    return {f.name: FeatureHandle(cut.timber, OwnedFeatureHit(f, primitive)) for f in primitive.get_declared_features()}
+
+
+def foot_on_plane(point, plane):
+    """Project a world point squarely onto a plane with a unit normal."""
+    n = as_ndarray(plane.normal)
+    return point - n * ((point - as_ndarray(plane.point)) @ n)
+
+
+def gooseneck(joint):
+    """Draw the gooseneck profile and its matching socket."""
+    cuts = {ct.timber.ticket.path: ct for ct in Frame.from_joints([joint]).cut_timbers}
+    tail, socket = cuts['timber2'], cuts['timber1']
+
+    def profile_parts(cut, path):
+        profile = find_csg_by_labels(cut.cuts[0].negative_csg, path)
+        if not isinstance(profile, SolidUnion) or len(profile.children) != 2:
+            raise ValueError("Expected the gooseneck neck rectangle and head trapezoid")
+        return [primitive_features(cut, prism) for prism in profile.children]
+
+    neck, head = profile_parts(tail, ('gooseneck_waste', 'gooseneck'))
+    socket_neck, _ = profile_parts(socket, ('gooseneck',))
+    center = (point_of(neck['corner.4']) + point_of(head['corner.7'])) / 2
+    root = sheet('Lapped gooseneck splice', 'Plan of the projecting head and neck alongside the open socket.')
+    view, project = panel(root, 0, 'Gooseneck · plan', tail, PLAN, center, [], up_hint=(0, 1, 0))
+    corner_span(view, project, neck['corner.4'], head['corner.6'], 'gooseneck_length', 62)
+    corner_span(view, project, neck['corner.6'], head['corner.7'], 'gooseneck_head_length', -75, (150, 342))
+    corner_span(view, project, head['corner.4'], head['corner.5'], 'gooseneck_large_width', 134)
+    socket_center = (point_of(socket_neck['corner.4']) + center) / 2
+    view, project = panel(root, 1, 'Receiving socket', socket, BACK_RIGHT, socket_center, [])
+    corner_span(view, project, socket_neck['corner.3'], socket_neck['corner.7'], 'gooseneck_depth', 45, (84, 311))
+    corner_span(view, project, socket_neck['corner.4'], socket_neck['corner.7'], 'gooseneck_small_width', 50, (226, 85))
+    return root
+
+
+def scarf(joint):
+    """Draw the full Kanawa-tsugi profile and the dado at its stub tenon."""
+    cuts = {ct.timber.ticket.path: ct for ct in Frame.from_joints([joint]).cut_timbers}
+    first, second = cuts['timber1'], cuts['timber2']
+    stub = ('scarf_waste', 'stub_tenon')
+    ends = [feature(cut, stub, 'stub_tenon_back') for cut in (first, second)]
+    # Each stub ends at a dado corner on the scarf midline, half a scarf length from the key.
+    front = plane_of(feature(first, STOCK, 'rptw.front'))
+    profile_front = intersect_planes(front,
+                                     plane_of(feature(first, STOCK, 'ptw.centerplane_left_right')))
+    stations = [crossing(profile_front, plane_of(end)) for end in ends]
+    center = np.mean(stations, axis=0)
+    root = sheet('Kanawa-tsugi scarf', 'Side elevation of the oblique scarf with a detail of the stub tenon and dado.')
+    view, project = panel(root, 0, 'Scarf profile', first, SIDE, center, [], field_width=SPLICE_OVERVIEW_WIDTH)
+    annotate(view, Measure(*ends, label='scarf_length'), stations, project, -99)
+    # The square key seats against the short step between the two oblique lands.
+    key = joint.jointAccessories['peg']
+    key_faces = primitive_features(first, adopt_csg(key.transform, first.timber.transform, key.get_csg_local()))
+    step = intersect_planes(front, plane_of(key_faces['side.2']))
+    rebate = Measure(key_faces['side.1'], key_faces['side.3'], label='rebated_shoulder_depth')
+    annotate(view, rebate, [crossing(step, plane_of(h)) for h in (rebate.anchor_a, rebate.anchor_b)],
+             project, -42, (207, 104))
+    detail_center = as_ndarray(plane_of(ends[0]).point)
+    panel(root, 1, 'Dado and stub tenon', first, BACK_RIGHT, detail_center, [
+        (Measure(feature(first, stub, 'stub_tenon_right'), feature(first, stub, 'stub_tenon_left'),
+                 label='stub_tenon_width'), 44, (324, 76)),
+        (Measure(ends[0], feature(first, stub, 'side.1'), label='dado_depth'), -41, (179, 321)),
+    ])
+    return root
+
+
+def annotate_plan_angle(view, measure, vertex, reference, flank, caption):
+    """Draw a plan angle from a reference ray to a flank on the same face."""
+    run, side = reference - vertex, flank - vertex
+    a, b = run / np.linalg.norm(run), side / np.linalg.norm(side)
+    turn = np.arctan2(a[0] * b[1] - a[1] * b[0], a @ b)
+    if np.isclose(turn, 0):
+        return
+    radius = 0.78 * min(np.linalg.norm(run), np.linalg.norm(side))
+    start, stop = vertex + radius * a, vertex + radius * b
+    arc = (f'M{start[0]:.2f} {start[1]:.2f} A{radius:.2f} {radius:.2f} '
+           f'0 0 {int(turn > 0)} {stop[0]:.2f} {stop[1]:.2f}')
+    group = ET.SubElement(view, 'g', attrib={'class': 'dimension', 'fill': INK})
+    line(group, vertex, reference, WITNESS)
+    ET.SubElement(group, 'path', d=arc, fill='none', stroke=INK, attrib={'stroke-width': '1.8'})
+    line(group, (start + stop) / 2, (caption[0], caption[1] + 6), WITNESS)
+    ET.SubElement(group, 'text', x=str(caption[0]), y=str(caption[1]),
+                  attrib={'text-anchor': 'middle', 'font-size': '15'}).text = measure.format_label(format_angle(abs(turn)))
+
+
+def dovetail(joint):
+    """Draw a drop-in dovetail in plan and its open housing in isometric view."""
+    cuts = {ct.timber.ticket.path: ct for ct in Frame.from_joints([joint]).cut_timbers}
+    tail, socket = cuts['butt_timber'], cuts['receiving_timber']
+    profile = ('dovetail_waste', 'dovetail')
+    corners = [feature(tail, profile, f'corner.{i}') for i in range(4, 8)]
+    root = sheet('Drop-in dovetail', 'Plan of the neck and flared tail beside the recessed housing and socket floor.')
+    view, project = panel(root, 0, 'Dovetail · plan', tail, PLAN, (0, 0, 0), [], up_hint=(0, 1, 0))
+    corner_span(view, project, corners[0], corners[1], 'dovetail_small_width', -46, (268, 337))
+    shoulder, tip = (feature(tail, profile, f) for f in ('side.0', 'dovetail_front'))
+    neck = point_of(corners[1])
+    square_tip = foot_on_plane(neck, plane_of(tip))
+    annotate(view, Measure(shoulder, tip, label='dovetail_length'), [neck, square_tip], project, -82, (446, 308))
+
+    angle = Measure(feature(tail, profile, 'dovetail_right'), feature(tail, STOCK, 'ptw.centerplane_front_back'),
+                    label='dovetail_angle')
+    annotate_plan_angle(view, angle, project(neck), project(square_tip), project(point_of(corners[2])), (377, 53))
+
+    view, project = panel(root, 1, 'Housing and socket', socket, FRONT_LEFT, (0, -0.025, 0), [
+        (Measure(feature(socket, STOCK, 'rptw.right'), feature(socket, ('dovetail',), 'cap.0'),
+                 label='dovetail_depth'), -36, (411, 315)),
+    ])
+    outside = feature(socket, STOCK, 'rptw.front')
+    notch = find_feature(socket, ('shoulder_notch_relief',), 'corner.1')
+    if notch is not None:
+        inner = point_of(notch)
+        annotate(view, Measure(outside, notch, label='receiving_timber_shoulder_inset'),
+                 [foot_on_plane(inner, plane_of(outside)), inner], project, -36, (150, 285))
+    return root
+
+
 if __name__ == '__main__':
     save(mortise_and_tenon(pegged_example()), 'mortise-and-tenon.svg')
     save(tongue_and_fork(example_basic_tongue_and_fork_joint()), 'tongue-and-fork.svg')
+    save(gooseneck(example_basic_lapped_gooseneck_joint()), 'lapped-gooseneck.svg')
+    save(scarf(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint()), 'kanawa-tsugi.svg')
+    save(dovetail(example_basic_dropin_dovetail_butt_joint()), 'drop-in-dovetail.svg')

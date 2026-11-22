@@ -44,6 +44,8 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
 
     arrangement.front_face_on_timber1 determines the face which scarf cut profile is visible on.
 
+    [![Kanawa-tsugi scarf length and rebated shoulder with a detail of the dado and stub tenon](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+
     Args:
         arrangement: Splice arrangement with timber1, timber2, timber1_end, timber2_end,
             and front_face_on_timber1.

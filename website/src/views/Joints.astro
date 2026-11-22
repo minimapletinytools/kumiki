@@ -2,6 +2,9 @@
 // The joint catalog, in each language (pages/joints.astro, pages/ja/joints.astro).
 import mortiseDrawing from '../../../docs/assets/joint-drawings/mortise-and-tenon.svg?url';
 import bridleDrawing from '../../../docs/assets/joint-drawings/tongue-and-fork.svg?url';
+import dovetailDrawing from '../../../docs/assets/joint-drawings/drop-in-dovetail.svg?url';
+import gooseneckDrawing from '../../../docs/assets/joint-drawings/lapped-gooseneck.svg?url';
+import scarfDrawing from '../../../docs/assets/joint-drawings/kanawa-tsugi.svg?url';
 import Layout from '../layouts/Layout.astro';
 import { type Lang, localePath, strings } from '../i18n';
 
@@ -42,7 +45,8 @@ const data = [
       {
         jp: '蟻落し仕口 / Ari-otoshi',
         fn: 'cut_dropin_dovetail_butt_joint_on_face_aligned_timbers',
-        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/#kumiki.joints.workshop.butt.cut_dropin_dovetail_butt_joint_on_face_aligned_timbers',
+        drawing: { src: dovetailDrawing, alt: s.dovetailDrawing, height: 428 },
       },
       {
         jp: '大入れ仕口 / Oire-shiguchi',
@@ -64,12 +68,14 @@ const data = [
       {
         jp: '腰掛鎌継ぎ / Koshikake Kama-tsugi',
         fn: 'cut_basic_lapped_gooseneck_joint_on_aligned_timbers',
-        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/#kumiki.joints.workshop.splice.cut_lapped_gooseneck_joint_on_aligned_timbers',
+        drawing: { src: gooseneckDrawing, alt: s.gooseneckDrawing, height: 428 },
       },
       {
         jp: '金輪継ぎ / Kanawa-tsugi',
         fn: 'cut_basic_kanawa_tsugi_joint_on_aligned_timbers',
-        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/#kumiki.joints.workshop.splice.cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers',
+        drawing: { src: scarfDrawing, alt: s.scarfDrawing, height: 428 },
       },
       {
         jp: '相欠き継ぎ / Aikaki-tsugi',
