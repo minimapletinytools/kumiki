@@ -1,8 +1,8 @@
-"""Tests for kumiki.drawings.dimension_layout."""
+"""Tests for dimension placement in kumiki.drawings.auto_drawings."""
 
 import numpy as np
 
-from kumiki.drawings.dimension_layout import Dim, SheetView, place
+from kumiki.drawings.auto_drawings import Dim, SheetView, place
 
 # Square on to the z = 0 plane, on a 400 x 300 mm sheet, 300 sheet mm to the world metre.
 VIEW = SheetView(np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.zeros(3), 0.5, (0, 0, 1, 1), (400.0, 300.0))

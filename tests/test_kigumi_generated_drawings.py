@@ -100,8 +100,8 @@ def test_every_generated_length_is_placed(loaded):
 
 
 def test_dimensions_are_placed_in_the_views_the_viewer_draws(loaded):
-    # dimension_layout frames each view itself: the runner's cameras must be the same.
-    from kumiki.drawings.dimension_layout import sheet_views
+    # auto_drawings frames each view itself: the runner's cameras must be the same.
+    from kumiki.drawings.auto_drawings import sheet_views
 
     slot, _ = loaded
     scenes = {scene["id"]: scene for scene in runner.collect_drawings(slot.frame, None)}
