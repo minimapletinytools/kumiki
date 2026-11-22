@@ -5,13 +5,10 @@
     "imageAlt": "Kumiki timber frame CAD preview",
     "nav": {
       "label": "Site",
-      "download": "Download",
       "try": "Try it",
       "joints": "Joints",
-      "docs": "Docs",
       "videos": "Videos",
-      "github": "GitHub",
-      "about": "About"
+      "github": "GitHub"
     },
     "language": {
       "label": "Language",
@@ -56,6 +53,8 @@
     "downloadWindows": "Download for Windows",
     "getKigumi": "Get Kigumi",
     "tryInBrowser": "Try it in your browser",
+    "github": "View on GitHub",
+    "community": "Join the community",
     "also": "Kigumi {version} for <a href=\"{macArm}\">Mac (Apple silicon)</a>, <a href=\"{macIntel}\">Mac (Intel)</a> and <a href=\"{windows}\">Windows</a>, or as a <a href=\"{marketplace}\">VS Code extension</a>. Free and open source.",
     "heroAlt": "A tiny house frame designed in Kumiki",
     "titleBlock": {

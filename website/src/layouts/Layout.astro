@@ -244,13 +244,10 @@ const structuredData = {
         <span class="brand-text">Kumiki</span>
       </a>
       <nav class="site-nav" aria-label={s.nav.label}>
-        <a href={link('/install')}>{s.nav.download}</a>
-        {tryKigumi && <a href={`${base}/try/`}>{s.nav.try}</a>}
+        <a href={link('/install')}>{s.nav.try}</a>
         <a href={link('/joints')}>{s.nav.joints}</a>
-        <a href="https://kumiki.build/docs/">{s.nav.docs}</a>
         <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">{s.nav.videos}</a>
         <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">{s.nav.github}</a>
-        <a href={link('/about')}>{s.nav.about}</a>
         <a class="language-switch" href={otherHref} hreflang={other} lang={other} data-lang={other}
            aria-label={translated ? s.language.switchToLabel : s.language.switchToHomeLabel}>{s.language.switchTo}</a>
       </nav>

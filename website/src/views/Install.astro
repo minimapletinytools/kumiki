@@ -25,6 +25,7 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
   <article class="install">
     <h1>{s.heading}</h1>
     <p class="lead">{s.lead}</p>
+    {tryKigumi && <a class="btn btn-primary try" href={`${base}/try/`}>{home.tryInBrowser}</a>}
 
     <nav class="ways" aria-label={s.waysLabel}>
       <a href="#app">
@@ -114,6 +115,7 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
 <style>
   .install { max-width: 46rem; margin: 0 auto; padding: 2.5rem 0 1rem; }
   .lead { margin-top: 1rem; font-size: 1.12rem; color: var(--ink-soft); }
+  .try { margin-top: 1.5rem; }
 
   .ways {
     display: grid;

@@ -5,13 +5,10 @@
     "imageAlt": "Kumiki で設計した木組みの CAD プレビュー",
     "nav": {
       "label": "サイト",
-      "download": "ダウンロード",
-      "try": "ブラウザで試す",
+      "try": "試す",
       "joints": "継手・仕口",
-      "docs": "ドキュメント",
       "videos": "動画",
-      "github": "GitHub",
-      "about": "概要"
+      "github": "GitHub"
     },
     "language": {
       "label": "言語",
@@ -56,6 +53,8 @@
     "downloadWindows": "Windows 版をダウンロード",
     "getKigumi": "Kigumi を入手",
     "tryInBrowser": "ブラウザで試す",
+    "github": "GitHub で見る",
+    "community": "コミュニティに参加",
     "also": "Kigumi {version}：<a href=\"{macArm}\">Mac（Apple シリコン）</a>、<a href=\"{macIntel}\">Mac（Intel）</a>、<a href=\"{windows}\">Windows</a>、または <a href=\"{marketplace}\">VS Code 拡張機能</a>。無料のオープンソースです。",
     "heroAlt": "Kumiki で設計したタイニーハウスの架構",
     "titleBlock": {
