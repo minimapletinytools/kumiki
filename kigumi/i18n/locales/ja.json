@@ -71,8 +71,6 @@
   "viewer.options.export.installCadquery.title": "STEPエクスポート用に cadquery-ocp をインストールします",
   "viewer.themes.workshop": "工房",
   "viewer.themes.forestMist": "フォレストミスト",
-  "viewer.themes.blueprint": "青焼き",
-  "viewer.themes.washi": "和紙",
   "viewer.themes.dusk": "夕暮れ",
   "viewer.themes.slateNight": "スレートナイト",
   "viewer.refresh.changesDetected": "変更が検出されました",

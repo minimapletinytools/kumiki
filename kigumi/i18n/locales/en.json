@@ -71,8 +71,6 @@
   "viewer.options.export.installCadquery.title": "Install cadquery-ocp for STEP export",
   "viewer.themes.workshop": "Workshop",
   "viewer.themes.forestMist": "Forest Mist",
-  "viewer.themes.blueprint": "Blueprint",
-  "viewer.themes.washi": "Washi",
   "viewer.themes.dusk": "Dusk",
   "viewer.themes.slateNight": "Slate Night",
   "viewer.refresh.changesDetected": "changes detected",

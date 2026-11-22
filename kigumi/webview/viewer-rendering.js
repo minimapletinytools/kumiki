@@ -175,7 +175,7 @@ export const RenderingMixin = (Base) => class extends Base {
                 ctx.beginPath(); ctx.moveTo(i + h, 0); ctx.lineTo(i, h); ctx.stroke();
             }
         } else if (preset.pattern === 'grid') {
-            ctx.strokeStyle = preset.gridColor || 'rgba(80,140,220,0.12)';
+            ctx.strokeStyle = 'rgba(80,140,220,0.12)';
             ctx.lineWidth = 1;
             const sp = 24;
             for (let x = 0; x < w; x += sp) {
@@ -206,8 +206,7 @@ export const RenderingMixin = (Base) => class extends Base {
             return `repeating-linear-gradient(45deg, rgba(160,140,100,0.07) 0, rgba(160,140,100,0.07) 1px, transparent 1px, transparent 12px), repeating-linear-gradient(-45deg, rgba(160,140,100,0.07) 0, rgba(160,140,100,0.07) 1px, transparent 1px, transparent 12px), linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
         }
         if (preset.pattern === 'grid') {
-            const line = preset.gridColor || 'rgba(80,140,220,0.12)';
-            return `linear-gradient(${line} 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(90deg, ${line} 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
+            return `linear-gradient(rgba(80,140,220,0.12) 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(90deg, rgba(80,140,220,0.12) 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
         }
         if (preset.pattern === 'blobs' && Array.isArray(preset.blobColors)) {
             const blobLayers = preset.blobColors
