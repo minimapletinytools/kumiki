@@ -960,9 +960,9 @@ def cut_basic_mortise_and_tenon_joint(
     timber dimension; reduce both to fit the receiving face. The shoulder follows that entry face.
 
     The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
-    The receiving timber is sectioned through the mortise to expose its floor.
+    The X-ray view shows the floor through the intact receiving timber.
 
-    [![Tenon length and cross section, with a cutaway showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon length and cross section, with an X-ray view showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     from .mixed import cut_mortise_and_tenon_joint
     size, length, face = _basic_tenon_dimensions(arrangement)

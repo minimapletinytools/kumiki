@@ -5,8 +5,7 @@ from xml.etree import ElementTree as ET
 
 import numpy as np
 
-from kumiki import CutTimber, Frame, Measure, create_v3
-from kumiki.csg.cutcsg import HalfSpace, Intersection
+from kumiki import CutTimber, Frame, Measure
 from kumiki.csg.feature_paths import find_feature
 from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 from kumiki.drawings.svg import DrawingSolid, render_svg_view
@@ -87,23 +86,19 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
     text.text = measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
 
 
-def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, section=False):
-    """Draw a cut member at a preset isometric angle, optionally sectioned through world X = 0."""
+def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False):
+    """Draw a cut member at a preset isometric angle with optional X-ray edges."""
     transform = cut.timber.transform
     root = cut.render_timber_with_cuts_csg_local()
-    if section:
-        # Keep the half beyond the center of the socket, exposing its floor and entry.
-        inward = transform.global_to_local_direction(create_v3(1, 0, 0))
-        on_plane = transform.global_to_local(create_v3(0, 0, 0))
-        root = Intersection(root, HalfSpace(normal=inward, offset=inward.dot(on_plane)))
     solid = DrawingSolid(root, transform)
     toward = np.array(preset) / np.linalg.norm(preset)
     right = np.cross([0, 0, 1], toward)
     right /= np.linalg.norm(right)
     up = np.cross(toward, right)
     camera = dict(center=center, right=right, up=up, width=FIELD_WIDTH, height=FIELD_WIDTH * HEIGHT / WIDTH)
-    appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=1, edgeOpacity=1, width=1.5)
-    view = render_svg_view({title: solid}, set(), camera, WIDTH, HEIGHT, appearances={title: appearance})
+    appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=0.28 if xray else 1, edgeOpacity=1, width=1.5)
+    view = render_svg_view({title: solid}, set(), camera, WIDTH, HEIGHT, appearances={title: appearance},
+                           edge_mode='xray' if xray else 'noOverlay')
     view.attrib.update(x=str(slot * WIDTH), y='47', width=str(WIDTH), height=str(HEIGHT), overflow='hidden')
     sheet.append(view)
 
@@ -140,16 +135,16 @@ def mortise_and_tenon(joint):
     def cheek(name):
         return face(tenon, (*waste, 'tenon'), 'tenon_' + name)
 
-    root = sheet('Stopped mortise and tenon', 'Tenon dimensions in timber-local axes and a section through the stopped mortise.')
+    root = sheet('Stopped mortise and tenon', 'Tenon dimensions in timber-local axes and an X-ray view of the stopped mortise.')
     panel(root, 0, 'Tenon', tenon, BACK_RIGHT, (0, -0.025, 0), [
-        (Measure(cheek('top'), face(tenon, (*waste, 'shoulder'), 'shoulder'), label='tenon_length = {value}'), 25, None),
-        (Measure(cheek('right'), cheek('left'), label='tenon_size[0] = {value}'), 26, (196, 338)),
-        (Measure(cheek('front'), cheek('back'), label='tenon_size[1] = {value}'), -76, None),
+        (Measure(cheek('top'), face(tenon, (*waste, 'shoulder'), 'shoulder'), label='tenon_length'), 25, None),
+        (Measure(cheek('right'), cheek('left'), label='tenon_size[0]'), 26, (196, 338)),
+        (Measure(cheek('front'), cheek('back'), label='tenon_size[1]'), -76, None),
     ])
-    panel(root, 1, 'Mortise · center section', socket, FRONT_LEFT, (0.015, -0.01, 0), [
+    panel(root, 1, 'Mortise · X-ray', socket, FRONT_LEFT, (0.015, -0.01, 0), [
         (Measure(face(socket, STOCK, 'rptw.front'), face(socket, ('mortise_hole',), 'mortise_bottom'),
-                 label='mortise_depth = {value}'), 34, None),
-    ], section=True)
+                 label='mortise_depth'), 34, None),
+    ], xray=True)
     return root
 
 
@@ -169,7 +164,7 @@ def tongue_and_fork(joint):
 
     root = sheet('Tongue-and-fork corner', 'Centered tongue and mating fork. The cheeks divide the remaining stock equally.')
     panel(root, 0, 'Tongue', tongue, FRONT_LEFT, (0, 0.012, 0), [
-        (Measure(cheek('front'), cheek('back'), label='tongue_thickness = {value}'), 32, (200, 350)),
+        (Measure(cheek('front'), cheek('back'), label='tongue_thickness'), 32, (200, 350)),
     ])
     panel(root, 1, 'Fork · centered tongue', fork, FRONT_LEFT, (0.012, 0, 0), [
         (upper, -28, (270, 356)),

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
   <title>Stopped mortise and tenon</title>
-  <desc>Tenon dimensions in timber-local axes and a section through the stopped mortise.</desc>
+  <desc>Tenon dimensions in timber-local axes and an X-ray view of the stopped mortise.</desc>
   <rect width="100%" height="100%" fill="white" />
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
     <g class="member-fills">
@@ -43,7 +43,7 @@
       <line x1="292.13" y1="234.81" x2="305.13" y2="212.30" />
       <line x1="299.03" y1="216.86" x2="307.23" y2="214.66" />
       <line x1="192.19" y1="151.71" x2="303.13" y2="215.76" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(250.16 179.41) rotate(30.00)">tenon_length = 95.25mm</text>
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(250.16 179.41) rotate(30.00)">tenon_length</text>
     </g>
     <g fill="#244f6b" stroke="#244f6b">
       <line x1="287.63" y1="282.95" x2="260.63" y2="282.95" />
@@ -52,7 +52,7 @@
       <line x1="267.63" y1="240.41" x2="261.63" y2="234.41" />
       <line x1="264.63" y1="282.95" x2="264.63" y2="237.41" />
       <line x1="264.63" y1="260.18" x2="196.00" y2="323.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(196.00 338.00) rotate(0.00)">tenon_size[0] = 33.87mm</text>
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(196.00 338.00) rotate(0.00)">tenon_size[0]</text>
     </g>
     <g fill="#244f6b" stroke="#244f6b">
       <line x1="292.13" y1="240.01" x2="330.63" y2="306.69" />
@@ -60,53 +60,83 @@
       <line x1="403.06" y1="175.96" x2="441.56" y2="242.65" />
       <line x1="438.46" y1="243.28" x2="440.66" y2="235.08" />
       <line x1="328.63" y1="303.23" x2="439.56" y2="239.18" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(381.59 266.87) rotate(-30.00)">tenon_size[1] = 95.25mm</text>
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(381.59 266.87) rotate(-30.00)">tenon_size[1]</text>
     </g>
   </svg>
   <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Tenon</text>
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
     <g class="member-fills">
-      <path data-member="Mortise · center section" fill="#f0dfbf" fill-opacity="1" d="M324.83889 167.74326 L176.92879 82.347327 L886.89727 -327.55317 Z M1034.8074 -242.15723 L324.83889 167.74326 L886.89727 -327.55317 Z M176.92879 218.98083 L886.89727 -190.91967 L1034.8074 -105.52373 Z M176.92879 218.98083 L1034.8074 -105.52373 L324.83889 304.37676 Z M1034.8074 -242.15723 L1034.8074 -196.61273 L324.83889 213.28776 Z M324.83889 167.74326 L1034.8074 -242.15723 L324.83889 213.28776 Z M1034.8074 -105.52373 L324.83889 304.37676 L324.83889 258.83226 Z M1034.8074 -151.06823 L1034.8074 -105.52373 L324.83889 258.83226 Z M1034.8074 -151.06823 L380.30518 226.80879 L380.30518 181.26429 Z M1034.8074 -196.61273 L1034.8074 -151.06823 L380.30518 181.26429 Z M886.89727 -190.91967 L176.92879 218.98083 L176.92879 82.347327 Z M886.89727 -190.91967 L176.92879 82.347327 L886.89727 -327.55317 Z M1034.8074 -105.52373 L886.89727 -190.91967 L886.89727 -327.55317 Z M1034.8074 -105.52373 L886.89727 -327.55317 L1034.8074 -242.15723 Z M269.3726 117.21733 L380.30518 181.26429 L324.83889 213.28776 Z M213.90631 149.24081 L269.3726 117.21733 L324.83889 213.28776 Z M324.83889 258.83226 L213.90631 194.78531 L269.3726 162.76183 Z M324.83889 258.83226 L269.3726 162.76183 L380.30518 226.80879 Z M380.30518 226.80879 L269.3726 162.76183 L269.3726 117.21733 Z M380.30518 226.80879 L269.3726 117.21733 L380.30518 181.26429 Z M269.3726 162.76183 L213.90631 194.78531 L213.90631 149.24081 Z M269.3726 162.76183 L213.90631 149.24081 L269.3726 117.21733 Z M324.83889 304.37676 L176.92879 218.98083 L176.92879 173.43633 Z M324.83889 258.83226 L324.83889 304.37676 L176.92879 173.43633 Z M324.83889 167.74326 L324.83889 213.28776 L176.92879 127.89183 Z M176.92879 82.347327 L324.83889 167.74326 L176.92879 127.89183 Z M213.90631 149.24081 L213.90631 194.78531 L176.92879 173.43633 Z M176.92879 127.89183 L213.90631 149.24081 L176.92879 173.43633 Z" />
+      <path data-member="Mortise · X-ray" fill="#f0dfbf" fill-opacity="0.28" d="M-385.1296 577.64376 L-533.0397 492.24782 L886.89727 -327.55317 Z M1034.8074 -242.15723 L-385.1296 577.64376 L886.89727 -327.55317 Z M-533.0397 628.88132 L886.89727 -190.91967 L1034.8074 -105.52373 Z M-533.0397 628.88132 L1034.8074 -105.52373 L-385.1296 714.27726 Z M1034.8074 -242.15723 L1034.8074 -196.61273 L-385.1296 623.18826 Z M-385.1296 577.64376 L1034.8074 -242.15723 L-385.1296 623.18826 Z M-385.1296 714.27726 L-385.1296 623.18826 L269.3726 245.31124 Z M269.3726 336.40024 L-385.1296 714.27726 L269.3726 245.31124 Z M1034.8074 -105.52373 L269.3726 336.40024 L269.3726 290.85574 Z M1034.8074 -151.06823 L1034.8074 -105.52373 L269.3726 290.85574 Z M1034.8074 -151.06823 L380.30518 226.80879 L380.30518 181.26429 Z M1034.8074 -196.61273 L1034.8074 -151.06823 L380.30518 181.26429 Z M886.89727 -190.91967 L-533.0397 628.88132 L-533.0397 492.24782 Z M886.89727 -190.91967 L-533.0397 492.24782 L886.89727 -327.55317 Z M1034.8074 -105.52373 L886.89727 -190.91967 L886.89727 -327.55317 Z M1034.8074 -105.52373 L886.89727 -327.55317 L1034.8074 -242.15723 Z M-385.1296 577.64376 L-385.1296 714.27726 L-533.0397 628.88132 Z M-533.0397 492.24782 L-385.1296 577.64376 L-533.0397 628.88132 Z M158.44003 181.26429 L269.3726 117.21733 L380.30518 181.26429 Z M269.3726 245.31124 L158.44003 181.26429 L380.30518 181.26429 Z M269.3726 290.85574 L158.44003 226.80879 L269.3726 162.76183 Z M269.3726 290.85574 L269.3726 162.76183 L380.30518 226.80879 Z M380.30518 226.80879 L269.3726 162.76183 L269.3726 117.21733 Z M380.30518 226.80879 L269.3726 117.21733 L380.30518 181.26429 Z M269.3726 245.31124 L269.3726 290.85574 L158.44003 226.80879 Z M158.44003 181.26429 L269.3726 245.31124 L158.44003 226.80879 Z M269.3726 162.76183 L158.44003 226.80879 L158.44003 181.26429 Z M269.3726 162.76183 L158.44003 181.26429 L269.3726 117.21733 Z" />
     </g>
     <g class="face-fills" />
     <g class="edges" fill="none" stroke-linejoin="round">
-      <g data-member="Mortise · center section" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
-        <path data-feature="rptw.right" d="M886.89727 -327.55317 L176.92879 82.347327" />
-        <path data-feature="rptw.right" d="M176.92879 82.347327 L324.83889 167.74326" />
-        <path data-feature="rptw.right" d="M324.83889 167.74326 L1034.8074 -242.15723" />
+      <g data-member="Mortise · X-ray" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <g class="xray-edges" stroke-dasharray="5 4" opacity="0.45">
+          <path data-feature="rptw.right" d="M886.89727 -327.55317 L-533.0397 492.24782" />
+          <path data-feature="rptw.right" d="M-533.0397 492.24782 L-385.1296 577.64376" />
+          <path data-feature="rptw.right" d="M-385.1296 577.64376 L1034.8074 -242.15723" />
+          <path data-feature="rptw.right" d="M1034.8074 -242.15723 L886.89727 -327.55317" />
+          <path data-feature="rptw.left" d="M-533.0397 628.88132 L886.89727 -190.91967" />
+          <path data-feature="rptw.left" d="M886.89727 -190.91967 L1034.8074 -105.52373" />
+          <path data-feature="rptw.left" d="M1034.8074 -105.52373 L-385.1296 714.27726" />
+          <path data-feature="rptw.left" d="M-385.1296 714.27726 L-533.0397 628.88132" />
+          <path data-feature="rptw.front" d="M269.3726 245.31124 L380.30518 181.26429" />
+          <path data-feature="rptw.front" d="M1034.8074 -196.61273 L1034.8074 -242.15723" />
+          <path data-feature="rptw.front" d="M-385.1296 577.64376 L-385.1296 623.18826" />
+          <path data-feature="rptw.front" d="M-385.1296 623.18826 L-385.1296 714.27726" />
+          <path data-feature="rptw.front" d="M-385.1296 714.27726 L269.3726 336.40024" />
+          <path data-feature="rptw.front" d="M269.3726 290.85574 L269.3726 245.31124" />
+          <path data-feature="rptw.front" d="M269.3726 336.40024 L1034.8074 -105.52373" />
+          <path data-feature="rptw.front" d="M1034.8074 -105.52373 L1034.8074 -151.06823" />
+          <path data-feature="rptw.front" d="M380.30518 226.80879 L269.3726 290.85574" />
+          <path data-feature="rptw.front" d="M380.30518 181.26429 L380.30518 226.80879" />
+          <path data-feature="rptw.front" d="M1034.8074 -151.06823 L1034.8074 -196.61273" />
+          <path data-feature="rptw.back" d="M-533.0397 628.88132 L-533.0397 492.24782" />
+          <path data-feature="rptw.back" d="M886.89727 -327.55317 L886.89727 -190.91967" />
+          <path data-feature="rptw.top" d="M1034.8074 -242.15723 L1034.8074 -105.52373" />
+          <path data-feature="rptw.bottom" d="M-385.1296 714.27726 L-385.1296 577.64376" />
+          <path data-feature="mortise_right" d="M380.30518 181.26429 L269.3726 117.21733" />
+          <path data-feature="mortise_right" d="M269.3726 117.21733 L158.44003 181.26429" />
+          <path data-feature="mortise_right" d="M158.44003 181.26429 L269.3726 245.31124" />
+          <path data-feature="mortise_left" d="M269.3726 290.85574 L158.44003 226.80879" />
+          <path data-feature="mortise_left" d="M158.44003 226.80879 L269.3726 162.76183" />
+          <path data-feature="mortise_left" d="M269.3726 162.76183 L380.30518 226.80879" />
+          <path data-feature="mortise_front" d="M269.3726 162.76183 L269.3726 117.21733" />
+          <path data-feature="mortise_back" d="M158.44003 181.26429 L158.44003 226.80879" />
+        </g>
+        <path data-feature="rptw.right" d="M886.89727 -327.55317 L-533.0397 492.24782" />
+        <path data-feature="rptw.right" d="M-533.0397 492.24782 L-385.1296 577.64376" />
+        <path data-feature="rptw.right" d="M-385.1296 577.64376 L1034.8074 -242.15723" />
         <path data-feature="rptw.right" d="M1034.8074 -242.15723 L886.89727 -327.55317" />
-        <path data-feature="rptw.left" d="M1034.8074 -105.52373 L324.83889 304.37676" />
-        <path data-feature="rptw.left" d="M324.83889 304.37676 L176.92879 218.98083" />
-        <path data-feature="rptw.front" d="M324.83889 213.28776 L380.30518 181.26429" />
+        <path data-feature="rptw.left" d="M1034.8074 -105.52373 L-385.1296 714.27726" />
+        <path data-feature="rptw.left" d="M-385.1296 714.27726 L-533.0397 628.88132" />
+        <path data-feature="rptw.front" d="M269.3726 245.31124 L380.30518 181.26429" />
         <path data-feature="rptw.front" d="M1034.8074 -196.61273 L1034.8074 -242.15723" />
-        <path data-feature="rptw.front" d="M324.83889 167.74326 L324.83889 213.28776" />
-        <path data-feature="rptw.front" d="M324.83889 258.83226 L324.83889 304.37676" />
+        <path data-feature="rptw.front" d="M-385.1296 577.64376 L-385.1296 623.18826" />
+        <path data-feature="rptw.front" d="M-385.1296 623.18826 L-385.1296 714.27726" />
+        <path data-feature="rptw.front" d="M-385.1296 714.27726 L269.3726 336.40024" />
+        <path data-feature="rptw.front" d="M269.3726 290.85574 L269.3726 245.31124" />
+        <path data-feature="rptw.front" d="M269.3726 336.40024 L1034.8074 -105.52373" />
         <path data-feature="rptw.front" d="M1034.8074 -105.52373 L1034.8074 -151.06823" />
-        <path data-feature="rptw.front" d="M380.30518 226.80879 L324.83889 258.83226" />
+        <path data-feature="rptw.front" d="M380.30518 226.80879 L269.3726 290.85574" />
         <path data-feature="rptw.front" d="M380.30518 181.26429 L380.30518 226.80879" />
         <path data-feature="rptw.front" d="M1034.8074 -151.06823 L1034.8074 -196.61273" />
-        <path data-feature="rptw.back" d="M176.92879 218.98083 L176.92879 82.347327" />
+        <path data-feature="rptw.back" d="M-533.0397 628.88132 L-533.0397 492.24782" />
         <path data-feature="rptw.top" d="M1034.8074 -242.15723 L1034.8074 -105.52373" />
-        <path data-feature="mortise_right" d="M213.90631 149.24081 L324.83889 213.28776" />
-        <path data-feature="mortise_left" d="M324.83889 258.83226 L213.90631 194.78531" />
-        <path data-feature="mortise_left" d="M213.90631 194.78531 L253.34901 172.01306" />
+        <path data-feature="rptw.bottom" d="M-385.1296 714.27726 L-385.1296 577.64376" />
         <path data-feature="mortise_left" d="M340.86248 204.03654 L380.30518 226.80879" />
-        <path data-feature="mortise_bottom" d="M213.90631 194.78531 L213.90631 149.24081" />
-        <path data-feature="side.0" d="M176.92879 173.43633 L176.92879 218.98083" />
-        <path data-feature="side.0" d="M176.92879 82.347327 L176.92879 127.89183" />
-        <path data-feature="side.0" d="M176.92879 127.89183 L176.92879 173.43633" />
       </g>
     </g>
     <g class="references" fill="none" />
     <g fill="#244f6b" stroke="#244f6b">
-      <line x1="215.41" y1="146.64" x2="232.91" y2="116.33" />
-      <line x1="226.81" y1="120.89" x2="235.00" y2="118.70" />
-      <line x1="326.34" y1="210.69" x2="343.84" y2="180.38" />
-      <line x1="337.74" y1="184.94" x2="345.94" y2="182.74" />
-      <line x1="230.91" y1="119.80" x2="341.84" y2="183.84" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(288.87 147.49) rotate(30.00)">mortise_depth = 95.25mm</text>
+      <line x1="159.94" y1="178.67" x2="177.44" y2="148.36" />
+      <line x1="171.34" y1="152.92" x2="179.54" y2="150.72" />
+      <line x1="270.87" y1="242.71" x2="288.37" y2="212.40" />
+      <line x1="282.27" y1="216.96" x2="290.47" y2="214.77" />
+      <line x1="175.44" y1="151.82" x2="286.37" y2="215.87" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(233.41 179.51) rotate(30.00)">mortise_depth</text>
     </g>
   </svg>
-  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Mortise · center section</text>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Mortise · X-ray</text>
   <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
 </svg>

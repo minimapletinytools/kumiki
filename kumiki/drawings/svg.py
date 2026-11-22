@@ -15,10 +15,11 @@ from ..csg.cross_sections import (PolygonRegions, cross_section_outline, cross_s
 from ..csg.curves import CylindricalPatch, EllipseArc, angular_roots, cylindrical_patches
 from ..csg.cutcsg import (ConvexPolygonSimpleLoft, CutCSG, ExtrusionCap, FaceFeature,
                           walk_csg_with_parity)
+from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg
 from ..csg.feature_extent import extents_of
 from ..csg.meshcsg import TriangleSolid
 from ..csg.pathcsg import ArcSegment, PathExtrusion
-from ..geometry import Plane
+from ..geometry import Line, Plane
 from ..measuring import locate_face
 from ..rule import Transform, as_ndarray, create_v3
 from ..timber import PerfectTimberWithin
@@ -131,17 +132,25 @@ class DrawingSolid:
         normals = np.array([p.normal for p in self.planes])
         offsets = np.array([p.normal @ p.point for p in self.planes])
         for plane, a, b in outlines:
-            if np.linalg.norm(b - a) < 1e-8:
+            length = float(np.linalg.norm(b - a))
+            if length < 1e-8:
                 continue
             if self.patches:
                 on_other = ((np.abs(normals @ a - offsets) < 1e-7) & (np.abs(normals @ b - offsets) < 1e-7)
                             & (np.abs(normals @ plane.normal) < 1 - 1e-8))
                 if not np.any(on_other):
                     continue
-            key = tuple(sorted((tuple(a.round(9)), tuple(b.round(9)))))
-            if key not in seen:
-                self.lines.append((plane.name, a, b))
-                seen.add(key)
+            # A cutter's face outline can continue beyond a shoulder across coplanar stock.
+            line = Line(point=create_v3(*((a + b) / 2)), direction=create_v3(*((b - a) / length)))
+            creases = crop_line_to_crease_segments_on_csg(line, self.root, length / 2, tolerance=1e-8)
+            pieces = [(a, b)] if creases is None else [(as_ndarray(c.start), as_ndarray(c.end)) for c in creases]
+            for start, end in pieces:
+                if np.linalg.norm(end - start) < 1e-8:
+                    continue
+                key = tuple(sorted((tuple(start.round(9)), tuple(end.round(9)))))
+                if key not in seen:
+                    self.lines.append((plane.name, start, end))
+                    seen.add(key)
 
     def _on_both(self, point, first, second):
         at = create_v3(*point)
@@ -512,7 +521,10 @@ def _fill_member(parent, key, triangles, faces, index, view, appearance):
 def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: dict,
                     width: float, height: float, styles: DrawingStyles = DrawingStyles(),
                     *, appearances: dict | None = None, edge_mode: str = 'noOverlay') -> ET.Element:
-    """Return SVG content for one orthographic viewport, with its live camera dimensions in metres."""
+    """Render an orthographic viewport with camera dimensions in metres.
+
+    The xray edge mode draws dashed edges through material beneath the solid visible edges.
+    """
     view = _Viewport(camera, width, height)
     appearances = appearances or {}
     svg = ET.Element('svg', {'xmlns': 'http://www.w3.org/2000/svg', 'viewBox': f'0 0 {width} {height}'})
@@ -558,16 +570,16 @@ def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: 
             if parts:
                 ET.SubElement(parent, 'path', {'data-feature': name, 'd': ' '.join(parts)})
 
-        if edge_mode != 'none' and appearance.get('edgeOpacity', 1) > 0:
+        def draw_edges(layer, through):
             for name, a, b in solid.lines:
-                stroke(group, name, project(a), project(b), overlay=edge_mode == 'overlay')
+                stroke(layer, name, project(a), project(b), overlay=through)
             for name, a, b in solid.generators(basis[:, 2]):
-                stroke(group, name, project(a), project(b), overlay=edge_mode == 'overlay')
+                stroke(layer, name, project(a), project(b), overlay=through)
             drawn_arcs = set()
             for rim in solid.rims:
                 arc = EllipseArc(project(rim.arc.center), rim.arc.u @ basis, rim.arc.v @ basis, rim.start, rim.stop)
                 paths = []
-                for a, b in ([(arc.start, arc.stop)] if edge_mode == 'overlay' else _visible_angles(arc, occlusion)):
+                for a, b in ([(arc.start, arc.stop)] if through else _visible_angles(arc, occlusion)):
                     path = _arc_path(view, arc, a, b)
                     if path not in drawn_arcs:
                         paths.append(path)
@@ -576,7 +588,14 @@ def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: 
                     attrs = {'data-feature': rim.name, 'd': ' '.join(paths)}
                     if rim.owner.label.name:
                         attrs['data-source'] = rim.owner.label.name
-                    ET.SubElement(group, 'path', attrs)
+                    ET.SubElement(layer, 'path', attrs)
+
+        if edge_mode != 'none' and appearance.get('edgeOpacity', 1) > 0:
+            if edge_mode == 'xray':
+                underlay = ET.SubElement(group, 'g', {'class': 'xray-edges', 'stroke-dasharray': '5 4',
+                                                       'opacity': '0.45'})
+                draw_edges(underlay, through=True)
+            draw_edges(group, through=edge_mode == 'overlay')
         timber = solid.timber
         if timber is None or ghost:
             continue

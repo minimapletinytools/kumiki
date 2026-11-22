@@ -384,9 +384,9 @@ def cut_mortise_and_tenon_joint(
     when depth is omitted.
 
     The basic pattern uses 4 × 5 in stock. The tenon is dimensioned along its local axes.
-    The receiving timber is sectioned through the mortise to expose its floor.
+    The X-ray view shows the floor through the intact receiving timber.
 
-    [![Tenon length and cross section, with a cutaway showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon length and cross section, with an X-ray view showing mortise depth](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
