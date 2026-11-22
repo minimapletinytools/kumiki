@@ -424,7 +424,7 @@ def cut_mortise_and_tenon_joint(
                 FeatureOverride(prism_face_key(PrismFace.FRONT), "tenon_front", measured_against(_TENON_FACE, "tenon_back")),
                 FeatureOverride(prism_face_key(PrismFace.BACK), "tenon_back", measured_against(_TENON_FACE, "tenon_front")),
                 FeatureOverride(prism_face_key(PrismFace.TOP), tenon_tip_name,
-                                measured_against(_TENON_FACE, "shoulder", Datum.AVOID)),
+                                measured_against(_TENON_FACE, "shoulder", datum=Datum.AVOID)),
             ],
             label=CutCSGLabel("tenon"),
         )

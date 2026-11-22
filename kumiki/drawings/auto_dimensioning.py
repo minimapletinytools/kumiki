@@ -173,8 +173,8 @@ def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
 
 @fixed
 def declared_pairs(candidate: DimensionCandidate, context: PickContext) -> float:
-    """Criterion: between a feature and the one it is marked relative to (FeatureMarkingSpec.mark_relative_to),
-    e.g. a tenon's two cheeks, or its tip and its shoulder."""
+    """Criterion: between a feature and one it is marked relative to (FeatureMarkingSpec.mark_relative_to),
+    e.g. a tenon's two cheeks, its tip and its shoulder, or a dovetail's flank and its wide face."""
     a, b = _ends(candidate)
     return 0.0 if _marked_relative(a, b, candidate.solve) or _marked_relative(b, a, candidate.solve) else 1.0
 
@@ -197,18 +197,37 @@ def _datum(feature) -> Datum:
 
 
 def _marked_relative(one: FeatureHandle, other: FeatureHandle, solve: DrawingSolve) -> bool:
-    """Return whether `other` is (or is coincident with) the feature `one` is marked relative to: the nearest
-    of that name in the timber's tree, so each tenon's tip finds its own shoulder."""
-    marking = None if one.feature.is_derived() else one.feature.properties.marking_override
-    if marking is None or marking.mark_relative_to is None or other.timber is not one.timber:
+    """Return whether `other` is (or is coincident with) a feature `one` is marked relative to: the nearest
+    of each name in the timber's tree, so each tenon's tip finds its own shoulder. A partner edge is also
+    met by a face it lies on, which stands for the edge where that face is seen edge-on. A derived edge
+    takes its faces' partners: a flank's line on a timber face pairs with the wide face's line there."""
+    if other.timber is not one.timber:
         return False
+    carriers = _solving_carriers(other, solve.carriers)
+    if not carriers:
+        return False
+    if not one.feature.is_derived():
+        return any(carriers <= partner for partner in _partner_carriers(one, solve))
+    own = _solving_carriers(one, solve.carriers)
+    for parent in one.feature.parents:
+        face = FeatureHandle(timber=one.timber, hit=parent)
+        rest = own - _solving_carriers(face, solve.carriers)
+        if any(carriers == rest | partner for partner in _partner_carriers(face, solve)):
+            return True
+    return False
+
+
+def _partner_carriers(one: FeatureHandle, solve: DrawingSolve) -> List[FrozenSet[CarrierRef]]:
+    """Return the carriers of each feature a declared feature is marked relative to."""
+    marking = one.feature.properties.marking_override
+    if marking is None or not marking.mark_relative_to:
+        return []
     cut = next((cut for cut in solve.cut_timbers if cut.timber is one.timber), None)
     if cut is None:
-        return False
-    partners = _nearest_named(cut.render_timber_with_cuts_csg_local(), id(one.owner), marking.mark_relative_to)
-    carriers = _solving_carriers(other, solve.carriers)
-    return any(carriers and _solving_carriers(partner, solve.carriers) == carriers
-               for partner in (FeatureHandle(timber=one.timber, hit=hit) for hit in partners))
+        return []
+    root = cut.render_timber_with_cuts_csg_local()
+    return [_solving_carriers(FeatureHandle(timber=one.timber, hit=hit), solve.carriers)
+            for name in marking.mark_relative_to for hit in _nearest_named(root, id(one.owner), name)]
 
 
 def _solving_carriers(handle: FeatureHandle, carriers: CarrierMap) -> FrozenSet[CarrierRef]:
@@ -247,8 +266,8 @@ def _below(node: CutCSG) -> List[CutCSG]:
 #: The default order of preference, first to last; reorder or drop lines to try another.
 PREFERENCE_ORDER: Tuple[Criterion, ...] = (
     angles_first,
-    angles_from_the_timber,
     declared_pairs,
+    angles_from_the_timber,
     preferred_datum,
     edges_over_faces,
     from_reference,

@@ -21,6 +21,7 @@ from kumiki.csg.cutcsg import (
     Intersection,
     SolidUnion,
     adopt_csg,
+    measured_against,
     shoulder_override,
     side_key,
 )
@@ -92,10 +93,11 @@ _DOVETAIL_FACE = FeatureProperties(group=FeatureGroup.TENON)
 #: planes of that timber's own faces -- naming either would derive the same line
 #: as the body's own edge with the shoulder plane (see _drop_duplicate_derived).
 def _dovetail_face_overrides(face: FeatureProperties = _DOVETAIL_FACE):
+    """Return the dovetail's face overrides; each cheek's angle is measured from the wide face."""
     return (
-        FeatureOverride(side_key(1), "dovetail_right", face),
-        FeatureOverride(side_key(2), "dovetail_front", face),
-        FeatureOverride(side_key(3), "dovetail_left", face),
+        FeatureOverride(side_key(1), "dovetail_right", measured_against(face, "dovetail_front")),
+        FeatureOverride(side_key(2), "dovetail_front", measured_against(face, "dovetail_right", "dovetail_left")),
+        FeatureOverride(side_key(3), "dovetail_left", measured_against(face, "dovetail_front")),
     )
 
 
