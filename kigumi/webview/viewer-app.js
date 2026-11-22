@@ -178,8 +178,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this._csgHighlightSource = null;
         this.renderProfiles = RENDER_PROFILES;
         this.memberRenderProfileByType = {
-            timber: 'timber-default',
-            accessory: 'accessory-cute',
+            timber: 'timber-workshop',
+            accessory: 'accessory-steel',
         };
 
         this.animationHandle = null;
