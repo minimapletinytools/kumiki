@@ -11,7 +11,8 @@ Concepts demonstrated — details
 ------------------------------
 An 8-by-4-foot footprint supports mudsills, posts, beams, and infill members. Five parallel
 rafters span unequal-height top plates to form a single-pitch roof; housing cuts seat them in
-the plates. Dimensions and counts are source constants.
+the plates. The two sides and three back bays are filled with 1x6 boards set into grooves
+in the frame. Dimensions and counts are source constants.
 Recipe notes
 ------------
 Oscar's Shed - A simple timber frame shed structure
@@ -50,6 +51,50 @@ post_front_height = feet(5)   # Height of front posts
 small_timber_size = create_v2(inches(4), inches(scalar(5, 2)))   # 4" vertical x 2.5" depth
 med_timber_size = create_v2(inches(4), inches(4))                   # 4" x 4"
 big_timber_size = create_v2(inches(6), inches(4))                   # 6" vertical x 4" depth
+
+# Wall boards: nominal 1x6 (actual 3/4" x 5-1/2"), set into a groove this deep all round.
+wall_board_width = inches(scalar(11, 2))
+wall_board_thickness = inches(scalar(3, 4))
+wall_board_groove_depth = inches(scalar(1, 2))
+
+
+def _boards_in_grooved_frame(
+    frame_timbers: list,
+    start: V3,
+    width_direction: V3,
+    width: Numeric,
+    height: Numeric,
+    name: str,
+) -> Joint:
+    """Return a joint filling an opening with horizontal 1x6 boards set into a groove in `frame_timbers`.
+
+    `start` is the opening's bottom corner where the boards begin, on the boards' centre plane;
+    the boards run along `width_direction` (unit, horizontal) for `width` and stack up for `height`.
+    Full boards stack from the bottom and the top one is ripped to what is left.
+    """
+    up = create_v3(scalar(0), scalar(0), scalar(1))
+    stack = height + 2 * wall_board_groove_depth
+    full_boards = int(stack // wall_board_width)
+    widths = [wall_board_width] * full_boards
+    if stack - full_boards * wall_board_width > 0:
+        widths.append(stack - full_boards * wall_board_width)
+    boards = []
+    offset = -wall_board_groove_depth
+    for i, board_width in enumerate(widths, start=1):
+        boards.append(Board(
+            length=width + 2 * wall_board_groove_depth,
+            size=create_v2(board_width, wall_board_thickness),
+            transform=Transform(
+                position=start + up * (offset + board_width / scalar(2)) - width_direction * wall_board_groove_depth,
+                orientation=Orientation.from_z_and_x(width_direction, up),
+            ),
+            ticket=BoardTicket(path=f"{name} {i}", tags=("board", "1x6")),
+        ))
+        offset += board_width
+    return cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
+        boards=PanelBoardArrangement(boards=boards),
+        frame_timbers=ExtendedTimberArrangement(timbers=frame_timbers),
+    )
 
 
 def create_oscarshed(center: Optional[V3] = None) -> Frame:
@@ -1039,6 +1084,55 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         rafter_house_joints.append((joint_back, joint_front))
 
     # ============================================================================
+    # Fill the two sides and the three back bays with 1x6 boards set in grooves
+    # ============================================================================
+    # Boards run horizontally and sit in a groove cut into the frame around each opening.
+    # The side posts and girts (x 3..7") only overlap the side mudsills (x 0..4") by 1",
+    # so the side boards sit centred in that overlap. The back boards sit centred in the
+    # back wall.
+
+    mudsill_top = mudsill_size[0]
+    post_half = post_size[0] / scalar(2)
+    side_board_plane_x = (post_inset - post_half + mudsill_size[1]) / scalar(2)
+    side_opening_y = (post_size[1], base_length - post_size[1])
+    side_opening_top = post_back_height - side_girt_size[0] / scalar(2)
+    back_board_plane_y = base_length - post_size[1] / scalar(2)
+    back_opening_top = post_back_height + inches(3) - top_plate_size[0] / scalar(2)
+
+    left_side_boards = _boards_in_grooved_frame(
+        frame_timbers=[side_girt_left, mudsill_left, post_front_left, post_back_left],
+        start=create_v3(center[0] + side_board_plane_x, center[1] + side_opening_y[0], center[2] + mudsill_top),
+        width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+        width=side_opening_y[1] - side_opening_y[0],
+        height=side_opening_top - mudsill_top,
+        name="Left Side Board",
+    )
+    right_side_boards = _boards_in_grooved_frame(
+        frame_timbers=[side_girt_right, mudsill_right, post_front_right, post_back_right],
+        start=create_v3(center[0] + base_width - side_board_plane_x, center[1] + side_opening_y[0], center[2] + mudsill_top),
+        width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+        width=side_opening_y[1] - side_opening_y[0],
+        height=side_opening_top - mudsill_top,
+        name="Right Side Board",
+    )
+
+    # Back bays, left to right along X: between each pair of neighbouring back posts.
+    back_posts_along_x = [post_back_left, post_back_middle_left, post_back_middle_right, post_back_right]
+    back_post_centers_x = [post_inset, post_inset + back_post_spacing, post_inset + 2 * back_post_spacing, base_width - post_inset]
+    back_bay_boards = []
+    for bay, (left_post, right_post) in enumerate(zip(back_posts_along_x, back_posts_along_x[1:])):
+        bay_start_x = back_post_centers_x[bay] + post_half
+        bay_end_x = back_post_centers_x[bay + 1] - post_half
+        back_bay_boards.append(_boards_in_grooved_frame(
+            frame_timbers=[top_plate_back, mudsill_back, left_post, right_post],
+            start=create_v3(center[0] + bay_start_x, center[1] + back_board_plane_y, center[2] + mudsill_top),
+            width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width=bay_end_x - bay_start_x,
+            height=back_opening_top - mudsill_top,
+            name=f"Back Bay {bay + 1} Board",
+        ))
+
+    # ============================================================================
     # Create Frame from joints using the new from_joints constructor
     # ============================================================================
     # The from_joints method automatically:
@@ -1092,6 +1186,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         all_joints.append(joint_front)
         all_joints.append(joint_back)
     
+    all_joints.extend([left_side_boards, right_side_boards, *back_bay_boards])
+
     # Joists now have dovetail joints, so no unjointed timbers
     unjointed_timbers = []
     
@@ -1163,5 +1259,7 @@ if __name__ == "__main__":
     print(f"  - Outside faces of outer rafters flush with ends of top plates")
     print(f"  - Stickout: 12 inches on both ends (symmetric)")
     print(f"  - Top plates have housed joints (rafter pockets) for each rafter")
+    print(f"Wall boards: 1x6 (3/4\" x 5-1/2\"), horizontal, in 1/2\" grooves")
+    print(f"  - Fill both sides and the three back bays; the last board in each is ripped to fit")
     print("="*60)
 
