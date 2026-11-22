@@ -12,7 +12,7 @@ from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.csg.cutcsg import (
     END_CAP, START_CAP, FeatureCategory, FeatureGroup, FeatureOverride, FeatureProperties, arris_against_cap,
-    side_key,
+    measured_against, side_key,
 )
 from ..shavings import *
 
@@ -22,11 +22,26 @@ from ..shavings import *
 _DOVETAIL_FEATURE = FeatureProperties(group=FeatureGroup.CROSSING)
 _SIDE_NAMES = ("dovetail_neck", "dovetail_right_flank", "dovetail_wide_face", "dovetail_left_flank")
 _END_NAMES = ("dovetail_backward_end", "dovetail_forward_end")
+#: Each flank's angle is measured from the wide face.
+_SIDE_PARTNERS = {"dovetail_right_flank": ("dovetail_wide_face",), "dovetail_left_flank": ("dovetail_wide_face",),
+                  "dovetail_wide_face": ("dovetail_right_flank", "dovetail_left_flank")}
 _DOVETAIL_FACES = [
-    *(FeatureOverride(side_key(side), name, _DOVETAIL_FEATURE) for side, name in enumerate(_SIDE_NAMES)),
+    *(FeatureOverride(side_key(side), name, measured_against(_DOVETAIL_FEATURE, *_SIDE_PARTNERS[name])
+                      if name in _SIDE_PARTNERS else _DOVETAIL_FEATURE)
+      for side, name in enumerate(_SIDE_NAMES)),
     FeatureOverride(START_CAP, _END_NAMES[0], _DOVETAIL_FEATURE),
     FeatureOverride(END_CAP, _END_NAMES[1], _DOVETAIL_FEATURE),
 ]
+
+
+def _end_edge(side: str, end: str) -> FeatureProperties:
+    """An end edge's properties: paired like its side, so a tapered flank, never seen edge-on, is still
+    angled from the wide face where both meet that end."""
+    partners = _SIDE_PARTNERS.get(side, ())
+    return measured_against(_DOVETAIL_FEATURE, *(f"{other}×{end}" for other in partners)) if partners \
+        else _DOVETAIL_FEATURE
+
+
 #: Its edges, named by the two faces they join: along its length between neighbouring sides,
 #: and round each end. CROSSING too, so where one leaves a timber's face is a point to measure to.
 _DOVETAIL_EDGES = [
@@ -34,8 +49,8 @@ _DOVETAIL_EDGES = [
     for side, name in enumerate(_SIDE_NAMES)
     for override in (
         FeatureOverride((FeatureCategory.ARRIS, side), f"{name}×{_SIDE_NAMES[(side + 1) % 4]}", _DOVETAIL_FEATURE),
-        FeatureOverride(arris_against_cap(side, 4, end=False), f"{name}×{_END_NAMES[0]}", _DOVETAIL_FEATURE),
-        FeatureOverride(arris_against_cap(side, 4, end=True), f"{name}×{_END_NAMES[1]}", _DOVETAIL_FEATURE),
+        FeatureOverride(arris_against_cap(side, 4, end=False), f"{name}×{_END_NAMES[0]}", _end_edge(name, _END_NAMES[0])),
+        FeatureOverride(arris_against_cap(side, 4, end=True), f"{name}×{_END_NAMES[1]}", _end_edge(name, _END_NAMES[1])),
     )
 ]
 _DOVETAIL_FEATURES = [*_DOVETAIL_FACES, *_DOVETAIL_EDGES]

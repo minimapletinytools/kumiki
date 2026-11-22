@@ -320,12 +320,13 @@ class FeatureMarkingStatus(Enum):
 class FeatureMarkingSpec:
     """How to mark a feature on a drawing, when not the default.
 
-    `mark_relative_to` names the feature to dimension it from: the nearest feature of that name in the
-    CSG tree. Auto dimensioning prefers that measurement; naming each other makes a symmetric pair.
+    `mark_relative_to` names the features to dimension it from: for each name, the nearest feature of
+    that name in the CSG tree. Auto dimensioning prefers those measurements; naming each other makes a
+    symmetric pair.
     """
 
     mark: FeatureMarkingStatus = FeatureMarkingStatus.OPTIONAL
-    mark_relative_to: Optional[str] = None
+    mark_relative_to: Tuple[str, ...] = ()
 
 
 class FeaturePurpose(Enum):
@@ -1797,10 +1798,10 @@ class FeatureOverride:
         )
 
 
-def measured_against(properties: FeatureProperties, partner: str, datum: Datum = Datum.NEUTRAL) -> FeatureProperties:
-    """Return `properties` marked relative to the feature named `partner` (FeatureMarkingSpec):
+def measured_against(properties: FeatureProperties, *partners: str, datum: Datum = Datum.NEUTRAL) -> FeatureProperties:
+    """Return `properties` marked relative to the features named `partners` (FeatureMarkingSpec):
     auto dimensioning prefers measuring between them. Two naming each other are a symmetric pair."""
-    return replace(properties, marking_override=FeatureMarkingSpec(mark_relative_to=partner), datum=datum)
+    return replace(properties, marking_override=FeatureMarkingSpec(mark_relative_to=partners), datum=datum)
 
 
 def shoulder_override(key: FeatureKey, name: Optional[str] = None,
