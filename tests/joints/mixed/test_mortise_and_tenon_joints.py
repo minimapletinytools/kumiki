@@ -1817,6 +1817,8 @@ def test_merge_twin_tenons_with_one_inset_shoulder(simple_T_configuration):
 
     left = component(-1, 2)
     right = component(1, 3)
+    assert type(left) is Joint and type(right) is Joint
+    right = Joint(dict(reversed(right.cuttings.items())), right.ticket, right.jointAccessories)
     merged = merge_mortise_and_tenon_joints([left, right], relief=ButtJointNotchReliefConfig())
     shank = _render_cutting(merged.cuttings[tenon.ticket.path])
     receiver = _render_cutting(merged.cuttings[mortise.ticket.path])

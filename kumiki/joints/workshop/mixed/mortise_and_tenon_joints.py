@@ -40,6 +40,7 @@ from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
     mark_distance_from_end_along_centerline,
+    mark_plane_from_edge_in_direction,
     get_center_point_on_face_global,
     Space,
 )
@@ -239,18 +240,6 @@ def _mortise_walls() -> List[FeatureOverride]:
         FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back", measured_against(wall, "mortise_front")),
         FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
     ]
-
-
-@dataclass(frozen=True, kw_only=True)
-class _MortiseAndTenonJoint(Joint):
-    arrangement: ButtJointTimberArrangement
-    shoulder_plane: Plane
-    shoulder_half_space_global: HalfSpace
-    shoulder_distance: Numeric
-    parallel_face: Union[TimberLongFace, bool]
-    tenon_local: CutCSG
-    independent_tenon_cuts: tuple[CutCSG, ...]
-    has_relief: bool
 
 
 def _plane_aligned_shoulder_notch(
@@ -718,7 +707,6 @@ def cut_mortise_and_tenon_joint(
                 positive_csg=Intersection(wedge.get_csg_local(), bore_local))
         else:
             joint_accessories[f"wedge{suffix}"] = wedge
-    independent_tenon_cuts = list(slots)
     if peg_parameters is not None:
         peg_results = compute_peg_positions(
             arrangement=arrangement,
@@ -794,7 +782,6 @@ def cut_mortise_and_tenon_joint(
             )
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
-        independent_tenon_cuts.extend(peg_holes_in_tenon_local)
         if peg_holes_in_tenon_local:
             tenon_cut_with_pegs_csg = _union_into_cut(
                 tenon_cut_csg, peg_holes_in_tenon_local, TENON_CUT_LABEL)
@@ -846,12 +833,7 @@ def cut_mortise_and_tenon_joint(
         assembly_ordering=Ordering(0, 0),
     )
 
-    return _MortiseAndTenonJoint(
-        arrangement=arrangement, shoulder_plane=shoulder_plane, shoulder_half_space_global=shoulder_half_space_global,
-        shoulder_distance=mortise_shoulder_distance_from_centerline_or_centerplane,
-        parallel_face=set_mortise_shoulder_parallel_to_face,
-        tenon_local=tenon_prism_local, independent_tenon_cuts=tuple(independent_tenon_cuts),
-        has_relief=shoulder_notch_relief_geom is not None or tenon_cut is not tenon_cut_no_relief,
+    return Joint(
         cuttings={
             tenon_timber.ticket.path: tenon_cut_timber,
             mortise_timber.ticket.path: mortise_cut_timber,
@@ -883,6 +865,41 @@ def _common_withdrawal(cuttings: Sequence[Cutting]) -> AssemblyFreedom:
     return AssemblyFreedom(translations=tuple(translations))
 
 
+def _unrelieved_tenon_parts(joint: Joint) -> tuple[Cutting, Cutting, HalfSpace, CutCSG, list[CutCSG]]:
+    """Return the tenon and mortise cuttings, local shoulder, retained tenon and independent tenon cuts."""
+    assert joint.ticket.joint_type == "mortise_and_tenon" and len(joint.cuttings) == 2, (
+        "Expected a single butt mortise and tenon joint"
+    )
+    tenon, mortise = joint.cuttings.values()
+    if tenon.get_maybe_top_end_cut() is None and tenon.get_maybe_bottom_end_cut() is None:
+        tenon, mortise = mortise, tenon
+    assert (tenon.get_maybe_top_end_cut() is None) != (tenon.get_maybe_bottom_end_cut() is None), "Expected one tenon end"
+    assert mortise.get_maybe_top_end_cut() is None and mortise.get_maybe_bottom_end_cut() is None, "Expected a butt joint"
+
+    hole = mortise.negative_csg
+    assert hole is not None
+    bores = hole.children if isinstance(hole, SolidUnion) and hole.label == MORTISE_CUT_LABEL else [hole]
+    relief_error = (
+        "Expected one mortise hole and optional peg holes. Inputs that already have shoulder or scribe relief "
+        "must be cut with relief=None and inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief"
+    )
+    mortises = [bore for bore in bores if not (bore.label.name or "").startswith("peg_hole_")]
+    assert len(mortises) == 1 and mortises[0].label.name == "mortise_hole", relief_error
+    cut = tenon.negative_csg
+    assert cut is not None
+    cuts = cut.children if isinstance(cut, SolidUnion) and cut.label == TENON_CUT_LABEL else [cut]
+    wastes = [node for node in cuts if isinstance(node, Difference) and node.label.name == "tenon_waste"]
+    assert len(wastes) == 1, "Expected one tenon on one shoulder"
+    waste = wastes[0]
+    assert isinstance(waste.base, HalfSpace) and len(waste.subtract) == 1, "Expected one tenon on one shoulder"
+    independent_cuts = [node for node in cuts if node is not waste]
+    for node in independent_cuts:
+        # An oblique wedge kerf is clipped to the shoulder.
+        tool = node.left if isinstance(node, Intersection) else node
+        assert (tool.label.name or "").startswith(("peg_hole_", "tenon_kerf")), relief_error
+    return tenon, mortise, waste.base, waste.subtract[0], independent_cuts
+
+
 def merge_mortise_and_tenon_joints(
     joints: Sequence[Joint],
     *,
@@ -898,45 +915,41 @@ def merge_mortise_and_tenon_joints(
     The caller sets the spacing between mortises.
     """
     assert len(joints) >= 2, "Supply at least two mortise and tenon joints"
-    parts: list[_MortiseAndTenonJoint] = []
+    tenon_cuts: list[Cutting] = []
+    mortise_cuts: list[Cutting] = []
+    shoulders: list[HalfSpace] = []
+    tenons: list[CutCSG] = []
+    remaining_cuts: list[CutCSG] = []
     for joint in joints:
-        assert isinstance(joint, _MortiseAndTenonJoint) and joint.ticket.joint_type == "mortise_and_tenon", (
-            "Expected a single butt mortise and tenon joint"
-        )
-        assert not joint.has_relief, (
-            "Inputs already have shoulder or scribe relief. Cut them with relief=None "
-            "and inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief"
-        )
-        parts.append(joint)
-    assert len({id(part.tenon_local) for part in parts}) == len(parts), "A tenon was supplied more than once"
+        tenon_cut, mortise_cut, local_plane, solid, extra_cuts = _unrelieved_tenon_parts(joint)
+        tenon_cuts.append(tenon_cut)
+        mortise_cuts.append(mortise_cut)
+        shoulders.append(local_plane)
+        tenons.append(solid)
+        remaining_cuts.extend(extra_cuts)
 
-    first = parts[0]
-    arrangement = first.arrangement
-    shoulder = first.shoulder_plane
-    for part in parts[1:]:
-        other = part.arrangement
-        assert other.receiving_timber is arrangement.receiving_timber, "Expected the same mortise timber"
-        assert (_same_direction(shoulder.normal, part.shoulder_plane.normal)
-                and safe_zero_test(safe_dot_product(shoulder.normal, part.shoulder_plane.point - shoulder.point))), (
-            "Expected the same oriented shoulder plane"
-        )
-        assert other.butt_timber is arrangement.butt_timber and other.butt_timber_end == arrangement.butt_timber_end, (
-            "Expected all tenons on the same tenon timber end"
-        )
-
-    tenon_key = arrangement.butt_timber.ticket.path
-    mortise_key = arrangement.receiving_timber.ticket.path
-    tenon_cuts = [part.cuttings[tenon_key] for part in parts]
-    mortise_cuts = [part.cuttings[mortise_key] for part in parts]
+    assert len({id(solid) for solid in tenons}) == len(tenons), "A tenon was supplied more than once"
+    tenon_timber, mortise_timber = tenon_cuts[0].timber, mortise_cuts[0].timber
+    assert isinstance(tenon_timber, TimberLike) and isinstance(mortise_timber, TimberLike)
+    assert all(cut.timber is mortise_timber for cut in mortise_cuts), "Expected the same mortise timber"
+    top_end = tenon_cuts[0].get_maybe_top_end_cut() is not None
+    assert all(cut.timber is tenon_timber and (cut.get_maybe_top_end_cut() is not None) == top_end
+               for cut in tenon_cuts), "Expected all tenons on the same tenon timber end"
+    shoulder_local = shoulders[0]
+    assert all(_same_direction(other.normal, shoulder_local.normal) and safe_zero_test(other.offset - shoulder_local.offset)
+               for other in shoulders[1:]), "Expected the same oriented shoulder plane"
     for cuts in (tenon_cuts, mortise_cuts):
         assert all(cut.assembly_ordering == cuts[0].assembly_ordering for cut in cuts), (
             "Cuttings on a shared timber must agree on assembly ordering"
         )
 
-    shoulder_local = adopt_csg(None, arrangement.butt_timber.transform, first.shoulder_half_space_global)
-    tenons = [replace(part.tenon_local, label=CutCSGLabel(f"tenon_{i}")) for i, part in enumerate(parts)]
-    shoulder_waste = Difference(shoulder_local, tenons, label=CutCSGLabel("tenon_waste"))
-    remaining_cuts = [cut for part in parts for cut in part.independent_tenon_cuts]
+    arrangement = ButtJointTimberArrangement(tenon_timber, mortise_timber, TimberEnd.TOP if top_end else TimberEnd.BOTTOM)
+    shoulder_global = adopt_csg(tenon_timber.transform, None, shoulder_local)
+    assert isinstance(shoulder_global, HalfSpace)
+    shoulder = Plane(normal=-shoulder_global.normal, point=shoulder_global.normal * shoulder_global.offset)
+    shoulder_distance = mark_plane_from_edge_in_direction(shoulder, mortise_timber, TimberCenterline.CENTERLINE).distance
+    kept_tenons = [replace(solid, label=CutCSGLabel(f"tenon_{i}")) for i, solid in enumerate(tenons)]
+    shoulder_waste = Difference(shoulder_local, kept_tenons, label=CutCSGLabel("tenon_waste"))
     holes = [replace(cut.negative_csg, label=CutCSGLabel(f"mortise_{i}"))
              for i, cut in enumerate(mortise_cuts) if cut.negative_csg is not None]
 
@@ -944,22 +957,23 @@ def merge_mortise_and_tenon_joints(
     notch = None
     if isinstance(relief, ButtJointNotchReliefConfig):
         located = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-            arrangement, first.shoulder_distance)
+            arrangement, shoulder_distance)
         plane_aligned = (arrangement.check_plane_aligned() is None
                          and _same_direction(located.normal, shoulder.normal))
         from_face = relief.notch_from is NotchFrom.Face
         assert plane_aligned or not from_face, "A face-referenced notch requires a plane-aligned shoulder"
         if plane_aligned:
-            notch = _plane_aligned_shoulder_notch(arrangement, relief.notch_from, first.shoulder_distance)
+            notch = _plane_aligned_shoulder_notch(arrangement, relief.notch_from, shoulder_distance)
         else:
             notch = chop_butt_joint_shoulder_notch_relief_4sided(
-                arrangement, first.shoulder_distance, shoulder_plane=shoulder)
+                arrangement, shoulder_distance, shoulder_plane=shoulder)
         inset_style = InsetShoulderReliefStyle.PerfectOnly if from_face else InsetShoulderReliefStyle.NoRelief
         if inset_shoulder_relief_style is not None and inset_shoulder_relief_style is not inset_style:
             raise ValueError(f"A {relief.notch_from.name}-referenced notch requires inset housing style {inset_style.name}")
 
-    housing = _inset_shoulder_relief(arrangement, shoulder, first.shoulder_half_space_global, first.shoulder_distance,
-                                     first.parallel_face, None, inset_style)
+    shoulder_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(shoulder.normal)
+    housing = _inset_shoulder_relief(arrangement, shoulder, shoulder_global, shoulder_distance,
+                                     shoulder_face, None, inset_style)
     for geometry in (housing, notch):
         if geometry is not None:
             holes.append(geometry.receiving_timber_notch_negative_CSG)
@@ -981,9 +995,9 @@ def merge_mortise_and_tenon_joints(
                       assembly_freedom=_common_withdrawal(mortise_cuts))
     tenon, mortise = _apply_scribe_relief_if_configured(
         relief if isinstance(relief, ButtJointScribeReliefConfig) else None, tenon, mortise)
-    accessories = {f"{key}_tenon_{i}": accessory for i, part in enumerate(parts)
-                   for key, accessory in part.jointAccessories.items()}
-    return Joint({tenon_key: tenon, mortise_key: mortise}, JointTicket(joint_type="mortise_and_tenon"), accessories)
+    accessories = {f"{key}_tenon_{i}": accessory for i, joint in enumerate(joints)
+                   for key, accessory in joint.jointAccessories.items()}
+    return Joint({tenon_timber.ticket.path: tenon, mortise_timber.ticket.path: mortise}, JointTicket(joint_type="mortise_and_tenon"), accessories)
 
 
 def _tenon_height_index(arrangement: ButtJointTimberArrangement) -> int:
@@ -1122,8 +1136,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
                         TENON_CUT_LABEL,
                     ),
                 )
-            assert isinstance(joint, _MortiseAndTenonJoint)
-            joint = replace(joint, cuttings=updated_cuttings, has_relief=True)
+            joint = replace(joint, cuttings=updated_cuttings)
 
     return joint
 
