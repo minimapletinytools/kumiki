@@ -64,6 +64,7 @@ Current ordinary rectangular, round, and corner tenon basic recipes use stopped 
 | `cutcsg.py` | Primitive and boolean solid tree; feature labels, properties, and coordinate adoption |
 | `pathcsg.py` | Closed line/arc profiles, extrusion, and their features |
 | `triangles.py` | Meshing, mesh operations, and raycasting |
+| `coplanar_cuts.py` | Before a mesh difference, sweep cutter faces off coincident faces (switch: `TRIANGLES_DETACH_COPLANAR_CUTS`) |
 | `edges_on_csg.py` | Cropping lines against solids and deriving boundary/crease geometry |
 | `cross_sections.py` | Sections, outlines, areas, centroids, and projected shadows |
 | `feature_paths.py` | Resolve named features into runtime handles |
