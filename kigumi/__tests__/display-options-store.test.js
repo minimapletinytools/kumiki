@@ -1,6 +1,6 @@
 const { DisplayOptionsStore } = require('../webview/display-options-store.js');
 
-const THEME_IDS = ['cream', 'forest', 'slate-night'];
+const THEME_IDS = ['workshop', 'cream', 'forest', 'slate-night'];
 
 function store() {
     return new DisplayOptionsStore({ themeIds: THEME_IDS });
@@ -108,7 +108,7 @@ describe('saving and restoring', () => {
         const options = store();
         options.applyPayload({ units: 'furlongs', activeTheme: 'nonsense', edgeMode: 42 });
         expect(options.get('units')).toBe('metric');
-        expect(options.get('activeTheme')).toBe('forest');
+        expect(options.get('activeTheme')).toBe('workshop');
         expect(options.get('edgeMode')).toBe('noOverlay');
     });
 
@@ -130,7 +130,7 @@ describe('per-scene overrides', () => {
         const options = store();
         options.overridesBySceneId.set('drawing-1', { activeTheme: 'cream' });
         expect(options.resolve('drawing-1', 'activeTheme')).toBe('cream');
-        expect(options.resolve('default-3d', 'activeTheme')).toBe('forest');
+        expect(options.resolve('default-3d', 'activeTheme')).toBe('workshop');
     });
 });
 

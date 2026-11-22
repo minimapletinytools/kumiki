@@ -49,7 +49,7 @@ const { UNIT_SYSTEMS, PRECISIONS, DEFAULT_PRECISIONS } = KigumiUnits;
  */
 function optionSpecs(themeIds) {
     return {
-        activeTheme: { value: 'forest', normalize: oneOfOrReject(themeIds) },
+        activeTheme: { value: 'workshop', normalize: oneOfOrReject(themeIds) },
         // Whether a drawing shows the timbers it is not about, faintly, to
         // place the piece among its neighbours.
         showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
