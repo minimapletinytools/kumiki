@@ -160,6 +160,8 @@ def cut_practice_rounded_end_decoration(
     gentle bowed/bullnose end profile, visible as a curved outline when looking
     straight at `rounded_face` (the arc's plane is perpendicular to
     `rounded_face`'s normal, i.e. that normal is the cylinder's own axis).
+
+    [![Rounded end](../../../assets/joint-drawings/rounded-end.svg)](../../../assets/joint-drawings/rounded-end.svg)
     """
     if safe_compare(distance_from_end, radius, Comparison.LT):
         warnings.warn(
@@ -240,6 +242,8 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     ______________◜  ←scallop_height
                 ↑
                 scallop_width
+
+    [![Rafter tail scallop](../../../assets/joint-drawings/rafter-scallop.svg)](../../../assets/joint-drawings/rafter-scallop.svg)
     """
     assert safe_compare(scallop_length, 0, Comparison.GT), "scallop_length must be positive"
     assert safe_compare(scallop_height, 0, Comparison.GT), "scallop_height must be positive"

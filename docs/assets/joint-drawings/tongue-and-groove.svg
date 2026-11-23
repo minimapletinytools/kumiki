@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Tongue and groove</title>
+  <desc>Tongue and groove</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Tongue at board end" fill="#f0dfbf" fill-opacity="1" d="M260.65791 201.16716 L260.65791 -4087.0226 L280 -4098.1898 Z M280 190 L260.65791 201.16716 L280 -4098.1898 Z M840.92061 491.51335 L782.89434 525.01483 L782.89434 -3763.175 Z M840.92061 491.51335 L782.89434 -3763.175 L840.92061 -3796.6765 Z M840.92061 -3796.6765 L840.92061 491.51335 L318.68418 190 Z M318.68418 -4098.1898 L840.92061 -3796.6765 L318.68418 190 Z M260.65791 -4064.6883 L782.89434 -3763.175 L782.89434 525.01483 Z M260.65791 -4064.6883 L782.89434 525.01483 L260.65791 223.50148 Z M318.68418 -4098.1898 L840.92061 -3796.6765 L782.89434 -3763.175 Z M318.68418 -4098.1898 L782.89434 -3763.175 L260.65791 -4064.6883 Z M299.34209 -4087.0226 L280 -4075.8555 L260.65791 -4087.0226 Z M299.34209 -4087.0226 L260.65791 -4087.0226 L280 -4098.1898 Z M840.92061 491.51335 L782.89434 525.01483 L260.65791 223.50148 Z M318.68418 190 L840.92061 491.51335 L260.65791 223.50148 Z M280 190 L299.34209 201.16716 L280 212.33432 Z M260.65791 201.16716 L280 190 L280 212.33432 Z M318.68418 190 L299.34209 201.16716 L299.34209 -4087.0226 Z M318.68418 190 L299.34209 -4087.0226 L318.68418 -4098.1898 Z M299.34209 -4087.0226 L299.34209 201.16716 L280 190 Z M299.34209 -4087.0226 L280 190 L280 -4098.1898 Z M260.65791 -4087.0226 L280 -4075.8555 L280 212.33432 Z M260.65791 201.16716 L260.65791 -4087.0226 L280 212.33432 Z M260.65791 223.50148 L260.65791 -4064.6883 L280 -4075.8555 Z M260.65791 223.50148 L280 -4075.8555 L280 212.33432 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Tongue at board end" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M280 -4098.1898 L260.65791 -4087.0226" />
+        <path data-feature="rptw.right" d="M260.65791 -4087.0226 L260.65791 201.16716" />
+        <path data-feature="rptw.right" d="M260.65791 201.16716 L280 190" />
+        <path data-feature="rptw.right" d="M280 190 L280 -4098.1898" />
+        <path data-feature="rptw.left" d="M840.92061 491.51335 L782.89434 525.01483" />
+        <path data-feature="rptw.left" d="M840.92061 -3796.6765 L840.92061 491.51335" />
+        <path data-feature="rptw.front" d="M318.68418 190 L840.92061 491.51335" />
+        <path data-feature="rptw.front" d="M840.92061 -3796.6765 L318.68418 -4098.1898" />
+        <path data-feature="rptw.front" d="M318.68418 -4098.1898 L318.68418 190" />
+        <path data-feature="rptw.back" d="M782.89434 525.01483 L260.65791 223.50148" />
+        <path data-feature="rptw.back" d="M260.65791 223.50148 L260.65791 -4064.6883" />
+        <path data-feature="rptw.top" d="M299.34209 -4087.0226 L318.68418 -4098.1898" />
+        <path data-feature="rptw.top" d="M280 -4098.1898 L299.34209 -4087.0226" />
+        <path data-feature="rptw.bottom" d="M318.68418 190 L299.34209 201.16716" />
+        <path data-feature="rptw.bottom" d="M280 212.33432 L260.65791 223.50148" />
+        <path data-feature="rptw.bottom" d="M299.34209 201.16716 L280 190" />
+        <path data-feature="rptw.bottom" d="M260.65791 201.16716 L280 212.33432" />
+        <path data-feature="side.2" d="M299.34209 201.16716 L299.34209 -4087.0226" />
+        <path data-feature="side.1" d="M280 190 L280 -142.91095" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="278.00" y1="193.46" x2="261.00" y2="222.91" />
+      <line x1="258.90" y1="220.54" x2="267.10" y2="218.35" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="297.34" y1="204.63" x2="280.34" y2="234.08" />
+      <line x1="278.24" y1="231.71" x2="286.44" y2="229.51" />
+      <line x1="263.00" y1="219.44" x2="282.34" y2="230.61" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="272.67" y1="225.03" x2="280.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 355.00) rotate(0.00)">tongue_depth</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Tongue at board end</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Groove at board end" fill="#f0dfbf" fill-opacity="1" d="M-222.89434 -3830.1779 L-164.86807 -3796.6765 L-164.86807 491.51335 Z M-222.89434 -3830.1779 L-164.86807 491.51335 L-222.89434 458.01186 Z M-222.89434 -3830.1779 L260.65791 -4109.357 L260.65791 178.83284 Z M-222.89434 458.01186 L-222.89434 -3830.1779 L260.65791 178.83284 Z M318.68418 -4075.8555 L318.68418 212.33432 L-164.86807 491.51335 Z M318.68418 -4075.8555 L-164.86807 491.51335 L-164.86807 -3796.6765 Z M241.31582 -4098.1898 L299.34209 -4064.6883 L-164.86807 -3796.6765 Z M241.31582 -4098.1898 L-164.86807 -3796.6765 L-222.89434 -3830.1779 Z M241.31582 -4098.1898 L260.65791 -4109.357 L280 -4098.1898 Z M241.31582 -4098.1898 L280 -4098.1898 L260.65791 -4087.0226 Z M280 -4075.8555 L299.34209 -4087.0226 L318.68418 -4075.8555 Z M280 -4075.8555 L318.68418 -4075.8555 L299.34209 -4064.6883 Z M241.31582 190 L299.34209 223.50148 L-164.86807 491.51335 Z M-222.89434 458.01186 L241.31582 190 L-164.86807 491.51335 Z M299.34209 201.16716 L318.68418 212.33432 L299.34209 223.50148 Z M280 212.33432 L299.34209 201.16716 L299.34209 223.50148 Z M264.54117 181.07484 L280 190 L260.65791 201.16716 Z M260.65791 178.83284 L264.54117 181.07484 L260.65791 201.16716 Z M241.31582 190 L260.65791 178.83284 L260.65791 201.16716 Z M280 -4075.8555 L280 212.33432 L260.65791 201.16716 Z M280 -4075.8555 L260.65791 201.16716 L260.65791 -4087.0226 Z M260.65791 -4087.0226 L280 -4098.1898 L280 190 Z M260.65791 201.16716 L260.65791 -4087.0226 L280 190 Z M299.34209 -4087.0226 L299.34209 201.16716 L280 212.33432 Z M299.34209 -4087.0226 L280 212.33432 L280 -4075.8555 Z M299.34209 -4087.0226 L318.68418 -4075.8555 L318.68418 212.33432 Z M299.34209 -4087.0226 L318.68418 212.33432 L299.34209 201.16716 Z M260.65791 -4109.357 L280 -4098.1898 L280 190 Z M260.65791 -4109.357 L280 190 L260.65791 178.83284 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Groove at board end" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M-164.86807 491.51335 L-222.89434 458.01186" />
+        <path data-feature="rptw.right" d="M-222.89434 458.01186 L-222.89434 -3830.1779" />
+        <path data-feature="rptw.front" d="M260.65791 178.83284 L260.65791 -4109.357" />
+        <path data-feature="rptw.front" d="M260.65791 -4109.357 L-222.89434 -3830.1779" />
+        <path data-feature="rptw.front" d="M-222.89434 458.01186 L260.65791 178.83284" />
+        <path data-feature="rptw.back" d="M318.68418 -4075.8555 L318.68418 212.33432" />
+        <path data-feature="rptw.back" d="M318.68418 212.33432 L-164.86807 491.51335" />
+        <path data-feature="rptw.top" d="M-222.89434 -3830.1779 L241.31582 -4098.1898" />
+        <path data-feature="rptw.top" d="M241.31582 -4098.1898 L260.65791 -4109.357" />
+        <path data-feature="rptw.top" d="M260.65791 -4109.357 L280 -4098.1898" />
+        <path data-feature="rptw.top" d="M280 -4075.8555 L299.34209 -4087.0226" />
+        <path data-feature="rptw.top" d="M299.34209 -4087.0226 L318.68418 -4075.8555" />
+        <path data-feature="rptw.bottom" d="M-164.86807 491.51335 L299.34209 223.50148" />
+        <path data-feature="rptw.bottom" d="M280 212.33432 L260.65791 201.16716" />
+        <path data-feature="rptw.bottom" d="M241.31582 190 L-222.89434 458.01186" />
+        <path data-feature="rptw.bottom" d="M299.34209 223.50148 L318.68418 212.33432" />
+        <path data-feature="rptw.bottom" d="M318.68418 212.33432 L299.34209 201.16716" />
+        <path data-feature="rptw.bottom" d="M299.34209 201.16716 L280 212.33432" />
+        <path data-feature="rptw.bottom" d="M260.65791 201.16716 L280 190" />
+        <path data-feature="rptw.bottom" d="M280 190 L264.54117 181.07484" />
+        <path data-feature="rptw.bottom" d="M264.54117 181.07484 L260.65791 178.83284" />
+        <path data-feature="rptw.bottom" d="M260.65791 178.83284 L241.31582 190" />
+        <path data-feature="side.0" d="M280 190 L280 212.33432" />
+        <path data-feature="side.1" d="M280 190 L280 -4098.1898" />
+        <path data-feature="side.3" d="M299.34209 -4087.0226 L299.34209 201.16716" />
+        <path data-feature="side.0" d="M280 190 L260.65791 178.83284" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="258.66" y1="204.63" x2="241.66" y2="234.08" />
+      <line x1="239.56" y1="231.71" x2="247.76" y2="229.51" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="278.00" y1="215.80" x2="261.00" y2="245.24" />
+      <line x1="258.90" y1="242.88" x2="267.10" y2="240.68" />
+      <line x1="243.66" y1="230.61" x2="263.00" y2="241.78" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="253.33" y1="236.20" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">tongue_width</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="262.66" y1="204.63" x2="279.66" y2="234.08" />
+      <line x1="276.56" y1="234.71" x2="278.76" y2="226.51" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="282.00" y1="193.46" x2="299.00" y2="222.91" />
+      <line x1="295.90" y1="223.54" x2="298.10" y2="215.35" />
+      <line x1="277.66" y1="230.61" x2="297.00" y2="219.44" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="287.33" y1="225.03" x2="406.10" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(406.10 355.00) rotate(0.00)">tongue_depth + groove_extra_depth</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Groove at board end</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

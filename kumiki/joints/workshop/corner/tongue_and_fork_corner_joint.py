@@ -44,6 +44,12 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     - Tongue timber end is cut to the face opposite the fork entry face.
     - Fork timber end is cut to the face opposite the tongue entry face.
 
+    The basic pattern uses 4 × 5 in stock with a centered tongue. Stock thickness in the
+    drawing is measured normal to the plane of the corner. Each fork cheek takes half the
+    thickness left after cutting the slot.
+
+    [![Tongue thickness and the cheek of its mating fork](../../../assets/joint-drawings/tongue-and-fork.svg)](../../../assets/joint-drawings/tongue-and-fork.svg)
+
     Args:
         arrangement: Corner arrangement where timber1 is the tongue timber and timber2 is
             the fork timber.
@@ -307,7 +313,10 @@ def cut_plain_tongue_and_fork_joint_on_plane_aligned_timbers(
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
 ) -> Joint:
-    """Compatibility alias for `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`."""
+    """Compatibility alias for `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`.
+
+    [![Tongue and fork](../../../assets/joint-drawings/tongue-and-fork.svg)](../../../assets/joint-drawings/tongue-and-fork.svg)
+    """
     return cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,

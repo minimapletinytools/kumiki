@@ -44,6 +44,8 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
 
     arrangement.front_face_on_timber1 determines the face which scarf cut profile is visible on.
 
+    [![Kanawa-tsugi scarf, dado and stub tenon with the joint center located on timber 1](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+
     Args:
         arrangement: Splice arrangement with timber1, timber2, timber1_end, timber2_end,
             and front_face_on_timber1.
@@ -329,7 +331,10 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     rebated_shoulder_depth: Optional[Numeric] = None,
     rebated_shoulder_length: Optional[Numeric] = None,
 ) -> Joint:
-    """Compatibility alias for cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers."""
+    """Compatibility alias for cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers.
+
+    [![Kanawa tsugi](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+    """
     actual_depth = rebated_shoulder_depth if rebated_shoulder_depth is not None else stepped_shoulder_depth
     actual_length = rebated_shoulder_length if rebated_shoulder_length is not None else stepped_shoulder_length
     assert actual_depth is not None, "rebated_shoulder_depth (or stepped_shoulder_depth) must be provided"

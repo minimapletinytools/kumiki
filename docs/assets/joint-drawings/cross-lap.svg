@@ -1,0 +1,117 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Cross lap</title>
+  <desc>Cross lap</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="First notch" fill="#f0dfbf" fill-opacity="1" d="M-356.01343 574.28171 L-503.92353 488.88578 L132.0899 121.68325 Z M280 207.07919 L-356.01343 574.28171 L132.0899 121.68325 Z M427.9101 121.68325 L280 36.287314 L916.01343 -330.91521 Z M1063.9235 -245.51928 L427.9101 121.68325 L916.01343 -330.91521 Z M-503.92353 625.51928 L916.01343 -194.28171 L1063.9235 -108.88578 Z M-503.92353 625.51928 L1063.9235 -108.88578 L-356.01343 710.91521 Z M1063.9235 -108.88578 L-356.01343 710.91521 L-356.01343 642.59846 Z M1063.9235 -177.20253 L1063.9235 -108.88578 L-356.01343 642.59846 Z M1063.9235 -245.51928 L1063.9235 -177.20253 L427.9101 190 Z M427.9101 121.68325 L1063.9235 -245.51928 L427.9101 190 Z M280 207.07919 L280 275.39594 L-356.01343 642.59846 Z M-356.01343 574.28171 L280 207.07919 L-356.01343 642.59846 Z M916.01343 -262.59846 L916.01343 -194.28171 L-503.92353 625.51928 Z M916.01343 -262.59846 L-503.92353 625.51928 L-503.92353 557.20253 Z M132.0899 190 L-503.92353 557.20253 L-503.92353 488.88578 Z M132.0899 190 L-503.92353 488.88578 L132.0899 121.68325 Z M916.01343 -262.59846 L280 104.60406 L280 36.287314 Z M916.01343 -262.59846 L280 36.287314 L916.01343 -330.91521 Z M1063.9235 -108.88578 L916.01343 -194.28171 L916.01343 -330.91521 Z M1063.9235 -108.88578 L916.01343 -330.91521 L1063.9235 -245.51928 Z M-356.01343 574.28171 L-356.01343 710.91521 L-503.92353 625.51928 Z M-503.92353 488.88578 L-356.01343 574.28171 L-503.92353 625.51928 Z M427.9101 190 L280 104.60406 L280 36.287314 Z M427.9101 190 L280 36.287314 L427.9101 121.68325 Z M280 343.71269 L132.0899 258.31675 L280 172.92081 Z M280 343.71269 L280 172.92081 L427.9101 258.31675 Z M280 207.07919 L280 275.39594 L132.0899 190 Z M132.0899 121.68325 L280 207.07919 L132.0899 190 Z M280 275.39594 L132.0899 190 L280 104.60406 Z M427.9101 190 L280 275.39594 L280 104.60406 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="First notch" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M132.0899 121.68325 L-503.92353 488.88578" />
+        <path data-feature="rptw.right" d="M-503.92353 488.88578 L-356.01343 574.28171" />
+        <path data-feature="rptw.right" d="M-356.01343 574.28171 L280 207.07919" />
+        <path data-feature="rptw.right" d="M280 207.07919 L132.0899 121.68325" />
+        <path data-feature="rptw.right" d="M916.01343 -330.91521 L280 36.287314" />
+        <path data-feature="rptw.right" d="M280 36.287314 L427.9101 121.68325" />
+        <path data-feature="rptw.right" d="M427.9101 121.68325 L1063.9235 -245.51928" />
+        <path data-feature="rptw.right" d="M1063.9235 -245.51928 L916.01343 -330.91521" />
+        <path data-feature="rptw.left" d="M1063.9235 -108.88578 L-356.01343 710.91521" />
+        <path data-feature="rptw.left" d="M-356.01343 710.91521 L-503.92353 625.51928" />
+        <path data-feature="rptw.front" d="M-356.01343 642.59846 L-356.01343 710.91521" />
+        <path data-feature="rptw.front" d="M1063.9235 -108.88578 L1063.9235 -177.20253" />
+        <path data-feature="rptw.front" d="M427.9101 190 L280 275.39594" />
+        <path data-feature="rptw.front" d="M1063.9235 -177.20253 L1063.9235 -245.51928" />
+        <path data-feature="rptw.front" d="M427.9101 121.68325 L427.9101 190" />
+        <path data-feature="rptw.front" d="M280 275.39594 L280 207.07919" />
+        <path data-feature="rptw.front" d="M-356.01343 574.28171 L-356.01343 642.59846" />
+        <path data-feature="rptw.back" d="M-503.92353 625.51928 L-503.92353 557.20253" />
+        <path data-feature="rptw.back" d="M191.25394 155.84163 L280 104.60406" />
+        <path data-feature="rptw.back" d="M-503.92353 557.20253 L-503.92353 488.88578" />
+        <path data-feature="rptw.back" d="M280 104.60406 L280 36.287314" />
+        <path data-feature="rptw.top" d="M1063.9235 -245.51928 L1063.9235 -108.88578" />
+        <path data-feature="rptw.bottom" d="M-356.01343 710.91521 L-356.01343 574.28171" />
+        <path data-feature="rptw.bottom" d="M-503.92353 488.88578 L-503.92353 625.51928" />
+        <path data-feature="crossing_front" d="M427.9101 190 L280 104.60406" />
+        <path data-feature="crossing_left" d="M427.9101 258.31675 L280 343.71269" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="278.00" y1="271.93" x2="261.00" y2="242.49" />
+      <line x1="261.90" y1="250.05" x2="264.10" y2="241.85" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="425.91" y1="186.54" x2="408.91" y2="157.09" />
+      <line x1="409.81" y1="164.65" x2="412.01" y2="156.46" />
+      <line x1="263.00" y1="245.95" x2="410.91" y2="160.56" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="336.96" y1="203.25" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">crossing timber width</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="423.91" y1="190.00" x2="389.91" y2="190.00" />
+      <line x1="396.91" y1="193.00" x2="390.91" y2="187.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="423.91" y1="121.68" x2="389.91" y2="121.68" />
+      <line x1="396.91" y1="124.68" x2="390.91" y2="118.68" />
+      <line x1="393.91" y1="190.00" x2="393.91" y2="121.68" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="393.91" y1="155.84" x2="420.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 37.00) rotate(0.00)">overlap × cut_ratio</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">First notch</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Second notch" fill="#f0dfbf" fill-opacity="1" d="M1063.9235 -245.51928 L-356.01343 574.28171 L-503.92353 488.88578 Z M1063.9235 -245.51928 L-503.92353 488.88578 L916.01343 -330.91521 Z M916.01343 -194.28171 L1063.9235 -108.88578 L427.9101 258.31675 Z M280 172.92081 L916.01343 -194.28171 L427.9101 258.31675 Z M132.0899 258.31675 L280 343.71269 L-356.01343 710.91521 Z M-503.92353 625.51928 L132.0899 258.31675 L-356.01343 710.91521 Z M132.0899 121.68325 L132.0899 258.31675 L-503.92353 625.51928 Z M-503.92353 488.88578 L132.0899 121.68325 L-503.92353 625.51928 Z M916.01343 -330.91521 L916.01343 -194.28171 L280 172.92081 Z M280 36.287314 L916.01343 -330.91521 L280 172.92081 Z M280 36.287314 L280 104.60406 L132.0899 190 Z M132.0899 121.68325 L280 36.287314 L132.0899 190 Z M1063.9235 -108.88578 L427.9101 258.31675 L427.9101 121.68325 Z M1063.9235 -108.88578 L427.9101 121.68325 L1063.9235 -245.51928 Z M280 343.71269 L-356.01343 710.91521 L-356.01343 574.28171 Z M280 343.71269 L-356.01343 574.28171 L280 207.07919 Z M427.9101 190 L280 275.39594 L280 207.07919 Z M427.9101 190 L280 207.07919 L427.9101 121.68325 Z M1063.9235 -245.51928 L1063.9235 -108.88578 L916.01343 -194.28171 Z M916.01343 -330.91521 L1063.9235 -245.51928 L916.01343 -194.28171 Z M-356.01343 710.91521 L-503.92353 625.51928 L-503.92353 488.88578 Z M-356.01343 710.91521 L-503.92353 488.88578 L-356.01343 574.28171 Z M280 36.287314 L427.9101 121.68325 L280 207.07919 Z M280 36.287314 L280 207.07919 L132.0899 121.68325 Z M280 275.39594 L280 343.71269 L132.0899 258.31675 Z M280 275.39594 L132.0899 258.31675 L132.0899 190 Z M427.9101 258.31675 L280 172.92081 L280 104.60406 Z M427.9101 190 L427.9101 258.31675 L280 104.60406 Z M280 104.60406 L427.9101 190 L280 275.39594 Z M132.0899 190 L280 104.60406 L280 275.39594 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Second notch" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M-503.92353 488.88578 L916.01343 -330.91521" />
+        <path data-feature="rptw.right" d="M916.01343 -330.91521 L1063.9235 -245.51928" />
+        <path data-feature="rptw.left" d="M427.9101 258.31675 L1063.9235 -108.88578" />
+        <path data-feature="rptw.left" d="M1063.9235 -108.88578 L916.01343 -194.28171" />
+        <path data-feature="rptw.left" d="M916.01343 -194.28171 L280 172.92081" />
+        <path data-feature="rptw.left" d="M280 172.92081 L427.9101 258.31675" />
+        <path data-feature="rptw.left" d="M-356.01343 710.91521 L280 343.71269" />
+        <path data-feature="rptw.left" d="M280 343.71269 L132.0899 258.31675" />
+        <path data-feature="rptw.left" d="M132.0899 258.31675 L-503.92353 625.51928" />
+        <path data-feature="rptw.left" d="M-503.92353 625.51928 L-356.01343 710.91521" />
+        <path data-feature="rptw.front" d="M132.0899 258.31675 L132.0899 190" />
+        <path data-feature="rptw.front" d="M132.0899 121.68325 L-503.92353 488.88578" />
+        <path data-feature="rptw.front" d="M-503.92353 488.88578 L-503.92353 625.51928" />
+        <path data-feature="rptw.front" d="M916.01343 -194.28171 L916.01343 -330.91521" />
+        <path data-feature="rptw.front" d="M916.01343 -330.91521 L280 36.287314" />
+        <path data-feature="rptw.front" d="M280 104.60406 L280 172.92081" />
+        <path data-feature="rptw.front" d="M132.0899 190 L280 104.60406" />
+        <path data-feature="rptw.front" d="M280 36.287314 L132.0899 121.68325" />
+        <path data-feature="rptw.back" d="M1063.9235 -245.51928 L1063.9235 -108.88578" />
+        <path data-feature="rptw.back" d="M280 343.71269 L-94.735762 560.06648" />
+        <path data-feature="rptw.back" d="M-94.735762 560.06648 L-356.01343 710.91521" />
+        <path data-feature="rptw.back" d="M280 275.39594 L280 343.71269" />
+        <path data-feature="rptw.back" d="M368.74606 224.15837 L280 275.39594" />
+        <path data-feature="crossing_front" d="M132.0899 190 L280 275.39594" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="136.09" y1="258.32" x2="170.09" y2="258.32" />
+      <line x1="169.09" y1="261.32" x2="163.09" y2="255.32" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="136.09" y1="190.00" x2="170.09" y2="190.00" />
+      <line x1="169.09" y1="193.00" x2="163.09" y2="187.00" />
+      <line x1="166.09" y1="258.32" x2="166.09" y2="190.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="166.09" y1="224.16" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">overlap × (1 − cut_ratio)</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="134.09" y1="193.46" x2="151.09" y2="222.91" />
+      <line x1="147.99" y1="223.54" x2="150.19" y2="215.35" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="282.00" y1="108.07" x2="299.00" y2="137.51" />
+      <line x1="295.90" y1="138.15" x2="298.10" y2="129.95" />
+      <line x1="149.09" y1="219.44" x2="297.00" y2="134.05" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="223.04" y1="176.75" x2="420.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 37.00) rotate(0.00)">crossing timber width</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Second notch</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

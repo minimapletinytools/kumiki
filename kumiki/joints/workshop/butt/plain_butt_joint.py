@@ -60,6 +60,8 @@ def cut_plain_butt_joint(
     The cut plane follows the actual receiving face geometry rather than being perpendicular
     to the butt timber's axis, so the mating face is always flush.
 
+    [![Angled butt joint](../../../assets/joint-drawings/angled-butt.svg)](../../../assets/joint-drawings/angled-butt.svg)
+
     Args:
         arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.
         relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
@@ -170,6 +172,8 @@ def cut_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArr
 
     Requires the timbers to be face-aligned. For an unrestricted version that works at any
     angle, use `cut_plain_butt_joint` directly.
+
+    [![Face-aligned butt joint](../../../assets/joint-drawings/plain-butt.svg)](../../../assets/joint-drawings/plain-butt.svg)
 
     Args:
         arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.

@@ -25,6 +25,8 @@ def cut_plain_corner_lap_joint_on_plane_aligned_timbers(
     to corner-arranged timbers and augmented with one end cut per timber so neither
     member extends past the corner.
 
+    [![Corner lap](../../../assets/joint-drawings/corner-lap.svg)](../../../assets/joint-drawings/corner-lap.svg)
+
     Args:
         arrangement: Corner-joint arrangement with timber1, timber2, timber1_end,
             timber2_end, and optional front_face_on_timber1.

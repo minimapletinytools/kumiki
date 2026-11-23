@@ -32,6 +32,8 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     ╚═══════════════╝╚═══════════════╝
                     ^ top_lap_shoulder_position_from_top_lap_shoulder_timber_end
 
+    [![Splice lap](../../../assets/joint-drawings/splice-lap.svg)](../../../assets/joint-drawings/splice-lap.svg)
+
     Args:
         arrangement: Splice joint arrangement with timber1, timber2, timber1_end, timber2_end,
                      and optionally front_face_on_timber1 (the lap cut face on timber1).

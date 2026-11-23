@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Free tapered dovetail</title>
+  <desc>Free tapered dovetail</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Tongue section" fill="#f0dfbf" fill-opacity="1" d="M305.73623 190 L197.64706 190 L197.64706 -213.39427 Z M362.35294 190 L305.73623 190 L197.64706 -213.39427 Z M362.35294 190 L197.64706 -213.39427 L197.64706 -715.88235 Z M362.35294 190 L197.64706 -715.88235 L362.35294 -715.88235 Z M318.97607 239.41176 L241.02393 239.41176 L254.26377 190 Z M318.97607 239.41176 L254.26377 190 L305.73623 190 Z M197.64706 190 L197.64706 -267.17274 L320.14613 190 Z M226.61403 239.41176 L239.85387 190 L320.14613 190 Z M333.38597 239.41176 L226.61403 239.41176 L320.14613 190 Z M197.64706 -715.88235 L362.35294 -715.88235 L362.35294 -600.23022 Z M197.64706 -267.17274 L197.64706 -715.88235 L362.35294 -600.23022 Z M320.14613 190 L197.64706 -267.17274 L362.35294 -600.23022 Z M362.35294 190 L320.14613 190 L362.35294 -600.23022 Z M197.64706 190 L197.64706 -715.88235 L362.35294 -715.88235 Z M197.64706 190 L362.35294 -715.88235 L362.35294 190 Z M318.97607 239.41176 L241.02393 239.41176 L254.26377 190 Z M318.97607 239.41176 L254.26377 190 L305.73623 190 Z M197.64706 -267.17274 L320.14613 190 L197.64706 190 Z M226.61403 239.41176 L239.85387 190 L320.14613 190 Z M333.38597 239.41176 L226.61403 239.41176 L320.14613 190 Z M320.14613 190 L197.64706 -267.17274 L197.64706 -715.88235 Z M362.35294 190 L320.14613 190 L197.64706 -715.88235 Z M362.35294 -715.88235 L362.35294 190 L197.64706 -715.88235 Z M320.14613 190 L333.38597 239.41176 L318.97607 239.41176 Z M320.14613 190 L318.97607 239.41176 L305.73623 190 Z M241.02393 239.41176 L226.61403 239.41176 L239.85387 190 Z M241.02393 239.41176 L239.85387 190 L254.26377 190 Z M320.14613 190 L333.38597 239.41176 L226.61403 239.41176 Z M239.85387 190 L320.14613 190 L226.61403 239.41176 Z M241.02393 239.41176 L254.26377 190 L305.73623 190 Z M241.02393 239.41176 L305.73623 190 L318.97607 239.41176 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Tongue section" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M362.35294 -715.88235 L362.35294 190" />
+        <path data-feature="rptw.left" d="M197.64706 190 L197.64706 -715.88235" />
+        <path data-feature="rptw.front" d="M239.85387 190 L227.0681 190" />
+        <path data-feature="rptw.front" d="M362.35294 190 L320.14613 190" />
+        <path data-feature="rptw.back" d="M197.64706 -267.17274 L197.64706 190" />
+        <path data-feature="rptw.back" d="M197.64706 190 L239.85387 190" />
+        <path data-feature="rptw.back" d="M239.85387 190 L226.61403 239.41176" />
+        <path data-feature="rptw.back" d="M226.61403 239.41176 L333.38597 239.41176" />
+        <path data-feature="rptw.back" d="M333.38597 239.41176 L320.14613 190" />
+        <path data-feature="rptw.back" d="M362.35294 -600.23022 L362.35294 -715.88235" />
+        <path data-feature="rptw.back" d="M362.35294 -715.88235 L197.64706 -715.88235" />
+        <path data-feature="rptw.back" d="M197.64706 -715.88235 L197.64706 -267.17274" />
+        <path data-feature="rptw.back" d="M320.14613 190 L362.35294 190" />
+        <path data-feature="rptw.back" d="M362.35294 190 L362.35294 -600.23022" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="239.41" x2="242.00" y2="239.41" />
+      <line x1="249.00" y1="242.41" x2="243.00" y2="236.41" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="190.00" x2="242.00" y2="190.00" />
+      <line x1="249.00" y1="193.00" x2="243.00" y2="187.00" />
+      <line x1="246.00" y1="239.41" x2="246.00" y2="190.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="246.00" y1="214.71" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">depth</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="247.06" y1="194.00" x2="247.06" y2="228.00" />
+      <line x1="244.06" y1="227.00" x2="250.06" y2="221.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="312.94" y1="194.00" x2="312.94" y2="228.00" />
+      <line x1="309.94" y1="227.00" x2="315.94" y2="221.00" />
+      <line x1="247.06" y1="224.00" x2="312.94" y2="224.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="280.00" y1="224.00" x2="420.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 355.00) rotate(0.00)">width</text>
+    </g>
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="320.15" y1="190.00" x2="320.15" y2="239.41" />
+      <path stroke-width="1.8" d="M320.15 228.54 A38.54 38.54 0 0 0 330.12 227.23" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="325.13" y1="227.88" x2="394.00" y2="114.00" />
+      <text text-anchor="middle" font-size="15" x="394" y="108">dovetail_angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Tongue section</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Dovetail socket" fill="#f0dfbf" fill-opacity="1" d="M356.43058 166.88632 L920.55555 492.58403 L920.55555 627.06582 Z M356.43058 166.88632 L920.55555 627.06582 L387.63719 319.38526 Z M365.79257 212.636 L387.63719 319.38526 L-244.09091 -45.343132 Z M365.79257 212.636 L-244.09091 -45.343132 L-244.09091 -139.48039 Z M320.03406 145.87278 L310.67208 180.81218 L-244.09091 -139.48039 Z M320.03406 145.87278 L-244.09091 -139.48039 L-244.09091 -179.82492 Z M804.09091 694.30671 L-360.55555 21.897763 L-360.55555 -72.23949 Z M804.09091 600.16946 L804.09091 694.30671 L-360.55555 -72.23949 Z M804.09091 600.16946 L259.51726 285.75971 L250.15527 240.01003 Z M804.09091 559.82492 L804.09091 600.16946 L250.15527 240.01003 Z M-360.55555 -72.23949 L-360.55555 -112.58403 L193.38008 207.23086 Z M184.0181 242.17025 L-360.55555 -72.23949 L193.38008 207.23086 Z M-360.55555 -112.58403 L-244.09091 -179.82492 L320.03406 145.87278 Z M193.38008 207.23086 L-360.55555 -112.58403 L320.03406 145.87278 Z M804.09091 559.82492 L250.15527 240.01003 L356.43058 166.88632 Z M920.55555 492.58403 L804.09091 559.82492 L356.43058 166.88632 Z M920.55555 627.06582 L804.09091 694.30671 L-360.55555 21.897763 Z M920.55555 627.06582 L-360.55555 21.897763 L-244.09091 -45.343132 Z M804.09091 559.82492 L920.55555 492.58403 L920.55555 627.06582 Z M804.09091 694.30671 L804.09091 559.82492 L920.55555 627.06582 Z M-244.09091 -179.82492 L-244.09091 -45.343132 L-360.55555 21.897763 Z M-244.09091 -179.82492 L-360.55555 21.897763 L-360.55555 -112.58403 Z M259.51726 285.75971 L250.15527 240.01003 L356.43058 166.88632 Z M365.79257 212.636 L259.51726 285.75971 L356.43058 166.88632 Z M365.79257 212.636 L259.51726 285.75971 L184.0181 242.17025 Z M365.79257 212.636 L184.0181 242.17025 L310.67208 180.81218 Z M310.67208 180.81218 L184.0181 242.17025 L193.38008 207.23086 Z M310.67208 180.81218 L193.38008 207.23086 L320.03406 145.87278 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Dovetail socket" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M356.43058 166.88632 L920.55555 492.58403" />
+        <path data-feature="rptw.right" d="M920.55555 492.58403 L920.55555 627.06582" />
+        <path data-feature="rptw.right" d="M71.773142 137.02106 L-244.09091 -45.343132" />
+        <path data-feature="rptw.right" d="M310.67208 180.81218 L324.54799 188.82344" />
+        <path data-feature="rptw.right" d="M320.03406 145.87278 L310.67208 180.81218" />
+        <path data-feature="rptw.right" d="M-244.09091 -179.82492 L320.03406 145.87278" />
+        <path data-feature="rptw.left" d="M-360.55555 -72.23949 L-360.55555 21.897763" />
+        <path data-feature="rptw.left" d="M-360.55555 21.897763 L804.09091 694.30671" />
+        <path data-feature="rptw.left" d="M804.09091 694.30671 L804.09091 600.16946" />
+        <path data-feature="rptw.left" d="M259.51726 285.75971 L184.0181 242.17025" />
+        <path data-feature="rptw.left" d="M250.15527 240.01003 L259.51726 285.75971" />
+        <path data-feature="rptw.left" d="M804.09091 600.16946 L804.09091 559.82492" />
+        <path data-feature="rptw.left" d="M804.09091 559.82492 L250.15527 240.01003" />
+        <path data-feature="rptw.left" d="M193.38008 207.23086 L-360.55555 -112.58403" />
+        <path data-feature="rptw.left" d="M-360.55555 -112.58403 L-360.55555 -72.23949" />
+        <path data-feature="rptw.left" d="M184.0181 242.17025 L193.38008 207.23086" />
+        <path data-feature="rptw.front" d="M-244.09091 -179.82492 L-360.55555 -112.58403" />
+        <path data-feature="rptw.front" d="M193.38008 207.23086 L320.03406 145.87278" />
+        <path data-feature="rptw.front" d="M356.43058 166.88632 L250.15527 240.01003" />
+        <path data-feature="rptw.front" d="M804.09091 559.82492 L920.55555 492.58403" />
+        <path data-feature="rptw.back" d="M920.55555 627.06582 L804.09091 694.30671" />
+        <path data-feature="rptw.back" d="M-98.510101 38.707986 L47.070707 122.75911" />
+        <path data-feature="rptw.top" d="M804.09091 559.82492 L804.09091 694.30671" />
+        <path data-feature="rptw.bottom" d="M-360.55555 21.897763 L-360.55555 -112.58403" />
+        <path data-feature="dovetail_right_flank" d="M356.43058 166.88632 L271.27299 225.4798" />
+        <path data-feature="dovetail_right_flank" d="M271.27299 225.4798 L250.15527 240.01003" />
+        <path data-feature="dovetail_wide_face" d="M184.0181 242.17025 L310.67208 180.81218" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="250.16" y1="240.01" x2="366.62" y2="172.77" />
+      <path stroke-width="1.8" d="M341.00 187.56 L340.33 187.18 L339.67 186.80 L338.99 186.43 L338.32 186.06 L337.64 185.69 L336.95 185.32 L336.26 184.96 L335.56 184.60 L334.86 184.24 L334.16 183.89 L333.45 183.54 L332.73 183.19" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="336.87" y1="185.38" x2="414.00" y2="97.00" />
+      <text text-anchor="middle" font-size="15" x="414" y="91">taper_angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Dovetail socket</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

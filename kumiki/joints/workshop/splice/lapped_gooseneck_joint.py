@@ -48,6 +48,8 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     profile. The gooseneck profile provides mechanical interlock while the lap provides additional
     bearing surface.
 
+    [![Lapped gooseneck profile and receiving socket with head, neck, and depth dimensions](../../../assets/joint-drawings/lapped-gooseneck.svg)](../../../assets/joint-drawings/lapped-gooseneck.svg)
+
     Args:
         arrangement: Splice arrangement where timber1 is the gooseneck timber,
             timber2 is the receiving timber, timber1_end/timber2_end are the joined

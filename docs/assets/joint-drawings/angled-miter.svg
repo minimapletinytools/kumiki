@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 428">
+  <title>Angled miter</title>
+  <desc>Angled miter</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Assembled joint" fill="#f0dfbf" fill-opacity="1" d="M220.73333 -947.92 L339.26667 -947.92 L339.26667 155.78237 Z M220.73333 224.21763 L220.73333 -947.92 L339.26667 155.78237 Z M233.81093 94.897479 L220.73333 87.347122 L220.73333 -947.92 L339.26667 -947.92 Z M233.81093 94.897479 L220.73333 224.21763 L220.73333 224.21763 L220.73333 87.347122 Z M233.81093 94.897479 L339.26667 -947.92 L339.26667 155.78237 Z M220.73333 224.21763 L233.81093 94.897479 L339.26667 155.78237 L339.26667 155.78237 Z" />
+      <path data-member="timber2" fill="#d4c5a9" fill-opacity="1" d="M1295.101 707.63356 L1235.8343 810.28644 L220.73333 224.21763 Z M339.26667 155.78237 L1295.101 707.63356 L220.73333 224.21763 Z M339.26667 155.78237 L1295.101 707.63356 L1235.8343 810.28644 Z M339.26667 155.78237 L339.26667 155.78237 L1235.8343 810.28644 L354.93771 301.70056 Z M339.26667 155.78237 L354.93771 301.70056 L220.73333 224.21763 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Assembled joint" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M339.26667 155.78237 L339.26667 -947.92" />
+        <path data-feature="rptw.right" d="M339.26667 -947.92 L220.73333 -947.92" />
+        <path data-feature="rptw.right" d="M220.73333 -947.92 L220.73333 224.21763" />
+        <path data-feature="rptw.right" d="M220.73333 224.21763 L339.26667 155.78237" />
+        <path data-feature="rptw.left" d="M220.73333 224.21763 L220.73333 -947.92" />
+      </g>
+      <g data-member="timber2" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M220.73333 224.21763 L1235.8343 810.28644" />
+        <path data-feature="rptw.right" d="M1235.8343 810.28644 L1295.101 707.63356" />
+        <path data-feature="rptw.right" d="M1295.101 707.63356 L339.26667 155.78237" />
+        <path data-feature="rptw.right" d="M339.26667 155.78237 L220.73333 224.21763" />
+        <path data-feature="rptw.left" d="M1235.8343 810.28644 L220.73333 224.21763" />
+        <path data-feature="rptw.back" d="M1295.101 707.63356 L944.49125 505.20895" />
+        <path data-feature="rptw.back" d="M944.49125 505.20895 L339.26667 155.78237" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="280.00" y1="190.00" x2="280.00" y2="78.00" />
+      <path stroke-width="1.8" d="M280.00 102.64 A87.36 87.36 0 0 1 355.66 233.68" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="317.83" y1="168.16" x2="380.00" y2="90.00" />
+      <text text-anchor="middle" font-size="15" x="380" y="84">corner_angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Assembled joint</text>
+  <path d="M0 46H560" stroke="#d1c8b8" />
+</svg>

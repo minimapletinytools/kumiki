@@ -92,6 +92,9 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     All three timbers must be face-aligned, each butt timber must be perpendicular to the
     receiving timber, and the two butt timbers must be antiparallel.
 
+    [![Splined opposing double butt](../../../assets/joint-drawings/splined-double-butt.svg)](../../../assets/joint-drawings/splined-double-butt.svg)
+    [![Splined joint with stub tenons](../../../assets/joint-drawings/splined-stub-tenons.svg)](../../../assets/joint-drawings/splined-stub-tenons.svg)
+
     Args:
         arrangement: Double butt joint arrangement with butt_timber_1, butt_timber_2,
             receiving_timber, butt_timber_1_end, butt_timber_2_end.

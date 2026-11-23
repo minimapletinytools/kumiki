@@ -50,6 +50,8 @@ def cut_plain_cross_lap_joint(
     maintaining a flush outer face on both sides. By default material removal is split
     equally (half from each timber).
 
+    [![Cross lap](../../../assets/joint-drawings/cross-lap.svg)](../../../assets/joint-drawings/cross-lap.svg)
+
     Args:
         arrangement: Cross-joint arrangement with timber1 and timber2, and optional
                      front_face_on_timber1 (the cut face on timber1). If not provided,
@@ -291,6 +293,8 @@ def cut_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) ->
     Implemented as a cross-lap joint with cut_ratio=1.
 
     Note this different from cut_free_house_joint in the way it handles relief cuts on the non-ptw parts of the timbers.
+
+    [![Cross-lap housing](../../../assets/joint-drawings/cross-lap-house.svg)](../../../assets/joint-drawings/cross-lap-house.svg)
 
     Args:
         arrangement: Cross-joint arrangement where timber1 is the housing timber (to be relieved)

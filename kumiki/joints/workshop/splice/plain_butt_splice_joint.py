@@ -20,6 +20,8 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(
 
     Both timbers are cut at the splice plane, creating a flush end-to-end connection.
 
+    [![Butt splice](../../../assets/joint-drawings/butt-splice.svg)](../../../assets/joint-drawings/butt-splice.svg)
+
     Args:
         arrangement: Splice joint arrangement with timber1, timber2, timber1_end, timber2_end.
                      Timbers must have parallel length axes.

@@ -73,6 +73,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     `arrangement.top_face_on_butt_timber`; the opposite side slopes outward by `dovetail_depth`
     over `tenon_depth` to give the joint its mechanical pull-out resistance.
 
+    [![Wedged half-dovetail](../../../assets/joint-drawings/wedged-half-dovetail.svg)](../../../assets/joint-drawings/wedged-half-dovetail.svg)
+
     Args:
         arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
             Must be face-aligned and orthogonal, with top_face_on_butt_timber set to the

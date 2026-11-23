@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Half-blind dovetail corner</title>
+  <desc>Half-blind dovetail corner</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Tail layout" fill="#f0dfbf" fill-opacity="1" d="M2253.2314 11.037908 L2253.2314 345.72026 L349.72549 345.72026 Z M349.72549 11.037908 L2253.2314 11.037908 L349.72549 345.72026 Z M349.72549 106.32941 L349.72549 250.42876 L210.27451 273.67059 Z M210.27451 83.087582 L349.72549 106.32941 L210.27451 273.67059 Z M349.72549 106.32941 L1786.0706 345.72026 L349.72549 345.72026 Z M210.27451 83.087582 L349.72549 106.32941 L349.72549 250.42876 Z M210.27451 83.087582 L349.72549 250.42876 L210.27451 273.67059 Z M2253.2314 11.037908 L2253.2314 345.72026 L1786.0706 345.72026 Z M2253.2314 11.037908 L1786.0706 345.72026 L349.72549 106.32941 Z M2253.2314 11.037908 L349.72549 106.32941 L349.72549 11.037908 Z M349.72549 106.32941 L349.72549 250.42876 L210.27451 273.67059 Z M210.27451 83.087582 L349.72549 106.32941 L210.27451 273.67059 Z M349.72549 250.42876 L210.27451 273.67059 L210.27451 83.087582 Z M349.72549 250.42876 L210.27451 83.087582 L349.72549 106.32941 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Tail layout" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M349.72549 11.037908 L2253.2314 11.037908" />
+        <path data-feature="rptw.right" d="M2253.2314 11.037908 L349.72549 11.037908" />
+        <path data-feature="rptw.left" d="M349.72549 345.72026 L2253.2314 345.72026" />
+        <path data-feature="rptw.left" d="M2253.2314 345.72026 L349.72549 345.72026" />
+        <path data-feature="rptw.front" d="M2253.2314 345.72026 L2253.2314 11.037908" />
+        <path data-feature="rptw.front" d="M349.72549 11.037908 L349.72549 106.32941" />
+        <path data-feature="rptw.front" d="M349.72549 250.42876 L349.72549 345.72026" />
+        <path data-feature="rptw.front" d="M210.27451 273.67059 L349.72549 250.42876" />
+        <path data-feature="rptw.front" d="M349.72549 106.32941 L210.27451 83.087582" />
+        <path data-feature="rptw.front" d="M210.27451 83.087582 L210.27451 273.67059" />
+        <path data-feature="rptw.back" d="M1786.0706 345.72026 L1140.2062 345.72026" />
+        <path data-feature="rptw.back" d="M349.72549 345.72026 L349.72549 250.42876" />
+        <path data-feature="rptw.back" d="M210.27451 83.087582 L349.72549 106.32941" />
+        <path data-feature="rptw.back" d="M2253.2314 345.72026 L1786.0706 345.72026" />
+        <path data-feature="rptw.back" d="M349.72549 106.32941 L349.72549 11.037908" />
+        <path data-feature="shoulder" d="M349.72549 250.42876 L349.72549 256.18809" />
+        <path data-feature="shoulder" d="M349.72549 256.18809 L349.72549 345.72026" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="345.73" y1="250.43" x2="311.73" y2="250.43" />
+      <line x1="318.73" y1="253.43" x2="312.73" y2="247.43" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="345.73" y1="106.33" x2="311.73" y2="106.33" />
+      <line x1="318.73" y1="109.33" x2="312.73" y2="103.33" />
+      <line x1="315.73" y1="250.43" x2="315.73" y2="106.33" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="315.73" y1="178.38" x2="280.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 37.00) rotate(0.00)">dovetails[0].small_width</text>
+    </g>
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="349.73" y1="106.33" x2="210.27" y2="106.33" />
+      <path stroke-width="1.8" d="M240.95 106.33 A108.77 108.77 0 0 1 242.43 88.45" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="241.69" y1="97.39" x2="396.00" y2="61.00" />
+      <text text-anchor="middle" font-size="15" x="396" y="55">dovetails[0].angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Tail layout</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Blind socket" fill="#f0dfbf" fill-opacity="1" d="M304.65168 143.50666 L156.74158 58.11072 L1650.6336 -804.38824 Z M1798.5437 -718.9923 L304.65168 143.50666 L1650.6336 -804.38824 Z M156.74158 331.37772 L1650.6336 -531.12124 L1798.5437 -445.72531 Z M156.74158 331.37772 L1798.5437 -445.72531 L304.65168 416.77365 Z M1798.5437 -718.9923 L1798.5437 -445.72531 L304.65168 416.77365 Z M304.65168 143.50666 L1798.5437 -718.9923 L304.65168 416.77365 Z M1650.6336 -726.58305 L156.74158 135.91591 L156.74158 58.11072 Z M1650.6336 -726.58305 L156.74158 58.11072 L1650.6336 -804.38824 Z M304.65168 50.51997 L1650.6336 -726.58305 L1650.6336 -531.12124 Z M304.65168 50.51997 L1650.6336 -531.12124 L304.65168 245.98178 Z M156.74158 253.57253 L304.65168 168.17659 L304.65168 245.98178 Z M156.74158 253.57253 L304.65168 245.98178 L156.74158 331.37772 Z M1798.5437 -445.72531 L1650.6336 -531.12124 L1650.6336 -804.38824 Z M1798.5437 -445.72531 L1650.6336 -804.38824 L1798.5437 -718.9923 Z M403.25842 88.47372 L403.25842 244.08409 L304.65168 168.17659 Z M403.25842 88.47372 L304.65168 168.17659 L304.65168 50.51997 Z M304.65168 168.17659 L403.25842 244.08409 L255.34832 329.48003 Z M304.65168 168.17659 L255.34832 329.48003 L156.74158 253.57253 Z M403.25842 88.47372 L403.25842 244.08409 L255.34832 329.48003 Z M255.34832 173.86966 L403.25842 88.47372 L255.34832 329.48003 Z M255.34832 173.86966 L156.74158 135.91591 L304.65168 50.51997 Z M403.25842 88.47372 L255.34832 173.86966 L304.65168 50.51997 Z M304.65168 367.43378 L304.65168 416.77365 L156.74158 331.37772 Z M304.65168 367.43378 L156.74158 331.37772 L156.74158 253.57253 Z M304.65168 143.50666 L304.65168 192.84653 L156.74158 135.91591 Z M304.65168 143.50666 L156.74158 135.91591 L156.74158 58.11072 Z M304.65168 367.43378 L255.34832 329.48003 L255.34832 173.86966 Z M304.65168 367.43378 L255.34832 173.86966 L304.65168 192.84653 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Blind socket" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M1650.6336 -804.38824 L156.74158 58.11072" />
+        <path data-feature="rptw.right" d="M156.74158 58.11072 L304.65168 143.50666" />
+        <path data-feature="rptw.right" d="M304.65168 143.50666 L1798.5437 -718.9923" />
+        <path data-feature="rptw.right" d="M1798.5437 -718.9923 L1650.6336 -804.38824" />
+        <path data-feature="rptw.left" d="M1798.5437 -445.72531 L304.65168 416.77365" />
+        <path data-feature="rptw.left" d="M304.65168 416.77365 L156.74158 331.37772" />
+        <path data-feature="rptw.front" d="M1798.5437 -445.72531 L1798.5437 -718.9923" />
+        <path data-feature="rptw.front" d="M304.65168 143.50666 L304.65168 416.77365" />
+        <path data-feature="rptw.back" d="M156.74158 135.91591 L156.74158 58.11072" />
+        <path data-feature="rptw.back" d="M156.74158 253.57253 L255.34832 196.64191" />
+        <path data-feature="rptw.back" d="M156.74158 331.37772 L156.74158 253.57253" />
+        <path data-feature="side.1" d="M255.34832 329.48003 L156.74158 253.57253" />
+        <path data-feature="side.2" d="M255.34832 173.86966 L255.34832 329.48003" />
+        <path data-feature="side.3" d="M156.74158 135.91591 L255.34832 173.86966" />
+        <path data-feature="side.0" d="M304.65168 367.43378 L304.65168 416.77365" />
+        <path data-feature="side.0" d="M304.65168 143.50666 L304.65168 192.84653" />
+        <path data-feature="side.0" d="M304.65168 192.84653 L304.65168 367.43378" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line x1="152.64" y1="118.04" x2="160.84" y2="115.84" />
+      <line x1="251.25" y1="174.97" x2="259.45" y2="172.77" />
+      <line x1="156.74" y1="116.94" x2="255.35" y2="173.87" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(208.54 141.07) rotate(30.00)">dovetails[0].depth</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Blind socket</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

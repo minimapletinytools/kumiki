@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Sliding dovetail</title>
+  <desc>Sliding dovetail</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Sliding tongue · end" fill="#f0dfbf" fill-opacity="1" d="M86.579099 33.659747 L1014.9994 -502.36398 L1014.9994 -419.92923 Z M86.579099 33.659747 L1014.9994 -419.92923 L1014.9994 -413.02669 Z M86.579099 33.659747 L1014.9994 -413.02669 L86.579099 122.99703 Z M280 234.66864 L86.579099 122.99703 L1014.9994 -413.02669 Z M280 234.66864 L1014.9994 -413.02669 L1208.4203 -301.35508 Z M86.579099 33.659747 L1014.9994 -502.36398 L1208.4203 -390.69237 Z M280 145.33136 L86.579099 33.659747 L1208.4203 -390.69237 Z M1208.4203 -301.35508 L1014.9994 -413.02669 L1014.9994 -502.36398 Z M1208.4203 -301.35508 L1014.9994 -502.36398 L1208.4203 -390.69237 Z M1234.2098 -303.83667 L1208.4203 -323.6894 L1208.4203 -368.35805 Z M1234.2098 -303.83667 L1208.4203 -368.35805 L1234.2098 -358.43168 Z M86.579099 122.99703 L86.579099 33.659747 L280 145.33136 Z M280 234.66864 L86.579099 122.99703 L280 145.33136 Z M280 212.33432 L280 167.66568 L305.78945 177.59204 Z M305.78945 232.18705 L280 212.33432 L305.78945 177.59204 Z M280 212.33432 L280 167.66568 L305.78945 177.59204 Z M305.78945 232.18705 L280 212.33432 L305.78945 177.59204 Z M1234.2098 -303.83667 L1208.4203 -323.6894 L1208.4203 -368.35805 Z M1234.2098 -303.83667 L1208.4203 -368.35805 L1234.2098 -358.43168 Z M280 167.66568 L280 145.33136 L1208.4203 -390.69237 Z M280 167.66568 L1208.4203 -390.69237 L1208.4203 -368.35805 Z M280 212.33432 L1208.4203 -323.6894 L1208.4203 -301.35508 Z M280 212.33432 L1208.4203 -301.35508 L280 234.66864 Z M280 167.66568 L1208.4203 -368.35805 L1210.7367 -367.46647 Z M305.78945 177.59204 L280 167.66568 L1210.7367 -367.46647 Z M1234.2098 -358.43168 L305.78945 177.59204 L1210.7367 -367.46647 Z M305.78945 177.59204 L1234.2098 -358.43168 L1234.2098 -303.83667 Z M305.78945 232.18705 L305.78945 177.59204 L1234.2098 -303.83667 Z M1208.4203 -323.6894 L1234.2098 -303.83667 L305.78945 232.18705 Z M1208.4203 -323.6894 L305.78945 232.18705 L280 212.33432 Z M280 167.66568 L305.78945 177.59204 L305.78945 232.18705 Z M280 212.33432 L280 167.66568 L305.78945 232.18705 Z M1234.2098 -303.83667 L1208.4203 -323.6894 L1208.4203 -368.35805 Z M1234.2098 -303.83667 L1208.4203 -368.35805 L1234.2098 -358.43168 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Sliding tongue · end" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.left" d="M86.579099 33.659747 L1014.9994 -502.36398" />
+        <path data-feature="rptw.left" d="M86.579099 122.99703 L86.579099 33.659747" />
+        <path data-feature="rptw.front" d="M280 234.66864 L86.579099 122.99703" />
+        <path data-feature="rptw.front" d="M296.57893 225.09679 L280 234.66864" />
+        <path data-feature="rptw.back" d="M1208.4203 -390.69237 L1022.3098 -498.14332" />
+        <path data-feature="rptw.back" d="M1022.3098 -498.14332 L1014.9994 -502.36398" />
+        <path data-feature="rptw.back" d="M86.579099 33.659747 L280 145.33136" />
+        <path data-feature="rptw.back" d="M280 145.33136 L1208.4203 -390.69237" />
+        <path data-feature="rptw.top" d="M1014.9994 -502.36398 L1208.4203 -390.69237" />
+        <path data-feature="rptw.top" d="M1208.4203 -390.69237 L1208.4203 -368.35805" />
+        <path data-feature="rptw.top" d="M1208.4203 -368.35805 L1234.2098 -358.43168" />
+        <path data-feature="rptw.top" d="M1234.2098 -358.43168 L1234.2098 -303.83667" />
+        <path data-feature="rptw.bottom" d="M280 234.66864 L280 212.33432" />
+        <path data-feature="rptw.bottom" d="M280 167.66568 L280 145.33136" />
+        <path data-feature="rptw.bottom" d="M305.78945 177.59204 L280 167.66568" />
+        <path data-feature="rptw.bottom" d="M280 212.33432 L305.78945 232.18705" />
+        <path data-feature="rptw.bottom" d="M305.78945 232.18705 L305.78945 177.59204" />
+        <path data-feature="side.3" d="M1208.4203 -368.35805 L280 167.66568" />
+        <path data-feature="dovetail_left_flank" d="M1210.7367 -367.46647 L1208.4203 -368.35805" />
+        <path data-feature="dovetail_left_flank" d="M305.78945 177.59204 L1234.2098 -358.43168" />
+        <path data-feature="dovetail_left_flank" d="M1234.2098 -358.43168 L1210.7367 -367.46647" />
+        <path data-feature="dovetail_wide_face" d="M305.78945 232.18705 L1234.2098 -303.83667" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="212.33" x2="242.00" y2="212.33" />
+      <line x1="249.00" y1="215.33" x2="243.00" y2="209.33" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="167.67" x2="242.00" y2="167.67" />
+      <line x1="249.00" y1="170.67" x2="243.00" y2="164.67" />
+      <line x1="246.00" y1="212.33" x2="246.00" y2="167.67" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="246.00" y1="190.00" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">dovetail_small_width</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="278.00" y1="193.46" x2="261.00" y2="222.91" />
+      <line x1="258.90" y1="220.54" x2="267.10" y2="218.35" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="303.79" y1="208.35" x2="286.79" y2="237.80" />
+      <line x1="284.69" y1="235.43" x2="292.89" y2="233.24" />
+      <line x1="263.00" y1="219.44" x2="288.79" y2="234.33" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="275.89" y1="226.89" x2="420.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 355.00) rotate(0.00)">dovetail_depth</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Sliding tongue · end</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Sliding housing" fill="#f0dfbf" fill-opacity="1" d="M228.42109 696.24463 L228.42109 -375.80282 L280 -346.02372 Z M280 726.02372 L228.42109 696.24463 L280 -346.02372 Z M305.78945 740.91327 L280 726.02372 L280 217.2975 Z M305.78945 227.22387 L305.78945 740.91327 L280 217.2975 Z M305.78945 182.55523 L280 162.7025 L280 -346.02372 Z M305.78945 -331.13418 L305.78945 182.55523 L280 -346.02372 Z M744.21016 458.01186 L692.63126 428.23277 L692.63126 -643.81468 Z M744.21016 458.01186 L692.63126 -643.81468 L744.21016 -614.03559 Z M744.21016 -105.30937 L744.21016 -614.03559 L768.00703 -600.29646 Z M744.21016 -105.30937 L768.00703 -600.29646 L769.99962 -599.14604 Z M744.21016 -105.30937 L769.99962 -599.14604 L769.99962 -85.456636 Z M744.21016 458.01186 L744.21016 -50.714358 L769.99962 -40.787993 Z M744.21016 458.01186 L769.99962 -40.787993 L769.99962 472.90141 Z M389.24981 -379.32004 L769.99962 -599.14604 L769.99962 -85.456636 Z M305.78945 -331.13418 L389.24981 -379.32004 L769.99962 -85.456636 Z M305.78945 182.55523 L305.78945 -331.13418 L769.99962 -85.456636 Z M305.78945 227.22387 L769.99962 -40.787993 L769.99962 472.90141 Z M305.78945 740.91327 L305.78945 227.22387 L769.99962 472.90141 Z M609.1709 -595.62882 L692.63126 -643.81468 L692.63126 428.23277 Z M609.1709 -595.62882 L692.63126 428.23277 L228.42109 696.24463 Z M609.1709 -595.62882 L228.42109 696.24463 L228.42109 -375.80282 Z M228.42109 -375.80282 L692.63126 -643.81468 L769.99962 -599.14604 Z M305.78945 -331.13418 L228.42109 -375.80282 L769.99962 -599.14604 Z M692.63126 428.23277 L769.99962 472.90141 L305.78945 740.91327 Z M692.63126 428.23277 L305.78945 740.91327 L228.42109 696.24463 Z M744.21016 -105.30937 L769.99962 -85.456636 L305.78945 182.55523 Z M280 162.7025 L744.21016 -105.30937 L305.78945 182.55523 Z M280 162.7025 L744.21016 -105.30937 L744.21016 -50.714358 Z M280 162.7025 L744.21016 -50.714358 L280 217.2975 Z M305.78945 227.22387 L280 217.2975 L744.21016 -50.714358 Z M305.78945 227.22387 L744.21016 -50.714358 L769.99962 -40.787993 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Sliding housing" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M280 -346.02372 L234.39886 -372.35155" />
+        <path data-feature="rptw.right" d="M234.39886 -372.35155 L228.42109 -375.80282" />
+        <path data-feature="rptw.right" d="M228.42109 -375.80282 L228.42109 696.24463" />
+        <path data-feature="rptw.right" d="M228.42109 696.24463 L280 726.02372" />
+        <path data-feature="rptw.right" d="M280 217.2975 L280 162.7025" />
+        <path data-feature="rptw.right" d="M280 726.02372 L305.78945 740.91327" />
+        <path data-feature="rptw.right" d="M305.78945 740.91327 L305.78945 227.22387" />
+        <path data-feature="rptw.right" d="M305.78945 227.22387 L280 217.2975" />
+        <path data-feature="rptw.right" d="M280 162.7025 L305.78945 182.55523" />
+        <path data-feature="rptw.right" d="M305.78945 182.55523 L305.78945 -331.13418" />
+        <path data-feature="rptw.right" d="M305.78945 -331.13418 L280 -346.02372" />
+        <path data-feature="rptw.left" d="M692.63126 -643.81468 L744.21016 -614.03559" />
+        <path data-feature="rptw.left" d="M744.21016 -70.567088 L744.21016 -50.714358" />
+        <path data-feature="rptw.left" d="M744.21016 -614.03559 L768.00703 -600.29646" />
+        <path data-feature="rptw.left" d="M768.00703 -600.29646 L769.99962 -599.14604" />
+        <path data-feature="rptw.left" d="M769.99962 -599.14604 L769.99962 -85.456636" />
+        <path data-feature="rptw.left" d="M744.21016 -50.714358 L769.99962 -40.787993" />
+        <path data-feature="rptw.left" d="M769.99962 -40.787993 L769.99962 472.90141" />
+        <path data-feature="rptw.front" d="M769.99962 -599.14604 L389.24981 -379.32004" />
+        <path data-feature="rptw.front" d="M389.24981 -379.32004 L305.78945 -331.13418" />
+        <path data-feature="rptw.front" d="M305.78945 182.55523 L769.99962 -85.456636" />
+        <path data-feature="rptw.front" d="M769.99962 -40.787993 L305.78945 227.22387" />
+        <path data-feature="rptw.front" d="M305.78945 740.91327 L769.99962 472.90141" />
+        <path data-feature="rptw.back" d="M609.1709 -595.62882 L692.63126 -643.81468" />
+        <path data-feature="rptw.back" d="M228.42109 -375.80282 L609.1709 -595.62882" />
+        <path data-feature="rptw.top" d="M769.99962 -599.14604 L692.63126 -643.81468" />
+        <path data-feature="rptw.top" d="M692.63126 -643.81468 L228.42109 -375.80282" />
+        <path data-feature="rptw.top" d="M228.42109 -375.80282 L305.78945 -331.13418" />
+        <path data-feature="rptw.top" d="M305.78945 -331.13418 L769.99962 -599.14604" />
+        <path data-feature="rptw.bottom" d="M305.78945 740.91327 L228.42109 696.24463" />
+        <path data-feature="dovetail_wide_face" d="M744.21016 -50.714358 L280 217.2975" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line x1="283.00" y1="220.30" x2="277.00" y2="214.30" />
+      <line x1="283.00" y1="165.70" x2="277.00" y2="159.70" />
+      <line x1="280.00" y1="217.30" x2="280.00" y2="162.70" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="280.00" y1="190.00" x2="280.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 355.00) rotate(0.00)">dovetail_small_width + 2 × dovetail_depth × cos(dovetail_angle)</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Sliding housing</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

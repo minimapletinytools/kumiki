@@ -84,6 +84,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     and the receiving timber forms the tongue (material removed from both cheeks). The receiving
     (tongue) timber does **not** receive an end cut — it continues through the joint.
 
+    [![Tongue-and-fork butt](../../../assets/joint-drawings/fork-butt.svg)](../../../assets/joint-drawings/fork-butt.svg)
+
     Args:
         arrangement: Butt arrangement where butt_timber is the fork and
             receiving_timber is the tongue.
