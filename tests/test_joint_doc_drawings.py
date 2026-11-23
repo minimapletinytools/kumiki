@@ -45,7 +45,7 @@ def test_tenon_dimensions_measure_their_own_arguments(values):
     )
     tenon, mortise, end, plan = mortise_and_tenon(joint).findall('svg')
     assert values == {'tenon_size[0]': '24mm', 'tenon_size[1]': '73mm',
-                      'tenon_length': '49mm', 'mortise_depth': '61mm', 'mortise_depth − tenon_length': '12mm',
+                      'tenon_length': '49mm', 'mortise_depth': '61mm',
                       'tenon_position[0]': '17mm', 'tenon_position[1]': '11mm',
                       'mortise_shoulder_distance_from_centerline_or_centerplane': '63.5mm'}
     assert {node.text for view in (tenon, mortise, end, plan)
@@ -115,7 +115,7 @@ def test_scarf_dimensions_distinguish_the_rebate_dado_and_stub(values):
                       'dado_depth': '22mm', 'dado_height': '27mm', 'stub_tenon_width': '35mm'}
 
 
-def test_published_drawings_cover_every_basic_pattern():
+def test_published_drawings_cover_the_reviewed_patterns():
     import ast
     from pathlib import Path
     from xml.etree import ElementTree
@@ -133,14 +133,16 @@ def test_published_drawings_cover_every_basic_pattern():
     definitions = ast.parse(Path(basic_joints_patterns.__file__).read_text())
     basic = {fn.name for fn in definitions.body if isinstance(fn, ast.FunctionDef)
              and any(isinstance(d, ast.Call) and ast.unparse(d.func) == 'pattern' for d in fn.decorator_list)}
-    assert basic == set(pilots) | {fn.__name__ for fn, *_ in CATALOG if fn.__module__ == basic_joints_patterns.__name__}
+    omitted = {'basic_multi_cross_lap', 'example_basic_mitered_and_keyed_lap_joint', 'roundover'}
+    assert basic - omitted == set(pilots) | {fn.__name__ for fn, *_ in CATALOG if fn.__module__ == basic_joints_patterns.__name__}
     assets = {file.stem for file in OUT.glob('*.svg')}
     assert assets == set(pilots.values()) | {slug for _, slug, *_ in CATALOG}
     ns = {'s': 'http://www.w3.org/2000/svg'}
-    for _, slug, _, _, rows in CATALOG:
+    for _, slug, _, _, panels in CATALOG:
         root = ElementTree.parse(OUT / f'{slug}.svg')
-        assert len(root.findall('s:svg', ns)) == 2 * rows, slug
-        assert root.findall(".//s:g[@class='dimension']/s:text", ns), slug
+        assert len(root.findall('s:svg', ns)) == panels, slug
+        if slug not in {'plain-butt', 'angled-butt', 'butt-splice'}:
+            assert root.findall(".//s:g[@class='dimension']/s:text", ns), slug
     assert 'peg' not in (OUT / 'mortise-and-tenon.svg').read_text().lower()
 
 
@@ -163,7 +165,7 @@ def test_housing_dimensions_follow_independent_arguments(measured_spans):
     joint = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         create_canonical_example_butt_joint_timbers(), receiving_timber_shoulder_inset=mm(18),
         housing_length=mm(54), housing_width=mm(62), housing_depth=mm(32), housing_lateral_offset=mm(7))
-    housed(Plate(joint, 'Housing', 1))
+    housed(Plate(joint, 'Housing', 2))
     assert measured_spans == pytest.approx(dict(receiving_timber_shoulder_inset=18, housing_length=54,
                                                housing_width=62, housing_depth=32))
 
@@ -179,7 +181,7 @@ def test_tusk_dimensions_follow_the_exit_face(measured_spans):
         tenon_width_relative_to_joint=mm(65), tenon_height_relative_to_joint=mm(37),
         tusk_parameters=TuskParameters(tusk_thickness=mm(23), tusk_small_width=mm(29),
                                       tusk_back_stickout=mm(12), tusk_tip_stickout=mm(19)))
-    tusked(Plate(joint, 'Tusk', 2))
+    tusked(Plate(joint, 'Tusk', 4))
     assert measured_spans == pytest.approx(dict(tenon_length_past_opposite_shoulder=91,
         tenon_width_relative_to_joint=65, tenon_height_relative_to_joint=37,
         tusk_thickness=23, tusk_small_width=29, tusk_tip_stickout=19))
@@ -191,7 +193,7 @@ def test_splice_lap_dimensions_follow_the_removed_depth(measured_spans):
 
     joint = cut_plain_splice_lap_joint_on_aligned_timbers(create_canonical_example_splice_joint_timbers(),
         lap_length=mm(145), lap_depth=mm(31), top_lap_shoulder_position_from_top_lap_shoulder_timber_end=mm(72))
-    splice_lap(Plate(joint, 'Splice', 1))
+    splice_lap(Plate(joint, 'Splice', 2))
     assert measured_spans == pytest.approx(dict(lap_length=145, lap_depth=31))
 
 
@@ -201,6 +203,50 @@ def test_cross_lap_ratio_measures_the_removed_side_of_each_member(measured_spans
     from tools.joint_doc_patterns import Plate, cross_lap
 
     joint = cut_plain_cross_lap_joint(create_canonical_example_cross_joint_timbers(), cut_ratio=0.25)
-    cross_lap(Plate(joint, 'Cross lap', 1))
+    cross_lap(Plate(joint, 'Cross lap', 2))
     assert measured_spans['overlap × cut_ratio'] == pytest.approx(25.4)
     assert measured_spans['overlap × (1 − cut_ratio)'] == pytest.approx(76.2)
+
+
+def test_sliding_housing_width_lands_on_the_finished_board_edge(monkeypatch):
+    import numpy as np
+    from tools import joint_doc_patterns as drawings
+    from kumiki.drawings.svg import DrawingSolid
+    from patterns.basic_joints_patterns import sliding_dovetail
+
+    plate = drawings.Plate(sliding_dovetail(), 'Sliding dovetail', 2)
+    _, receiver = plate.cuts.values()
+    edges = []
+    def record(view, label, ends, *args):
+        if label.startswith('dovetail_small_width +'):
+            edges.append(np.asarray(ends))
+
+    monkeypatch.setattr(drawings, 'annotate', record)
+    drawings.sliding(plate)
+    actual, = edges
+    solid = DrawingSolid(receiver.render_timber_with_cuts_csg_local(), receiver.timber.transform)
+    finished = [np.asarray([a, b]) @ solid.rotation.T + solid.origin for _, a, b in solid.lines]
+    assert any(np.allclose(actual, edge) or np.allclose(actual, edge[::-1]) for edge in finished)
+
+
+def test_scarf_overview_measures_to_original_timber_end(monkeypatch):
+    import numpy as np
+    from tools import render_joint_docs as drawings
+
+    arrangement = replace(create_canonical_example_splice_joint_timbers(), front_face_on_timber1=TimberLongFace.FRONT)
+    joint = cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
+        arrangement, scarf_length=mm(330), rebated_shoulder_depth=mm(14), dado_depth=mm(22),
+        dado_height=mm(27), stub_tenon_width=mm(35), joint_center_relative_to_timber1_end=mm(73))
+    anchors = []
+    def record(view, label, ends, *args):
+        if label == 'joint_center_relative_to_timber1_end':
+            anchors.append(ends)
+
+    monkeypatch.setattr(drawings, 'annotate', record)
+    root = drawings.scarf(joint)
+    (end, center), = anchors
+    timber = arrangement.timber1
+    axis = drawings.as_ndarray(timber.get_length_direction_global())
+    assert np.dot(end - drawings.as_ndarray(timber.get_bottom_position_global()), axis) == pytest.approx(float(timber.length))
+    assert np.dot(end - center, axis) == pytest.approx(float(mm(73)))
+    assert root.findall('svg')[-1].get('width') == str(2 * drawings.WIDTH)

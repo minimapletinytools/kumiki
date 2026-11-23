@@ -22,8 +22,6 @@ def cut_free_house_joint(
     Each housed timber may be a CutTimber, in which case the housing cut follows that CutTimber's
     actual remaining body.
 
-    [![Free housing](../../../assets/joint-drawings/free-housing.svg)](../../../assets/joint-drawings/free-housing.svg)
-
     Args:
         housing_timber: Timber that will be cut to house the housed timbers
         housed_timbers: Timbers that will be housed

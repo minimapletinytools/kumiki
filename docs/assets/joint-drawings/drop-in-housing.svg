@@ -106,13 +106,11 @@
       <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">housing_depth</text>
     </g>
     <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="223.30" y1="169.73" x2="240.30" y2="140.28" />
-      <line x1="234.20" y1="144.84" x2="242.40" y2="142.65" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="252.88" y1="186.80" x2="269.88" y2="157.36" />
-      <line x1="263.79" y1="161.92" x2="271.98" y2="159.73" />
-      <line x1="238.30" y1="143.74" x2="267.88" y2="160.82" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="253.09" y1="152.28" x2="414.70" y2="42.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(414.70 37.00) rotate(0.00)">receiving_timber_shoulder_inset</text>
+      <line x1="217.20" y1="310.92" x2="225.40" y2="308.73" />
+      <line x1="246.79" y1="328.00" x2="254.98" y2="325.80" />
+      <line x1="221.30" y1="309.82" x2="250.88" y2="326.90" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="236.09" y1="318.36" x2="414.70" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(414.70 355.00) rotate(0.00)">receiving_timber_shoulder_inset</text>
     </g>
   </svg>
   <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Recessed socket</text>

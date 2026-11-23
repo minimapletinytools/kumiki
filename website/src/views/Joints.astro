@@ -14,7 +14,7 @@ const s = strings(lang).joints;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const drawingAssets = import.meta.glob<string>('../../../docs/assets/joint-drawings/*.svg', {
-  eager: true, query: '?url', import: 'default',
+  eager: true, query: '?url&no-inline', import: 'default',
 });
 type DrawingName = keyof typeof s.drawingTitles;
 function drawing(name: DrawingName, height = 428) {
@@ -89,7 +89,7 @@ const data = [
         jp: '金輪継ぎ / Kanawa-tsugi',
         fn: 'cut_basic_kanawa_tsugi_joint_on_aligned_timbers',
         href: 'https://kumiki.build/docs/reference/joints/workshop/splice/#kumiki.joints.workshop.splice.cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers',
-        drawing: { src: scarfDrawing, alt: s.scarfDrawing, height: 428 },
+        drawing: { src: scarfDrawing, alt: s.scarfDrawing, height: 856 },
       },
       {
         jp: '相欠き継ぎ / Aikaki-tsugi',
@@ -107,7 +107,7 @@ const data = [
       {
         jp: '箱相欠き車知栓仕口 / Hako Aikaki Shachi-sen',
         fn: 'cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers',
-        drawing: drawing('keyed-miter', 856),
+        drawing: undefined,
         href: 'https://kumiki.build/docs/reference/joints/workshop/corner/',
       },
       {
@@ -131,7 +131,7 @@ const categories = data.map((cat) => {
   const words = s.categories[cat.id as keyof typeof s.categories];
   return { ...cat, ...words, joints: cat.joints.map((joint, i) => ({ ...joint, name: words.joints[i] })) };
 });
-const featured = new Set(data.flatMap(cat => cat.joints.map(joint => joint.drawing.src)));
+const featured = new Set(data.flatMap(cat => cat.joints.flatMap(joint => joint.drawing ? [joint.drawing.src] : [])));
 const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
   .map(name => drawing(name)).filter(plate => !featured.has(plate.src));
 ---

@@ -33,8 +33,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     This is a traditional Japanese timber joint that combines a miter joint with interlocking
     finger laps on the inside of the miter for additional mechanical strength.
 
-    [![Mitered and keyed lap](../../../assets/joint-drawings/keyed-miter.svg)](../../../assets/joint-drawings/keyed-miter.svg)
-
     Args:
         arrangement: Corner joint arrangement where timber1 and timber2 are the joined
             timbers, timber1_end and timber2_end are the joined ends, and

@@ -121,13 +121,10 @@
     </g>
     <g class="references" fill="none" />
     <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="223.97" y1="226.97" x2="240.97" y2="256.41" />
-      <line x1="237.88" y1="257.04" x2="240.07" y2="248.85" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="282.00" y1="193.46" x2="299.00" y2="222.91" />
-      <line x1="295.90" y1="223.54" x2="298.10" y2="215.35" />
-      <line x1="238.97" y1="252.95" x2="297.00" y2="219.44" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="267.99" y1="236.20" x2="140.00" y2="340.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">board_thickness</text>
+      <line x1="220.88" y1="194.10" x2="223.07" y2="185.90" />
+      <line x1="278.90" y1="160.60" x2="281.10" y2="152.40" />
+      <line x1="221.97" y1="190.00" x2="280.00" y2="156.50" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(248.49 168.92) rotate(-30.00)">board_thickness</text>
     </g>
     <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
       <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="284.00" y1="190.00" x2="318.00" y2="190.00" />

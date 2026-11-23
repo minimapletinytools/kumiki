@@ -387,7 +387,7 @@ def cut_mortise_and_tenon_joint(
     The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
     and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon size and position, mortise depth and tip clearance](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and shoulder position](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
 
     [![Angled rectangular tenon](../../../assets/joint-drawings/angled-tenon.svg)](../../../assets/joint-drawings/angled-tenon.svg)
     """

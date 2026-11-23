@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 856">
   <title>Stopped mortise and tenon</title>
-  <desc>End and plan views locate the tenon relative to the stock and show the assembled tip inside the mortise.</desc>
+  <desc>End and plan views locate the tenon relative to the stock and locate the mortise shoulder.</desc>
   <rect width="100%" height="100%" fill="white" />
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
     <g class="member-fills">
@@ -198,11 +198,11 @@
   <text font-size="20" font-weight="600" x="19" y="459" fill="#463a2c">Tenon position · end view</text>
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="475" width="560" height="380" overflow="hidden">
     <g class="member-fills">
-      <path data-member="Tip clearance · mortise plan" fill="#f0dfbf" fill-opacity="0.28" d="M-724.04706 294.58824 L-724.04706 85.411765 L1284.0471 85.411765 Z M1284.0471 294.58824 L-724.04706 294.58824 L1284.0471 85.411765 Z M-724.04706 85.411765 L1284.0471 85.411765 L1284.0471 294.58824 Z M-724.04706 85.411765 L1284.0471 294.58824 L-724.04706 294.58824 Z M218.02941 111.35294 L374.91176 111.35294 L374.91176 294.58824 Z M218.02941 294.58824 L218.02941 111.35294 L374.91176 294.58824 Z M218.02941 294.58824 L218.02941 111.35294 L374.91176 111.35294 Z M218.02941 294.58824 L374.91176 111.35294 L374.91176 294.58824 Z" />
+      <path data-member="Shoulder position · mortise plan" fill="#f0dfbf" fill-opacity="0.28" d="M-724.04706 294.58824 L-724.04706 85.411765 L1284.0471 85.411765 Z M1284.0471 294.58824 L-724.04706 294.58824 L1284.0471 85.411765 Z M-724.04706 85.411765 L1284.0471 85.411765 L1284.0471 294.58824 Z M-724.04706 85.411765 L1284.0471 294.58824 L-724.04706 294.58824 Z M218.02941 111.35294 L374.91176 111.35294 L374.91176 294.58824 Z M218.02941 294.58824 L218.02941 111.35294 L374.91176 294.58824 Z M218.02941 294.58824 L218.02941 111.35294 L374.91176 111.35294 Z M218.02941 294.58824 L374.91176 111.35294 L374.91176 294.58824 Z" />
     </g>
     <g class="face-fills" />
     <g class="edges" fill="none" stroke-linejoin="round">
-      <g data-member="Tip clearance · mortise plan" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+      <g data-member="Shoulder position · mortise plan" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
         <g class="xray-edges" stroke-dasharray="5 4" opacity="0.45">
           <path data-feature="rptw.right" d="M1284.0471 85.411765 L-724.04706 85.411765" />
           <path data-feature="rptw.right" d="M-724.04706 85.411765 L-724.04706 294.58824" />
@@ -236,18 +236,6 @@
       </g>
     </g>
     <g class="references" fill="none" />
-    <line stroke-dasharray="8 3 2 3" stroke-width="1.4" x1="218.03" y1="137.71" x2="374.91" y2="137.71" stroke="#346979" />
-    <line stroke-dasharray="8 3 2 3" stroke-width="1.4" x1="296.47" y1="294.59" x2="296.47" y2="111.35" stroke="#346979" />
-    <text text-anchor="end" font-size="15" x="210.03" y="142.71" fill="#346979">Tenon tip</text>
-    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="300.47" y1="137.71" x2="408.47" y2="137.71" />
-      <line x1="407.47" y1="140.71" x2="401.47" y2="134.71" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="300.47" y1="111.35" x2="408.47" y2="111.35" />
-      <line x1="407.47" y1="114.35" x2="401.47" y2="108.35" />
-      <line x1="404.47" y1="137.71" x2="404.47" y2="111.35" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="404.47" y1="124.53" x2="415.00" y2="55.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(415.00 50.00) rotate(0.00)">mortise_depth − tenon_length</text>
-    </g>
     <line stroke-dasharray="8 3 2 3" stroke-width="1.4" x1="186.65" y1="190.00" x2="406.29" y2="190.00" stroke="#756a5a" />
     <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
       <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="292.47" y1="294.59" x2="212.47" y2="294.59" />
@@ -259,6 +247,6 @@
       <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 345.00) rotate(0.00)">mortise_shoulder_distance_from_centerline_or_centerplane</text>
     </g>
   </svg>
-  <text font-size="20" font-weight="600" x="579" y="459" fill="#463a2c">Tip clearance · mortise plan</text>
+  <text font-size="20" font-weight="600" x="579" y="459" fill="#463a2c">Shoulder position · mortise plan</text>
   <path d="M0 46H1120 M0 428H1120 M0 474H1120 M560 0v856" stroke="#d1c8b8" />
 </svg>

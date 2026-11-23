@@ -51,8 +51,6 @@ def cut_multi_cross_lap_joint_on_plane_aligned_timbers(
     Each of these ratios is relative to the starting and finish face, NOT the local
     cut_ratio parameter of the underlying cut_plain_cross_lap_joint call.
 
-    [![Multiple cross lap](../../../assets/joint-drawings/multi-cross-lap.svg)](../../../assets/joint-drawings/multi-cross-lap.svg)
-
     Args:
         timbers: Ordered chain of at least 2 timbers to weave together.
         starting_face_on_first_timber: The long face on timbers[0] marking the start of

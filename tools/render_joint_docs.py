@@ -1,24 +1,25 @@
 """Render the joint reference figures. Run with python -m tools.render_joint_docs."""
 
+from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
 
-from kumiki import CutTimber, Frame, Measure, create_v2, mm
+from kumiki import CutTimber, Frame, Measure, TimberLongFace, create_v2, mm
 from kumiki.csg.cutcsg import OwnedFeatureHit, SolidUnion, adopt_csg
 from kumiki.csg.feature_paths import FeatureHandle, find_csg_by_labels, find_feature
 from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 from kumiki.drawings.svg import DrawingSolid, render_svg_view
-from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+from kumiki.example_shavings import create_canonical_example_butt_joint_timbers, create_canonical_example_splice_joint_timbers
 from kumiki.geometry import Plane, Point, intersect_line_plane, intersect_planes
 from kumiki.joints.workshop.basic_joints import _basic_tenon_dimensions
 from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint
+from kumiki.joints.workshop.splice import cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
 from kumiki.timber import CSGAccessory
 from kumiki.rule import as_ndarray, format_angle, format_length
 from patterns.basic_joints_patterns import (
     example_basic_dropin_dovetail_butt_joint,
-    example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint,
     example_basic_lapped_gooseneck_joint,
     example_basic_tongue_and_fork_joint,
 )
@@ -90,7 +91,8 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
     group = ET.SubElement(view, 'g', fill=INK, stroke=INK, attrib={'class': 'dimension', 'stroke-width': '1.3'})
 
     for p in (a, b):
-        line(group, p + np.sign(offset) * 4 * normal, p + (offset + np.sign(offset) * 4) * normal, WITNESS)
+        if offset:
+            line(group, p + np.sign(offset) * 4 * normal, p + (offset + np.sign(offset) * 4) * normal, WITNESS)
         tick = 3 * (along + normal)
         line(group, p + offset * normal - tick, p + offset * normal + tick)
     line(group, a + offset * normal, b + offset * normal)
@@ -101,13 +103,22 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
         angle = 0
         bar_center = (a + b) / 2 + offset * normal
         line(group, bar_center, np.array([x, y + 5 if y < bar_center[1] else y - 15]), WITNESS)
+    anchor = 'middle'
+    if isinstance(measure, str) and '\n' in measure and caption_at is None:
+        x, y = (a + b) / 2 + np.array([12, -3])
+        angle, anchor = 0, 'start'
     text = ET.SubElement(group, 'text', transform=f'translate({x:.2f} {y:.2f}) rotate({angle:.2f})',
-                         attrib={'text-anchor': 'middle', 'font-size': '15', 'stroke': 'white',
+                         attrib={'text-anchor': anchor, 'font-size': '15', 'stroke': 'white',
                                  'stroke-width': '4', 'paint-order': 'stroke', 'stroke-linejoin': 'round'})
-    text.text = measure if isinstance(measure, str) else measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
+    label = measure if isinstance(measure, str) else measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
+    if '\n' in label:
+        for i, part in enumerate(label.splitlines()):
+            ET.SubElement(text, 'tspan', x='0', dy='0' if i == 0 else '1.1em').text = part
+    else:
+        text.text = label
 
 
-def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1), field_width=FIELD_WIDTH, companions=(), mesh_outline=False):
+def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1), field_width=FIELD_WIDTH, companions=(), mesh_outline=False, pixel_width=WIDTH):
     """Draw a cut member at a preset angle with optional X-ray edges."""
     transform = cut.timber.transform if isinstance(cut, CutTimber) else cut.transform
     root = cut.render_timber_with_cuts_csg_local() if isinstance(cut, CutTimber) else cut.get_csg_local()
@@ -116,7 +127,7 @@ def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dim
     right = np.cross(up_hint, toward)
     right /= np.linalg.norm(right)
     up = np.cross(toward, right)
-    camera = dict(center=center, right=right, up=up, width=field_width, height=field_width * HEIGHT / WIDTH)
+    camera = dict(center=center, right=right, up=up, width=field_width, height=field_width * HEIGHT / pixel_width)
     appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=0.28 if xray else 1, edgeOpacity=1, width=1.5)
     if mesh_outline:
         # Use the finished surface silhouette where several intersecting roundovers share a corner.
@@ -134,15 +145,15 @@ def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dim
     for name, body, pose in companions:
         solids[name] = DrawingSolid(body, pose)
         appearances[name] = {**appearance, 'surface': '#d4c5a9'}
-    view = render_svg_view(solids, set(), camera, WIDTH, HEIGHT, appearances=appearances,
+    view = render_svg_view(solids, set(), camera, pixel_width, HEIGHT, appearances=appearances,
                            edge_mode='xray' if xray else 'noOverlay')
     row, column = divmod(slot, 2)
     top = row * (HEIGHT + 48)
-    view.attrib.update(x=str(column * WIDTH), y=str(top + 47), width=str(WIDTH), height=str(HEIGHT), overflow='hidden')
+    view.attrib.update(x=str(column * WIDTH), y=str(top + 47), width=str(pixel_width), height=str(HEIGHT), overflow='hidden')
     sheet.append(view)
 
     def project(point):
-        return np.array([WIDTH / 2, HEIGHT / 2]) + (point - center) @ np.stack([right, -up], axis=1) * WIDTH / field_width
+        return np.array([pixel_width / 2, HEIGHT / 2]) + (point - center) @ np.stack([right, -up], axis=1) * pixel_width / field_width
 
     for measure, offset, caption_at in dimensions:
         annotate(view, measure, dimension_edge(solid, measure, toward), project, offset, caption_at)
@@ -151,8 +162,8 @@ def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dim
     return view, project
 
 
-def sheet(title, description, rows=1):
-    root = ET.Element('svg', xmlns='http://www.w3.org/2000/svg', viewBox=f'0 0 {2*WIDTH} {rows*(HEIGHT+48)}',
+def sheet(title, description, rows=1, columns=2):
+    root = ET.Element('svg', xmlns='http://www.w3.org/2000/svg', viewBox=f'0 0 {columns*WIDTH} {rows*(HEIGHT+48)}',
                       attrib={'font-family': 'system-ui, sans-serif', 'role': 'img'})
     ET.SubElement(root, 'title').text = title
     ET.SubElement(root, 'desc').text = description
@@ -161,13 +172,15 @@ def sheet(title, description, rows=1):
 
 
 def save(root, name):
-    height = int(root.get('viewBox').split()[-1])
+    width, height = map(int, root.get('viewBox').split()[-2:])
     rules = []
     for y in range(0, height, HEIGHT + 48):
         if y:
-            rules.append(f'M0 {y}H{2*WIDTH}')
-        rules.append(f'M0 {y+46}H{2*WIDTH}')
-    rules.append(f'M{WIDTH} 0v{height}')
+            rules.append(f'M0 {y}H{width}')
+        rules.append(f'M0 {y+46}H{width}')
+    if width > WIDTH:
+        split_height = min((int(v.get('y')) - 47 for v in root.findall('svg') if int(v.get('width')) == width), default=height)
+        rules.append(f'M{WIDTH} 0v{split_height}')
     ET.SubElement(root, 'path', d=' '.join(rules), stroke='#d1c8b8')
     ET.indent(root)
     ET.ElementTree(root).write(OUT / name, encoding='utf-8', xml_declaration=True)
@@ -225,7 +238,7 @@ def mortise_and_tenon(joint):
     sizes = [Measure(cheek(a), cheek(b), label=f'tenon_size[{i}]')
              for i, (a, b) in enumerate((('right', 'left'), ('front', 'back')))]
     tenon_size = [np.ptp(face_stations(size)[1]) for size in sizes]
-    root = sheet('Stopped mortise and tenon', 'End and plan views locate the tenon relative to the stock and show the assembled tip inside the mortise.', rows=2)
+    root = sheet('Stopped mortise and tenon', 'End and plan views locate the tenon relative to the stock and locate the mortise shoulder.', rows=2)
     panel(root, 0, 'Tenon', tenon, BACK_RIGHT, (0, -0.025, 0), [
         (Measure(tip, shoulder, label='tenon_length'), 56, None),
         (sizes[0], 26, (196, 338)),
@@ -257,20 +270,10 @@ def mortise_and_tenon(joint):
         annotate(view, Measure(stock_planes[i], tenon_planes[i], label=f'tenon_position[{i}]'),
                  [foot, tenon_center], project, (119, -90)[i], ((298, 30), (462, 230))[i])
 
-    title = 'Tip clearance · mortise plan'
+    title = 'Shoulder position · mortise plan'
     view, project = panel(root, 3, title, socket, PLAN, (0, 0, 0), [], xray=True, up_hint=(0, 1, 0))
     mouth_point = crossing(tenon_axis, plane_of(shoulder))
-    tip_point = crossing(tenon_axis, plane_of(tip))
-    floor_point = crossing(tenon_axis, plane_of(floor))
     half_width = tenon_size[1] / 2
-    guide(view, project, tip_point - local_y * half_width, tip_point + local_y * half_width, '#346979')
-    guide(view, project, mouth_point, floor_point, '#346979')
-    tip_left = project(tip_point - local_y * half_width)
-    ET.SubElement(view, 'text', x=f'{tip_left[0] - 8:.2f}', y=f'{tip_left[1] + 5:.2f}', fill='#346979',
-                  attrib={'text-anchor': 'end', 'font-size': '15'}).text = 'Tenon tip'
-    annotate(view, Measure(tip, floor, label='mortise_depth − tenon_length'), [tip_point, floor_point],
-             project, -108, (415, 50))
-
     receiver_mid = feature(socket, STOCK, 'ptw.centerplane_front_back')
     on_mid = crossing(tenon_axis, plane_of(receiver_mid))
     guide(view, project, on_mid - local_y * half_width * 1.4, on_mid + local_y * half_width * 1.4, '#756a5a')
@@ -354,6 +357,16 @@ def gooseneck(joint):
     return root
 
 
+def offset_scarf_example():
+    """Cut the basic scarf proportions with the joint center inset from timber 1’s nominal end."""
+    arrangement = replace(create_canonical_example_splice_joint_timbers(), front_face_on_timber1=TimberLongFace.FRONT)
+    width = arrangement.timber1.get_size_in_face_normal_axis(TimberLongFace.FRONT.rotate_right())
+    return cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
+        arrangement, scarf_length=4 * width, rebated_shoulder_depth=width / 5, dado_height=width / 5,
+        dado_depth=width / 5, stub_tenon_width=width / 5, joint_center_relative_to_timber1_end=width,
+    )
+
+
 def scarf(joint):
     """Draw the full Kanawa-tsugi profile and the dado at its stub tenon."""
     cuts = {ct.timber.ticket.path: ct for ct in Frame.from_joints([joint]).cut_timbers}
@@ -366,7 +379,7 @@ def scarf(joint):
                                      plane_of(feature(first, STOCK, 'ptw.centerplane_left_right')))
     stations = [crossing(profile_front, plane_of(end)) for end in ends]
     center = np.mean(stations, axis=0)
-    root = sheet('Kanawa-tsugi scarf', 'Side elevation of the oblique scarf with a detail of the stub tenon and dado.')
+    root = sheet('Kanawa-tsugi scarf', 'Scarf profile, stub tenon and full-length timber with the nominal end datum.', rows=2)
     view, project = panel(root, 0, 'Scarf profile', first, SIDE, center, [], field_width=SPLICE_OVERVIEW_WIDTH)
     annotate(view, Measure(*ends, label='scarf_length'), stations, project, -99)
     waste = first.cuts[0].negative_csg
@@ -392,10 +405,30 @@ def scarf(joint):
                  label='stub_tenon_width'), 44, (324, 76)),
         (Measure(ends[0], feature(first, stub, 'side.1'), label='dado_depth'), -41, (179, 321)),
     ])
+    timber = first.timber
+    axis = as_ndarray(timber.get_length_direction_global())
+    bottom = as_ndarray(timber.get_bottom_position_global())
+    top = bottom + float(timber.length) * axis
+    joint_at_top = any(c.maybe_top_end_cut_distance_from_bottom is not None for c in first.cuts)
+    nominal_end, far_end = (top, bottom) if joint_at_top else (bottom, top)
+    joint_center = as_ndarray(key.transform.position)
+    datum = joint_center + ((nominal_end - joint_center) @ axis) * axis
+    extent = np.array([far_end, *stations, datum])
+    midpoint = (extent.min(axis=0) + extent.max(axis=0)) / 2
+    view, project = panel(root, 2, 'Timber 1 · joint center from nominal end', first, SIDE, midpoint, [],
+                          field_width=np.ptp(extent @ axis) * 1.14, pixel_width=2 * WIDTH)
+    height = float(timber.size[0]) * .8
+    for point, caption, color, level in ((joint_center, 'Joint center', '#346979', 0), (datum, 'Nominal end', '#756a5a', 1)):
+        up = np.array([0, 0, height])
+        guide(view, project, point - up, point + up, color)
+        x, y = project(point + up)
+        ET.SubElement(view, 'text', x=f'{x:.2f}', y=f'{y - 8 - 19 * level:.2f}', fill=color,
+                      attrib={'text-anchor': 'middle', 'font-size': '15'}).text = caption
+    annotate(view, 'joint_center_relative_to_timber1_end', (datum, joint_center), project, -76, (825, 322))
     return root
 
 
-def annotate_plan_angle(view, measure, vertex, reference, flank, caption):
+def annotate_plan_angle(view, measure, vertex, reference, flank, caption, *, project=None):
     """Draw a plan angle from a reference ray to a flank on the same face."""
     run, side = reference - vertex, flank - vertex
     a, b = run / np.linalg.norm(run), side / np.linalg.norm(side)
@@ -406,6 +439,13 @@ def annotate_plan_angle(view, measure, vertex, reference, flank, caption):
     start, stop = vertex + radius * a, vertex + radius * b
     arc = (f'M{start[0]:.2f} {start[1]:.2f} A{radius:.2f} {radius:.2f} '
            f'0 0 {int(turn > 0)} {stop[0]:.2f} {stop[1]:.2f}')
+    if project is not None:
+        # Project the circular arc from its measurement plane into the oblique view.
+        perpendicular = np.array([-a[1], a[0]])
+        points = [project(vertex + radius * (np.cos(t) * a + np.sin(t) * perpendicular))
+                  for t in np.linspace(0, turn, 13)]
+        arc = 'M' + ' L'.join(f'{x:.2f} {y:.2f}' for x, y in points)
+        vertex, reference, start, stop = map(project, (vertex, reference, start, stop))
     group = ET.SubElement(view, 'g', attrib={'class': 'dimension', 'fill': INK})
     line(group, vertex, reference, WITNESS)
     ET.SubElement(group, 'path', d=arc, fill='none', stroke=INK, attrib={'stroke-width': '1.8'})
@@ -449,7 +489,7 @@ if __name__ == '__main__':
     save(mortise_and_tenon(offset_tenon_example()), 'mortise-and-tenon.svg')
     save(tongue_and_fork(example_basic_tongue_and_fork_joint()), 'tongue-and-fork.svg')
     save(gooseneck(example_basic_lapped_gooseneck_joint()), 'lapped-gooseneck.svg')
-    save(scarf(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint()), 'kanawa-tsugi.svg')
+    save(scarf(offset_scarf_example()), 'kanawa-tsugi.svg')
     save(dovetail(example_basic_dropin_dovetail_butt_joint()), 'drop-in-dovetail.svg')
     from tools.joint_doc_patterns import CATALOG, render_entry
     for entry in CATALOG:

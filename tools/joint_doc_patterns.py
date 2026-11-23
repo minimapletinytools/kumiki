@@ -5,20 +5,14 @@ from functools import partial
 
 import numpy as np
 
-from kumiki import Frame, TimberEdge, TimberEnd, Measure
-from kumiki.csg.meshcsg import TriangleSolid
-from kumiki.timber import CSGAccessory
-from kumiki.csg.cutcsg import Cylinder, csg_children
+from kumiki import Frame, TimberEnd, TimberLongFace
+from kumiki.csg.cutcsg import csg_children
+from kumiki.measuring import get_center_point_on_face_global
 from kumiki.geometry import Line, Plane, intersect_planes
-from kumiki.rule import as_ndarray, create_v2, create_v3
+from kumiki.rule import as_ndarray, create_v3
 from patterns import basic_joints_patterns as basic
 from patterns.board.board_joints_patterns import example_board_in_grooved_frame
-from patterns.decorative.decorative_joints_patterns import (
-    example_path_extrusion_corner_end_decoration,
-    example_straight_angled_end_cut_decoration,
-)
 from patterns.free.free_dovetail_joint_patterns import example_free_sliding_dovetail, example_free_tapered_dovetail
-from patterns.free.free_house_joint_patterns import free_house_joint
 from tools.render_joint_docs import (
     BACK_RIGHT,
     FRONT_LEFT,
@@ -29,8 +23,6 @@ from tools.render_joint_docs import (
     HEIGHT,
     WIDTH,
     annotate,
-    DrawingSolid,
-    dimension_edge,
     annotate_plan_angle,
     crossing,
     feature,
@@ -55,6 +47,8 @@ class Span:
     label: str
     start: np.ndarray
     end: np.ndarray
+    inline: bool = False
+    offset: float = 34
 
 
 def _walk(root):
@@ -84,8 +78,8 @@ def corners(cut, name, *, only_child=False):
     }
 
 
-def axis_span(label, point, plane):
-    return Span(label, point, foot_on_plane(point, plane))
+def axis_span(label, point, plane, *, offset=34):
+    return Span(label, point, foot_on_plane(point, plane), offset=offset)
 
 
 def stock_plane(cut, side):
@@ -95,8 +89,8 @@ def stock_plane(cut, side):
 class Plate:
     """Place member views and model-space dimensions on a two-column sheet."""
 
-    def __init__(self, joint, title, rows):
-        self.root = sheet(title, title, rows)
+    def __init__(self, joint, title, panels):
+        self.root = sheet(title, title, rows=(panels + 1) // 2, columns=min(panels, 2))
         frame = joint if isinstance(joint, Frame) else Frame.from_joints([joint])
         self.cuts = {c.timber.ticket.path: c for c in frame.cut_timbers}
         self.accessories = {} if isinstance(joint, Frame) else joint.jointAccessories
@@ -128,6 +122,9 @@ class Plate:
             run = b - a
             if np.linalg.norm(run) < 1e-5:
                 raise ValueError(f"{title}: {span.label} is end-on")
+            if span.inline:
+                annotate(view, span.label, (span.start, span.end), project, 0)
+                continue
             normal = np.array([run[1], -run[0]]) / np.linalg.norm(run)
             top = (a[1] + b[1]) / 2 < HEIGHT / 2
             margin = min(WIDTH / 2, len(span.label) * 4.3 + 12)
@@ -137,7 +134,7 @@ class Plate:
                 if abs(x - prev[0]) < margin + half_width and abs(caption[1] - prev[1]) < 21:
                     caption[1] += 24 if top else -24
             captions.append((caption.copy(), margin))
-            offset = 34 if (caption - (a + b) / 2) @ normal > 0 else -34
+            offset = span.offset if (caption - (a + b) / 2) @ normal > 0 else -span.offset
             annotate(view, span.label, (span.start, span.end), project, offset, caption)
         return view, project
 
@@ -150,13 +147,8 @@ class Plate:
         return self.view("Assembled joint", cut, preset, center, width=width, companions=bodies)
 
 
-def plain(plate, *, brace=False, splice=False, miter=False):
+def plain(plate, *, brace=False, miter=False):
     cuts = list(plate.cuts.values())
-    cut = (
-        plate.cuts["brace_timber"]
-        if brace
-        else next((c for c in cuts if c.cuts and c.cuts[0].negative_csg), cuts[0])
-    )
     center = (0.055, 0.55, 0) if brace else (0, 0, 0)
     if miter:
         view, project = plate.assembly(center, PLAN, width=OVERVIEW)
@@ -166,32 +158,6 @@ def plain(plate, *, brace=False, splice=False, miter=False):
         annotate_plan_angle(view, "corner_angle", project(vertex), first, second, (380, 84))
     else:
         plate.assembly(center, width=OVERVIEW)
-    # The end face is determined by the arrangement; show the two stock axes at the cut.
-    plane = (
-        Plane(
-            cut.timber.get_length_direction_global(),
-            cut.timber.get_bottom_position_global() + cut.timber.length * cut.timber.get_length_direction_global(),
-        )
-        if splice
-        else plane_of(
-            next(
-                h
-                for h in primitive_features(cut, cut.cuts[0].negative_csg).values()
-                if h.feature.name in ("shoulder", "side.0")
-            )
-        )
-    )
-    stock_sides = [stock_plane(cut, s) for s in ("right", "left", "front", "back")]
-    at = [crossing(intersect_planes(stock_sides[i], stock_sides[j]), plane) for i, j in ((0, 2), (1, 2), (0, 3))]
-    spans = (
-        [Span("stock width", at[0], at[1])]
-        if np.isclose(np.linalg.norm(at[0] - at[1]), float(cut.timber.size[0]))
-        else []
-    )
-    if not spans:
-        spans = [Span("cut face width", at[0], at[1])]
-    spans.append(Span("cut face length", at[0], at[2]))
-    plate.view("End cut", cut, BACK_RIGHT if splice or brace else FRONT_LEFT, np.mean(at, axis=0), *spans)
 
 
 def cross_lap(plate, *, house=False):
@@ -257,7 +223,7 @@ def splice_lap(p):
             for s1, s2 in [("right", "left"), ("front", "back")]
         ]
         if np.linalg.norm(edge) < max(widths) - 1e-8:
-            p.view("Mating lap", b, FRONT_LEFT, (w[i] + w[4]) / 2, Span("lap_depth", w[i], w[0]))
+            p.view("Mating lap", b, (-1, 1, 1), (w[i] + w[4]) / 2, Span("lap_depth", w[i + 4], w[4], inline=True))
             break
     else:
         raise ValueError("The mating section must be shallower than the stock")
@@ -281,15 +247,17 @@ def housed(p):
         FRONT_LEFT,
         (0, -0.025, 0),
         Span("housing_depth", v[4], v[0]),
-        axis_span("receiving_timber_shoulder_inset", w[1], stock_plane(b, "front")),
+        axis_span("receiving_timber_shoulder_inset", w[2], stock_plane(b, "front"), offset=0),
     )
 
 
 def fingers(p, *, splice=False):
     a, b = p.cuts.values()
     v = corners(a, "slot_2")
+    finger = corners(b, "slot_3")
+    width_label = "finger_width/finger_count\n(provide one or the other)"
     if splice:
-        mid1, mid2 = (v[0] + v[3]) / 2, (v[1] + v[2]) / 2
+        mid1, mid2 = (finger[0] + finger[3]) / 2, (finger[1] + finger[2]) / 2
         root, tip = v[1], v[2]
         square = tip.copy()
         square[1] = root[1]
@@ -298,21 +266,26 @@ def fingers(p, *, splice=False):
             a,
             PLAN,
             (0, 0, 0),
-            Span("span / finger_count", mid1, mid2),
+            Span(width_label, mid1, mid2, inline=True),
             Span("finger_length", root, square),
             width=BOARD_DETAIL,
         )
         view, project = p.view("Taper at the flank", b, PLAN, (0, 0, 0), width=BOARD_DETAIL)
         # The corresponding slot on the second member is the finger on the first.
-        t = corners(b, "slot_3")
+        t = finger
         q = t[0].copy()
         q[0] = t[3][0]
         annotate_plan_angle(view, "taper_angle", project(t[0]), project(q), project(t[3]), (365, 60))
     else:
         p.view(
-            "First board", a, FRONT_LEFT, (0, 0, 0), Span("span / finger_count", v[5], v[4]), width=BOARD_DETAIL
+            "First board",
+            a,
+            FRONT_LEFT,
+            (0, 0, 0),
+            Span(width_label, (finger[4] + finger[7]) / 2, (finger[5] + finger[6]) / 2, inline=True),
+            width=BOARD_DETAIL,
         )
-        w = corners(b, "slot_3")
+        w = finger
         p.view(
             "Mating board",
             b,
@@ -384,38 +357,21 @@ def tusked(p):
     width_end = crossing(sloping_edge, exit_cheek)
     width_start = foot_on_plane(v[3], exit_cheek)
     view, project = p.view(
-        "Loose tusk · side", tusk, END, (v[0] + v[2]) / 2, tip, Span("tusk_small_width", width_start, width_end)
+        "Loose tusk · side",
+        tusk,
+        END,
+        (v[0] + v[2]) / 2,
+        tip,
+        Span("tusk_small_width", width_start, width_end, inline=True),
     )
     annotate_plan_angle(view, "tusk_angle", project(v[1]), project(v[1] + v[3] - v[0]), project(v[2]), (399, 87))
-
-
-def keyed(p):
-    a, b = p.cuts.values()
-    p.assembly((0, 0, 0), BACK_RIGHT, width=OVERVIEW)
-    finger = next(n for n in _walk(a.cuts[0].negative_csg) if n.label.name == "lap_finger")
-    faces = primitive_features(a, finger)
-    thickness = Measure(faces["cap.0"], faces["cap.1"], label="lap_thickness")
-    solid = DrawingSolid(a.render_timber_with_cuts_csg_local(), a.timber.transform)
-    edge = dimension_edge(solid, thickness, FRONT_RIGHT)
-    p.view("Exposed lap", a, FRONT_RIGHT, np.mean(edge, axis=0), Span("lap_thickness", *edge))
-    slot = corners(b, "key_slot")
-    p.view("Key seat at the miter", b, FRONT_LEFT, (slot[4] + slot[6]) / 2, width=FIELD_WIDTH)
-    key = p.accessories["key_0"]
-    v = accessory_points(key)
-    p.view(
-        "Loose key",
-        key,
-        BACK_RIGHT,
-        (v[0] + v[6]) / 2,
-        Span("key_width", v[0], v[1]),
-        Span("key_thickness", v[1], v[5]),
-    )
 
 
 def rice(p):
     post, rail, receiver = p.cuts.values()
     p.assembly((0.05, 0.05, -0.05))
     u = corners(post, "long_tenon")
+    short = corners(post, "short_tenon")
     p.view(
         "Post tenons",
         post,
@@ -423,6 +379,8 @@ def rice(p):
         (0.05, 0.05, -0.04),
         Span("tenon_size[0]", u[1], u[0]),
         Span("tenon_size[1]", u[0], u[3]),
+        Span("tenon_size[0]", short[0], short[3]),
+        Span("tenon_size[1]", short[0], short[1]),
     )
     v = corners(rail, "rail_tenon")
     # The rail inset is measured down from the top of the joint.
@@ -434,9 +392,9 @@ def rice(p):
     p.view(
         "Rail tenon",
         rail,
-        FRONT_LEFT,
+        FRONT_RIGHT,
         (0.065, 0.025, -0.05),
-        axis_span("timber_2_tenon_distance_from_outer_face", v[1], top),
+        axis_span("timber_2_tenon_distance_from_outer_face", v[0], top),
     )
     # In plan the post shows the outside faces used to lay out its tenons.
     outside = next(
@@ -459,12 +417,17 @@ def splined(p, *, stubs=False):
     r, a, b = p.cuts.values()
     p.assembly((0, 0, 0), width=OVERVIEW)
     v = corners(a, "spline_slot")
+    slot_depth = Span("slot_depth", v[0], v[3])
+    if not stubs:
+        # Project the slot onto the shoulder at the open end of the butt timber.
+        shoulder = stock_plane(r, "front")
+        slot_depth = Span("slot_depth", foot_on_plane(v[0], shoulder), foot_on_plane(v[3], shoulder), inline=True)
     p.view(
         "Spline slot in butt timber",
         a,
         BACK_RIGHT,
         (0, -0.17, 0),
-        Span("slot_depth", v[0], v[3]),
+        slot_depth,
         Span("slot_thickness", v[0], v[1]),
         width=OVERVIEW,
     )
@@ -551,11 +514,23 @@ def angled_tenon(p, *, corner=False, round_profile=False):
         v = corners(a, "tenon")
         tip = (v[4] + v[6]) / 2
         center = crossing(Line(create_v3(*axis), create_v3(*tip)), shoulder)
-        profile = [
-            Span("tenon_height_relative_to_joint" if corner else "tenon_size[0]", v[4], v[5]),
-            Span("tenon_width_relative_to_joint" if corner else "tenon_size[1]", v[5], v[6]),
-        ]
-    p.view("Tenon and shoulder", a, FRONT_LEFT, (center + tip) / 2, *profile, Span("tenon_length", center, tip))
+        if corner:
+            profile = [
+                Span("tenon_height_relative_to_joint", v[4], v[5]),
+                Span("tenon_width_relative_to_joint", v[5], v[6]),
+            ]
+        else:
+            # These two edges meet at the forward, upper corner of the tenon tip.
+            profile = [Span("tenon_size[0]", v[4], v[5]), Span("tenon_size[1]", v[7], v[4])]
+    preset = BACK_RIGHT if corner else (1, 2, 1)
+    p.view(
+        "Tenon and shoulder",
+        a,
+        FRONT_LEFT if corner else preset,
+        (center + tip) / 2,
+        *profile,
+        Span("tenon_length", center, tip),
+    )
     bore = node(b, "mortise_hole")
     if round_profile:
         floor = as_ndarray(
@@ -567,7 +542,7 @@ def angled_tenon(p, *, corner=False, round_profile=False):
     p.view(
         "Mortise along insertion axis",
         b,
-        BACK_RIGHT,
+        preset,
         (center + floor) / 2,
         Span("mortise_depth", center, floor),
         xray=True,
@@ -583,9 +558,11 @@ def board_dovetails(p, *, blind=False):
     square[2] = neck[2]
     view, project = p.view("Tail layout", a, END, (neck + v[2]) / 2, Span("dovetails[0].small_width", v[0], v[1]))
     annotate_plan_angle(view, "dovetails[0].angle", project(neck), project(square), project(tip), (396, 55))
-    spans = [Span("dovetails[0].depth" if blind else "pin board thickness", neck, square)]
-    middle = (w[0] + w[1]) / 2
-    spans.append(axis_span("distances[0]", middle, stock_plane(a, "right")))
+    spans = []
+    if blind:
+        socket_floor = w[7]
+        end_face = socket_floor + ((w[4] + w[5]) - (w[6] + w[7])) / 2
+        spans.append(Span("dovetails[0].depth", end_face, socket_floor, inline=True))
     p.view("Blind socket" if blind else "Through socket", b, FRONT_LEFT, (w[0] + w[6]) / 2, *spans)
 
 
@@ -609,6 +586,13 @@ def sliding(p):
     a, b = p.cuts.values()
     v = corners(a, "dovetail_tongue_profile")
     w = corners(b, "dovetail_housing")
+    opening = max(
+        TimberLongFace, key=lambda face: as_ndarray(b.timber.get_face_direction_global(face)) @ (w[5] - w[1])
+    )
+    end_face = Plane(
+        b.timber.get_face_direction_global(opening), get_center_point_on_face_global(opening, b.timber)
+    )
+    lip = [foot_on_plane(w[i], end_face) for i in (1, 2)]
     base = (v[0] + v[3]) / 2
     tip = (v[1] + v[2]) / 2
     p.view(
@@ -623,10 +607,10 @@ def sliding(p):
     p.view(
         "Sliding housing",
         b,
-        FRONT_RIGHT,
-        (w[0] + w[4]) / 2,
-        Span("dovetail_small_width + 2 × dovetail_depth × cos(dovetail_angle)", w[1], w[2]),
-        width=OVERVIEW,
+        BACK_RIGHT,
+        np.mean(lip, axis=0),
+        Span("dovetail_small_width + 2 × dovetail_depth × cos(dovetail_angle)", *lip, offset=0),
+        width=BOARD_DETAIL,
     )
 
 
@@ -635,19 +619,7 @@ def decoration(p, kind):
     end = as_ndarray(
         a.timber.get_bottom_position_global() + a.timber.length * a.timber.get_length_direction_global()
     )
-    if kind == "roundover":
-        from kumiki.joints.workshop.basic_joints import cut_basic_practice_roundover_decoration
-
-        # Isolate the selected edge to show the quarter circle at full scale.
-        edge_joint = cut_basic_practice_roundover_decoration(a.timber, [TimberEdge.RIGHT_FRONT])
-        (a,) = Frame.from_joints([edge_joint]).cut_timbers
-        tree = node(a, "roundover_right_front")
-        (cyl,) = [n for n in csg_children(tree) if isinstance(n, Cylinder)]
-        center = as_ndarray(a.timber.transform.local_to_global(cyl.position))
-        center[2] = end[2] - float(cyl.radius)
-        point = center + np.array([1, 1, 0]) * float(cyl.radius) / np.sqrt(2)
-        dims = [Span("radius", center, point)]
-    elif kind == "rounded-end":
+    if kind == "rounded-end":
         cyl = node(a, "rounded_end_arc")
         center = as_ndarray(a.timber.transform.local_to_global(cyl.position))
         center[0] += float(a.timber.size[0]) / 2
@@ -667,10 +639,9 @@ def decoration(p, kind):
             Span("scallop_height", center, center + [0, height, 0]),
             Span("scallop_length", center, center - [0, 0, length]),
         ]
-    preset = BACK_RIGHT if kind == "roundover" else FRONT_RIGHT
-    p.view("Finished end", a, preset, end - [0, 0, 0.05], width=FIELD_WIDTH, mesh_outline=True)
+    p.view("Finished end", a, FRONT_RIGHT, end - [0, 0, 0.05], width=FIELD_WIDTH, mesh_outline=True)
     focus = (dims[1].end + center) / 2 if kind == "scallop" else center
-    p.view("Profile", a, PLAN if kind == "roundover" else END, focus, *dims, mesh_outline=True)
+    p.view("Profile", a, END, focus, *dims, mesh_outline=True)
 
 
 def accessory_points(accessory):
@@ -699,33 +670,18 @@ def free_dovetail(p, *, tapered=False):
     )
     square = v[1] + (depth - back)
     annotate_plan_angle(view, "dovetail_angle", project(v[1]), project(square), project(v[2]), (394, 108))
-    view, project = p.view(
-        "Socket in plan",
-        beam,
-        PLAN,
-        center,
-        Span("backward_length", back, center),
-        Span("forward_length", center, front),
-    )
+    view, project = p.view("Dovetail socket", beam, FRONT_RIGHT, center, width=FIELD_WIDTH)
     if tapered:
-        ref = v[0] + (front - back)
-        annotate_plan_angle(view, "taper_angle", project(v[0]), project(ref), project(v[4]), (414, 91))
-
-
-def free_house(p):
-    cut = p.cuts["timber1"]
-    v = corners(cut, "timber (rough)")
-    face = stock_plane(cut, "front")
-    near = [foot_on_plane(v[i], face) for i in (1, 2)]
-    p.assembly((0, 0, 0), width=OVERVIEW)
-    p.view(
-        "Housing section",
-        cut,
-        FRONT_LEFT,
-        (0, 0, 0),
-        Span("housed timber width", *near),
-        axis_span("stock overlap", near[0], stock_plane(cut, "right")),
-    )
+        ref = v[1] + (front - back)
+        annotate_plan_angle(
+            view,
+            "taper_angle",
+            v[1][:2],
+            ref[:2],
+            v[5][:2],
+            (414, 91),
+            project=lambda xy: project(np.append(xy, v[1][2])),
+        )
 
 
 def grooved_frame(p):
@@ -745,69 +701,10 @@ def grooved_frame(p):
         rail,
         FRONT_RIGHT,
         floor,
-        Span("board_thickness", floor, front),
+        Span("board_thickness", foot_on_plane(floor, inside), foot_on_plane(front, inside), inline=True),
         axis_span("groove_depth", floor, inside),
         width=BOARD_DETAIL,
     )
-
-
-def angled_end(p):
-    (cut,) = p.cuts.values()
-    f = plane_of(primitive_features(cut, node(cut, "straight_angled_end_cut"))["side.0"])
-    end = as_ndarray(
-        cut.timber.get_bottom_position_global() + cut.timber.length * cut.timber.get_length_direction_global()
-    )
-
-    def at(x):
-        return crossing(Line(create_v3(0, 0, 1), create_v3(x, 0, 0)), f)
-
-    pivot = at(0)
-    edge = at(float(cut.timber.size[0]) / 2)
-    p.view("Angled end", cut, FRONT_RIGHT, pivot, Span("position_from_end", pivot, end))
-    view, project = p.view("Cut angle", cut, SIDE, pivot)
-    ref = np.array([edge[0], 0, pivot[2]])
-    annotate_plan_angle(view, "angle", project(pivot), project(ref), project(edge), (393, 90))
-
-
-def path_end(p):
-    from kumiki.csg.pathcsg import ArcSegment
-
-    (cut,) = p.cuts.values()
-    profile = node(cut, "path_extrusion_decoration")
-
-    def world(pt):
-        return as_ndarray(
-            cut.timber.transform.local_to_global(
-                profile.transform.local_to_global(create_v3(pt[0], pt[1], profile.end_distance))
-            )
-        )
-
-    arcs = sorted(
-        (arc for arc in profile.path.segments if isinstance(arc, ArcSegment)), key=lambda arc: arc.center[0]
-    )
-    spans = []
-    for i, arc in enumerate(arcs):
-        center = world(arc.center)
-        angle = float(arc.start_angle + arc.sweep_angle / 2)
-        tip = world(arc.center + create_v2(np.cos(angle), np.sin(angle)) * arc.radius)
-        spans.append(Span(f"cut_path[{i}].radius", center, tip))
-    focus = (spans[0].end + spans[1].end) / 2
-    # Extrude the finished section so the curved cap and side share one perimeter.
-    from manifold3d import CrossSection, FillRule
-
-    stock = CrossSection.square((float(cut.timber.length), float(cut.timber.size[0])))
-    loop = profile.path.tessellate_for_mesh(0.00005)
-    waste = CrossSection([np.array([(float(pt[0]), float(pt[1])) for pt in loop])], FillRule.EvenOdd)
-    height = float(profile.end_distance - profile.start_distance)
-    mesh = (stock - waste).extrude(height).translate((0, 0, float(profile.start_distance))).to_mesh()
-    solid = TriangleSolid(
-        vertices=tuple(map(tuple, mesh.vert_properties[:, :3])),
-        faces=tuple(map(tuple, mesh.tri_verts)),
-        transform=profile.transform,
-    )
-    body = CSGAccessory(transform=cut.timber.transform, positive_csg=solid)
-    p.view("Carved end", body, (1, -1, -1), focus, mesh_outline=True)
-    p.view("Compound curve", body, SIDE, focus, *spans, mesh_outline=True)
 
 
 # Each entry names the basic pattern, the plate filename and the layout used for it.
@@ -817,7 +714,7 @@ CATALOG = [
         "rice-dumpling",
         "Three-way mitered tenon",
         rice,
-        2,
+        4,
     ),
     (basic.example_basic_miter_joint, "angled-miter", "Angled miter", partial(plain, miter=True), 1),
     (
@@ -829,74 +726,68 @@ CATALOG = [
     ),
     (basic.example_basic_butt_joint, "plain-butt", "Face-aligned butt joint", plain, 1),
     (basic.basic_plain_butt_angled, "angled-butt", "Angled butt joint", partial(plain, brace=True), 1),
-    (basic.example_basic_butt_splice_joint, "butt-splice", "Butt splice", partial(plain, splice=True), 1),
-    (basic.basic_finger_corner, "finger-corner", "Box corner", fingers, 1),
-    (basic.basic_finger_splice, "finger-splice", "Tapered finger splice", partial(fingers, splice=True), 1),
-    (basic.example_basic_cross_lap_joint, "cross-lap", "Cross lap", cross_lap, 1),
-    (basic.example_basic_house_joint, "cross-lap-house", "Cross-lap housing", partial(cross_lap, house=True), 1),
-    (basic.basic_corner_lap, "corner-lap", "Corner lap", cross_lap, 1),
-    (basic.basic_multi_cross_lap, "multi-cross-lap", "Multiple cross lap", cross_lap, 1),
-    (basic.example_basic_splice_lap_joint, "splice-lap", "Splice lap", splice_lap, 1),
+    (basic.example_basic_butt_splice_joint, "butt-splice", "Butt splice", plain, 1),
+    (basic.basic_finger_corner, "finger-corner", "Box corner", fingers, 2),
+    (basic.basic_finger_splice, "finger-splice", "Tapered finger splice", partial(fingers, splice=True), 2),
+    (basic.example_basic_cross_lap_joint, "cross-lap", "Cross lap", cross_lap, 2),
+    (basic.example_basic_house_joint, "cross-lap-house", "Cross-lap housing", partial(cross_lap, house=True), 2),
+    (basic.basic_corner_lap, "corner-lap", "Corner lap", cross_lap, 2),
+    (basic.example_basic_splice_lap_joint, "splice-lap", "Splice lap", splice_lap, 2),
     (
         basic.example_basic_splined_opposing_double_butt_joint,
         "splined-double-butt",
         "Splined opposing double butt",
         splined,
-        2,
+        4,
     ),
     (
         basic.example_basic_splined_opposing_double_butt_joint_with_stubby_tenons,
         "splined-stub-tenons",
         "Splined joint with stub tenons",
         partial(splined, stubs=True),
-        2,
+        4,
     ),
     (
         basic.example_basic_wedged_half_dovetail_mortise_and_tenon_joint,
         "wedged-half-dovetail",
         "Wedged half-dovetail",
         wedged,
-        2,
+        4,
     ),
-    (basic.example_basic_dropin_housed_butt_joint, "drop-in-housing", "Drop-in housed butt", housed, 1),
-    (basic.example_basic_mitered_and_keyed_lap_joint, "keyed-miter", "Mitered and keyed lap", keyed, 2),
-    (basic.example_basic_tusked_mortise_and_tenon_joint, "tusked-tenon", "Tusked through tenon", tusked, 2),
-    (basic.basic_tongue_and_fork_butt, "fork-butt", "Tongue-and-fork butt", fork_butt, 1),
-    (basic.rectangular_tenon, "angled-tenon", "Angled rectangular tenon", angled_tenon, 1),
-    (basic.round_tenon, "angled-round-tenon", "Angled round tenon", partial(angled_tenon, round_profile=True), 1),
-    (basic.corner_tenon, "corner-tenon", "Corner mortise and tenon", partial(angled_tenon, corner=True), 1),
-    (basic.dovetail_corner, "through-dovetails", "Through dovetail corner", board_dovetails, 1),
+    (basic.example_basic_dropin_housed_butt_joint, "drop-in-housing", "Drop-in housed butt", housed, 2),
+    (basic.example_basic_tusked_mortise_and_tenon_joint, "tusked-tenon", "Tusked through tenon", tusked, 4),
+    (basic.basic_tongue_and_fork_butt, "fork-butt", "Tongue-and-fork butt", fork_butt, 2),
+    (basic.rectangular_tenon, "angled-tenon", "Angled rectangular tenon", angled_tenon, 2),
+    (basic.round_tenon, "angled-round-tenon", "Angled round tenon", partial(angled_tenon, round_profile=True), 2),
+    (basic.corner_tenon, "corner-tenon", "Corner mortise and tenon", partial(angled_tenon, corner=True), 2),
+    (basic.dovetail_corner, "through-dovetails", "Through dovetail corner", board_dovetails, 2),
     (
         basic.half_blind_dovetail_corner,
         "half-blind-dovetails",
         "Half-blind dovetail corner",
         partial(board_dovetails, blind=True),
-        1,
+        2,
     ),
-    (basic.tongue_and_groove, "tongue-and-groove", "Tongue and groove", board_edge, 1),
-    (basic.sliding_dovetail, "sliding-dovetail", "Sliding dovetail", sliding, 1),
-    (basic.roundover, "roundover", "Roundover", partial(decoration, kind="roundover"), 1),
-    (basic.rounded_end, "rounded-end", "Rounded end", partial(decoration, kind="rounded-end"), 1),
-    (example_free_sliding_dovetail, "free-sliding-dovetail", "Free sliding dovetail", free_dovetail, 1),
+    (basic.tongue_and_groove, "tongue-and-groove", "Tongue and groove", board_edge, 2),
+    (basic.sliding_dovetail, "sliding-dovetail", "Sliding dovetail", sliding, 2),
+    (basic.rounded_end, "rounded-end", "Rounded end", partial(decoration, kind="rounded-end"), 2),
+    (example_free_sliding_dovetail, "free-sliding-dovetail", "Free sliding dovetail", free_dovetail, 2),
     (
         example_free_tapered_dovetail,
         "free-tapered-dovetail",
         "Free tapered dovetail",
         partial(free_dovetail, tapered=True),
-        1,
+        2,
     ),
-    (free_house_joint, "free-housing", "Free housing", free_house, 1),
-    (example_board_in_grooved_frame, "grooved-frame", "Board in a grooved frame", grooved_frame, 1),
-    (example_path_extrusion_corner_end_decoration, "carved-path", "Carved end profile", path_end, 1),
-    (example_straight_angled_end_cut_decoration, "angled-end", "Straight angled end cut", angled_end, 1),
-    (basic.rafter_tail, "rafter-scallop", "Rafter tail scallop", partial(decoration, kind="scallop"), 1),
+    (example_board_in_grooved_frame, "grooved-frame", "Board in a grooved frame", grooved_frame, 2),
+    (basic.rafter_tail, "rafter-scallop", "Rafter tail scallop", partial(decoration, kind="scallop"), 2),
 ]
 
 
 def render_entry(entry):
-    pattern, filename, title, layout, rows = entry
-    plate = Plate(pattern(), title, rows)
+    pattern, filename, title, layout, panels = entry
+    plate = Plate(pattern(), title, panels)
     layout(plate)
-    if plate.slot != 2 * rows:
+    if plate.slot != panels:
         raise ValueError(f"{title} has an empty panel")
     save(plate.root, filename + ".svg")

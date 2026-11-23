@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 428">
   <title>Angled butt joint</title>
   <desc>Angled butt joint</desc>
   <rect width="100%" height="100%" fill="white" />
@@ -37,48 +37,5 @@
     <g class="references" fill="none" />
   </svg>
   <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Assembled joint</text>
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
-    <g class="member-fills">
-      <path data-member="End cut" fill="#f0dfbf" fill-opacity="1" d="M-957.16412 224.96756 L-957.16412 104.19947 L210.27451 104.19947 Z M419.45098 224.96756 L-957.16412 224.96756 L210.27451 104.19947 Z M419.45098 361.60106 L-957.16412 361.60106 L-957.16412 240.83297 Z M419.45098 361.60106 L-957.16412 240.83297 L210.27451 240.83297 Z M210.27451 240.83297 L-957.16412 240.83297 L-957.16412 104.19947 Z M210.27451 240.83297 L-957.16412 104.19947 L210.27451 104.19947 Z M419.45098 224.96756 L419.45098 361.60106 L-957.16412 361.60106 Z M-957.16412 224.96756 L419.45098 224.96756 L-957.16412 361.60106 Z M419.45098 224.96756 L419.45098 361.60106 L210.27451 240.83297 Z M210.27451 104.19947 L419.45098 224.96756 L210.27451 240.83297 Z" />
-    </g>
-    <g class="face-fills" />
-    <g class="edges" fill="none" stroke-linejoin="round">
-      <g data-member="End cut" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
-        <path data-feature="rptw.right" d="M210.27451 104.19947 L-957.16412 104.19947" />
-        <path data-feature="rptw.right" d="M-957.16412 104.19947 L-957.16412 224.96756" />
-        <path data-feature="rptw.right" d="M-957.16412 224.96756 L419.45098 224.96756" />
-        <path data-feature="rptw.right" d="M419.45098 224.96756 L210.27451 104.19947" />
-        <path data-feature="rptw.left" d="M419.45098 361.60106 L-957.16412 361.60106" />
-        <path data-feature="rptw.left" d="M-957.16412 361.60106 L-957.16412 240.83297" />
-        <path data-feature="rptw.front" d="M-957.16412 240.83297 L-957.16412 137.89179" />
-        <path data-feature="rptw.back" d="M-957.16412 361.60106 L-370.31712 361.60106" />
-        <path data-feature="rptw.back" d="M-370.31712 361.60106 L419.45098 361.60106" />
-        <path data-feature="rptw.back" d="M419.45098 361.60106 L419.45098 224.96756" />
-        <path data-feature="rptw.back" d="M-957.16412 224.96756 L-957.16412 361.60106" />
-        <path data-feature="rptw.top" d="M-957.16412 240.78254 L-957.16412 240.83297" />
-        <path data-feature="rptw.top" d="M-957.16412 104.19947 L-957.16412 240.78254" />
-      </g>
-    </g>
-    <g class="references" fill="none" />
-    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="206.27" y1="240.83" x2="172.27" y2="240.83" />
-      <line x1="179.27" y1="243.83" x2="173.27" y2="237.83" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="206.27" y1="104.20" x2="172.27" y2="104.20" />
-      <line x1="179.27" y1="107.20" x2="173.27" y2="101.20" />
-      <line x1="176.27" y1="240.83" x2="176.27" y2="104.20" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="176.27" y1="172.52" x2="140.00" y2="42.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 37.00) rotate(0.00)">stock width</text>
-    </g>
-    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="212.27" y1="100.74" x2="229.27" y2="71.29" />
-      <line x1="223.18" y1="75.85" x2="231.37" y2="73.66" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="421.45" y1="221.50" x2="438.45" y2="192.06" />
-      <line x1="432.35" y1="196.62" x2="440.55" y2="194.42" />
-      <line x1="227.27" y1="74.75" x2="436.45" y2="195.52" />
-      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="331.86" y1="135.14" x2="420.00" y2="42.00" />
-      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 37.00) rotate(0.00)">cut face length</text>
-    </g>
-  </svg>
-  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">End cut</text>
-  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+  <path d="M0 46H560" stroke="#d1c8b8" />
 </svg>

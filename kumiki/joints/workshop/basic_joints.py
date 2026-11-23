@@ -532,7 +532,7 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     that width. Scarf length is 4 times that width. An unset front face defaults
     to FRONT.
 
-    [![Kanawa-tsugi scarf length and rebated shoulder with a detail of the dado and stub tenon](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+    [![Kanawa-tsugi scarf, dado and stub tenon with the joint center located on timber 1](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
 
     Args:
         arrangement: Splice joint timber arrangement. Timbers must be face-aligned with parallel axes.
@@ -799,8 +799,6 @@ def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     mechanical strength. All lap and key dimensions are auto-calculated. For full control,
     use `cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers` directly.
 
-    [![Mitered and keyed lap](../../../assets/joint-drawings/keyed-miter.svg)](../../../assets/joint-drawings/keyed-miter.svg)
-
     Args:
         arrangement: Corner joint arrangement. Timbers must be plane-aligned and
             `front_face_on_timber1` must specify the reference miter face on timber1.
@@ -907,10 +905,7 @@ def cut_basic_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangeme
 def cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(
     timbers: List[TimberLike], starting_face_on_first_timber: TimberFace,
 ) -> Joint:
-    """Cut a chain of cross laps with uniformly spaced cut boundaries.
-
-    [![Multiple cross lap](../../../assets/joint-drawings/multi-cross-lap.svg)](../../../assets/joint-drawings/multi-cross-lap.svg)
-    """
+    """Cut a chain of cross laps with uniformly spaced cut boundaries."""
     from .cross.multi_cross_lap_joint import cut_multi_cross_lap_joint_on_plane_aligned_timbers
     return cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers, starting_face_on_first_timber)
 
@@ -1026,7 +1021,7 @@ def cut_basic_mortise_and_tenon_joint(
     The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
     and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon size and position, mortise depth and tip clearance](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and shoulder position](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
 
     [![Angled rectangular tenon](../../../assets/joint-drawings/angled-tenon.svg)](../../../assets/joint-drawings/angled-tenon.svg)
     """
@@ -1157,10 +1152,7 @@ def cut_basic_dovetail_corner_joint(
 
 
 def cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]) -> Joint:
-    """Round selected edges with a radius one quarter of their smallest adjacent dimension.
-
-    [![Roundover](../../../assets/joint-drawings/roundover.svg)](../../../assets/joint-drawings/roundover.svg)
-    """
+    """Round selected edges with a radius one quarter of their smallest adjacent dimension."""
     from .decorative.decorative_joints import cut_practice_roundover_decoration, _EDGE_ADJACENT_FACES
     assert edges, "Select at least one edge"
     dimensions = [timber.get_size_in_face_normal_axis(face) for edge in edges for face in _EDGE_ADJACENT_FACES[edge]]

@@ -124,8 +124,6 @@ def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]
     Cuts a roundover of radius `radius` along edges of timber.
     Short edges (edges on the timber ends) are at the declared length of the timber rather than the maybe_end_cut length (which is not known here).
     Note, this does not check if round radii overlap.
-
-    [![Roundover](../../../assets/joint-drawings/roundover.svg)](../../../assets/joint-drawings/roundover.svg)
     """
     assert edges, "cut_practice_roundover_decoration needs at least one edge to round over"
 
@@ -309,8 +307,6 @@ def cut_practice_path_extrusion_corner_end_decoration(
     |________|__ +x
     ^
     cut_corner
-
-    [![Carved end profile](../../../assets/joint-drawings/carved-path.svg)](../../../assets/joint-drawings/carved-path.svg)
     """
     assert len(cut_path) > 0, "cut_path must have at least one segment"
 
@@ -402,8 +398,6 @@ def cut_practice_straight_angled_end_cut_decoration(
     ____________
     front_face  \\      <-timber_end
     _____________\\
-
-    [![Straight angled end cut](../../../assets/joint-drawings/angled-end.svg)](../../../assets/joint-drawings/angled-end.svg)
     """
     timber_end_face = timber_end.to.face()
     assert timber_end_face in (TimberFace.TOP, TimberFace.BOTTOM), (
