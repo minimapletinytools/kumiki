@@ -219,6 +219,7 @@ purpose, a short concept list, and implementation details. Public examples live 
 | [Cabriole table and STL placement](../patterns/structures/cabriole_table.py) | Furniture with four imported cabriole legs; separate placeholder for interactive STL alignment | None; source dimensions and STL placement |
 | [Starter frame](../patterns/structures/my_cute_frame.py) | Simple four-member frame; face-aligned and axis-oriented construction; pegged tenons | None; source dimensions |
 | [Simple sawhorse](../patterns/structures/horsey_example.py) | Small furniture; orthogonal feet, posts, stretcher, and top beam | None; source dimensions |
+| [Wedged twin-tenon bench](../patterns/structures/wedged_tenon_bench.py) | Arched slab feet with two through-tenons per foot and two flush wedges per tenon | None |
 | [Double-sawhorse workbench](../patterns/structures/doublesawhorseworkbench.py) | Furniture; through/stopped tenons; cross-lapped stretcher and tool tray | None; source dimensions |
 | [Coffee table](../patterns/structures/coffee_table.py) | Furniture; several joints meeting shared legs; tusked stretchers and decorative cuts | None; source dimensions |
 | [Dovetailed sawhorse](../patterns/structures/dovetailed_sawhorse.py) | Non-square construction; splayed legs; tapered dovetails; drawings and router templates | Sizing and angles: height, timber dimensions, leg spacing and splay; separate template-tool controls |
