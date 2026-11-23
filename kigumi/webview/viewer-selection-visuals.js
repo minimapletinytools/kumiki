@@ -4,6 +4,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
+import { roundDashShader } from './drawing-overlays.js';
 import { CSG_HIGHLIGHT_EDGE_WIDTH_PX, CSG_HIGHLIGHT_POINT_SIZE_PX, CsgTreeView, DRAWING_CONTEXT_OPACITY, KigumiMeasurements, SelectionVisuals, computeSelectionVisualContext, csgFocusKey, describeCandidates, edgeSegmentPositions, heldHighlightKey, selectionVisualPolicy, vscode } from './viewer-shared.js';
 import * as KigumiFeatureStates from './feature-states.js';
 import * as KigumiHighlights from './highlights.js';
@@ -88,6 +89,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             key: csgFocusKey({ timberKey, path, featureLabel }),
             mesh: hlMesh,
             parentMesh: parentHlMesh,
+            xrayLook: message.xrayLook,
             edgePositions: edgeSegmentPositions(message.highlightEdgeSegments),
             pointAt: KigumiHighlights.pointHighlightAt(message),
             featureLabel,
@@ -287,6 +289,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 hover: hover ? {
                     key: featureKeyOf(hover),
                     mesh: hover.highlightMesh,
+                    xrayLook: hover.xrayLook,
                     edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
                     pointAt: KigumiHighlights.pointHighlightAt(hover),
                     refused: KigumiHover.HoverState.isRefused(hover),
@@ -294,6 +297,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 held: (held && held.highlight) ? {
                     key: held.featureKey || heldHighlightKey(held.reference),
                     mesh: held.highlight.highlightMesh,
+                    xrayLook: held.highlight.xrayLook,
                     edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
                     pointAt: KigumiHighlights.pointHighlightAt(held),
                 } : null,
@@ -320,6 +324,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             build: (descriptor) => {
                 const object = this._buildHighlightObject(descriptor);
                 if (object) {
+                    object.userData.xrayLook = descriptor.xrayLook && new THREE.Vector3(...descriptor.xrayLook);
                     object.userData.role = descriptor.role;
                     object.userData.opacity = descriptor.opacity;
                     this.scene.add(object);
@@ -388,6 +393,10 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 transparent: true,
                 opacity: descriptor.opacity,
             });
+            if (descriptor.xrayLook) {
+                material.defines.USE_DASH = '';
+                material.fragmentShader = roundDashShader(material.fragmentShader, 6, 3);
+            }
             const line = new THREE.LineSegments2(geometry, material);
             line.computeLineDistances();
             return line;

@@ -333,6 +333,7 @@ class HoverState {
      */
     static sameHighlight(one, other) {
         return HoverState.sameFeature(one, other)
+            && String(one?.xrayLook || '') === String(other?.xrayLook || '')
             && HoverState.isRefused(one) === HoverState.isRefused(other);
     }
 

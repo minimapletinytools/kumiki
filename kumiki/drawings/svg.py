@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
 import math
@@ -13,13 +14,13 @@ import numpy as np
 from ..csg.cross_sections import (PolygonRegions, cross_section_outline, cross_section_polygons,
                                   face_cross_section, subtract)
 from ..csg.curves import CylindricalPatch, EllipseArc, angular_roots, cylindrical_patches
-from ..csg.cutcsg import (ConvexPolygonSimpleLoft, CutCSG, ExtrusionCap, FaceFeature,
+from ..csg.cutcsg import (ConvexPolygonSimpleLoft, CurvedFaceFeature, CutCSG, ExtrusionCap, FaceFeature,
                           walk_csg_with_parity)
 from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg
 from ..csg.feature_extent import extents_of
 from ..csg.meshcsg import TriangleSolid
-from ..csg.pathcsg import ArcSegment, PathExtrusion
-from ..geometry import Line, Plane
+from ..csg.pathcsg import ArcSegment, CurvedSide, PathExtrusion
+from ..geometry import Line, Plane, Point
 from ..measuring import locate_face
 from ..rule import Transform, as_ndarray, create_v3
 from ..timber import PerfectTimberWithin
@@ -39,6 +40,7 @@ class DrawingPlane:
 @dataclass
 class Rim:
     owner: CutCSG
+    patch: CylindricalPatch
     name: str
     arc: EllipseArc
     start: float
@@ -176,12 +178,14 @@ class DrawingSolid:
                 if interval in seen or abs(high - low) < 1e-10:
                     continue
                 if self._on_both(arc.point((low + high) / 2), owner, plane.owner):
-                    self.rims.append(Rim(owner, plane.name, arc, low, high))
+                    self.rims.append(Rim(owner, patch, plane.name, arc, low, high))
                     seen.add(interval)
 
-    def generators(self, toward_eye: np.ndarray):
+    def generators(self, toward_eye: np.ndarray, only: CylindricalPatch | None = None):
         """Yield exposed barrel tangents and the ends of partial circular profiles in local space."""
         for owner, patch in self.patches:
+            if only is not None and patch is not only:
+                continue
             rim = patch.rim
             a, b = float(toward_eye @ rim.u), float(toward_eye @ rim.v)
             angles = [(angle, owner) for angle in self.corner_angles.get(patch, [])]
@@ -324,6 +328,11 @@ class ProjectedFaces:
 
     def line(self, a, b, ignore: int = -1, margin: float = 0.) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Clip a line against nearer faces, allowing a projected boundary margin in metres."""
+        for start, stop in self.line_intervals(a, b, ignore, margin):
+            yield a + start * (b - a), a + stop * (b - a)
+
+    def line_intervals(self, a, b, ignore=-1, margin=0.):
+        """Yield visible intervals along the segment, from zero to one."""
         indices = self.nearby(np.minimum(a[:2], b[:2]) - margin, np.maximum(a[:2], b[:2]) + margin, ignore)
         values = self.normals[indices] @ a - self.offset[indices]
         if margin:
@@ -333,8 +342,7 @@ class ProjectedFaces:
         low = np.maximum(0., np.where(slopes > 0, crossing, -np.inf).max(axis=1))
         high = np.minimum(1., np.where(slopes < 0, crossing, np.inf).min(axis=1))
         inside = ((slopes != 0) | (values >= 0)).all(axis=1) & (low < high)
-        for start, stop in remaining_intervals(list(zip(low[inside], high[inside]))):
-            yield a + start * (b - a), a + stop * (b - a)
+        yield from remaining_intervals(list(zip(low[inside], high[inside])))
 
     def arc_breaks(self, arc: EllipseArc, ignore: int = -1) -> list[float]:
         """Return angles where the arc enters or leaves a projected occluder."""
@@ -374,6 +382,70 @@ class ProjectedFaces:
             if not region:
                 break
         return region
+
+
+def _curved_outline(solid: DrawingSolid, owner, feature, eye):
+    patches = [patch for node, patch in solid.patches if node is owner]
+    if isinstance(owner, PathExtrusion):
+        key = getattr(feature, 'key', None)
+        if not isinstance(key, CurvedSide):
+            return
+        indices = [i for i, segment in enumerate(owner.path.segments) if isinstance(segment, ArcSegment)]
+        patches = [patches[indices.index(key.index)]]
+    for patch in patches:
+        for _, a, b in solid.generators(eye, only=patch):
+            yield a, b
+        for rim in solid.rims:
+            if rim.patch is patch:
+                angles = np.linspace(rim.start, rim.stop, 1 + math.ceil(abs(rim.stop - rim.start) / (math.pi / 64)))
+                points = [rim.arc.point(t) for t in angles]
+                yield from zip(points, points[1:])
+
+
+def _xray_outlines(root, timber, solid):
+    """Return finished feature outlines by side in timber-local coordinates."""
+    lines = defaultdict(list)
+    for owner, _ in walk_csg_with_parity(root):
+        for feature in owner.get_declared_features():
+            if not feature.real or not feature.properties.xray_from_faces:
+                continue
+            extent = extents_of(root, timber).of(feature, owner)
+            for side in feature.properties.xray_from_faces:
+                eye = as_ndarray(side.get_direction())
+                if isinstance(feature, CurvedFaceFeature):
+                    if solid is None:
+                        solid = DrawingSolid(root, timber.transform, timber)
+                    lines[side].extend(_curved_outline(solid, owner, feature, eye))
+                elif extent is not None and isinstance(extent.located, Point):
+                    at = as_ndarray(extent.located.position)
+                    if root.is_point_on_boundary(extent.located.position):
+                        radius = float(min(timber.size)) * .015
+                        lines[side].extend((at - axis * radius, at + axis * radius)
+                                           for axis in np.eye(3) if abs(axis @ eye) < .5)
+                elif extent is not None:
+                    lines[side].extend(extent.outline())
+    return lines
+
+
+def hidden_xray_lines(root: CutCSG, timber: PerfectTimberWithin, world_triangles: np.ndarray,
+                      solid: DrawingSolid | None = None):
+    """Yield each allowed camera-side normal and the world segments hidden by the member itself."""
+    for side, outlines in _xray_outlines(root, timber, solid).items():
+        if not outlines:
+            continue
+        rotation = np.asarray(timber.transform.orientation.matrix.tolist(), dtype=float)
+        lines = np.asarray(outlines) @ rotation.T + as_ndarray(timber.transform.position)
+        normal = as_ndarray(timber.get_face_direction_global(side))
+        right = np.cross(np.eye(3)[np.argmin(np.abs(normal))], normal)
+        right /= np.linalg.norm(right)
+        basis = np.stack((right, np.cross(normal, right), normal), axis=1)
+        own = ProjectedFaces(world_triangles @ basis, np.zeros(len(world_triangles), dtype=int))
+        hidden = []
+        for a, b in lines:
+            for lo, hi in remaining_intervals(list(own.line_intervals(a @ basis, b @ basis))):
+                hidden.append((a + lo * (b - a), a + hi * (b - a)))
+        if hidden:
+            yield normal, np.array(hidden)
 
 
 @dataclass(frozen=True)
@@ -520,7 +592,8 @@ def _fill_member(parent, key, triangles, faces, index, view, appearance):
 
 def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: dict,
                     width: float, height: float, styles: DrawingStyles = DrawingStyles(),
-                    *, appearances: dict | None = None, edge_mode: str = 'noOverlay') -> ET.Element:
+                    *, appearances: dict | None = None, edge_mode: str = 'noOverlay',
+                    xray_members: set[str] | None = None) -> ET.Element:
     """Render an orthographic viewport with camera dimensions in metres.
 
     The xray edge mode draws dashed edges through material beneath the solid visible edges.
@@ -591,6 +664,15 @@ def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: 
                     ET.SubElement(layer, 'path', attrs)
 
         if edge_mode != 'none' and appearance.get('edgeOpacity', 1) > 0:
+            if not ghost and solid.timber is not None and (xray_members is None or key in xray_members):
+                for normal, lines in hidden_xray_lines(solid.root, solid.timber,
+                                                       solid.triangles @ solid.rotation.T + solid.origin, solid):
+                    if float(normal @ view.axes[:, 2]) < 1 - 1e-8:
+                        continue
+                    layer = ET.SubElement(group, 'g', {'class': 'feature-xray', 'stroke': '#554b60',
+                                                       'stroke-width': '1.4', 'stroke-dasharray': '6 3'})
+                    for a, b in view.world(lines):
+                        stroke(layer, 'xray', a, b, ignore=index, dashed=True)
             if edge_mode == 'xray':
                 underlay = ET.SubElement(group, 'g', {'class': 'xray-edges', 'stroke-dasharray': '5 4',
                                                        'opacity': '0.45'})
@@ -629,7 +711,8 @@ def render_svg_sheet(members: dict[str, DrawingSolid], sheet: dict) -> str:
             element = ET.SubElement(root, 'image', href=pane['image'], preserveAspectRatio='none')
         else:
             element = render_svg_view(members, set(sheet['ghosts']), pane['camera'], width * w, height * h,
-                                      styles, appearances=sheet.get('appearances'), edge_mode=sheet.get('edgeMode', 'noOverlay'))
+                                      styles, appearances=sheet.get('appearances'), edge_mode=sheet.get('edgeMode', 'noOverlay'),
+                                      xray_members=set(pane['xrayMembers']) if 'xrayMembers' in pane else None)
             root.append(element)
         element.attrib.update(rect)
         element.set('data-viewport', str(pane['id']))

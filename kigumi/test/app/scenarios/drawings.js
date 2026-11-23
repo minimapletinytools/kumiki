@@ -83,6 +83,54 @@ module.exports = {
         await capture('03c-drawing-dotted-lines');
         if (!drawn) return;
 
+        const xray = await inShell(`(() => {
+            const app = ${viewerApp};
+            const control = app.querySelector('#drawing-xray-mode');
+            const snapshot = (mode) => {
+                control.value = mode;
+                control.dispatchEvent(new Event('change', { bubbles: true }));
+                const shown = [];
+                app.renderViewports((view) => {
+                    const lines = Array.from(app.sceneManager.bundles()).flatMap(bundle => bundle.drawingLines || []);
+                    if (lines.some(line => line.option === 'drawingXray' && line.object.visible)) shown.push(view.id);
+                });
+                return shown;
+            };
+            const committed = app.viewports.filter(view => view.spec.measurements?.some(m => m.a?.xray || m.b?.xray))
+                .map(view => view.id);
+            const off = snapshot('off'), on = snapshot('on'), selected = snapshot('selection');
+            return { committed, off, on, selected };
+        })()`);
+        check('the mortise depth is revealed only in its authored elevation and stays with its dimension',
+            xray.committed.length === 1 && xray.off.length === 0 &&
+            [xray.on, xray.selected].every(ids => ids.length === 1 && ids[0] === xray.committed[0]),
+            JSON.stringify(xray));
+
+        if (ARTIFACTS) {
+            const sheets = await inShell(`(async () => {
+                const app = ${viewerApp};
+                const saved = app.collectViewerSettingsPayload();
+                try {
+                    app.setUnitPrecision('1', 'metric');
+                    app.setDrawingGhostsVisible(false);
+                    app.setDrawingOption('showDrawingPerfectFaces', false);
+                    app.setDrawingOption('showDrawingCenterplanes', false);
+                    const sheets = {};
+                    for (const mode of ['off', 'on']) {
+                        app.setDrawingXray(mode);
+                        sheets[mode] = await app.renderDrawingPng();
+                    }
+                    return sheets;
+                } finally {
+                    app.applyPersistedViewerSettings(saved);
+                }
+            })()`);
+            for (const [mode, data] of Object.entries(sheets)) {
+                fs.writeFileSync(path.join(ARTIFACTS, 'mortise-xray-' + mode + '.png'),
+                    Buffer.from(data.split(',')[1], 'base64'));
+            }
+        }
+
         // The agent's drawings tool: list them, go back to 3D, and open one again by its name.
         const toModel = await runAppCommand('kigumi.automationDrawings', { filePath: DRAWING_FRAME, open: '3d' }).catch((error) => ({ error: String(error) }));
         const inModel = await inShell(`${viewerApp}.isInDrawing`);

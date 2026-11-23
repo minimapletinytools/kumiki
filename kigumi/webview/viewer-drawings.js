@@ -186,6 +186,51 @@ export const DrawingsMixin = (Base) => class extends Base {
         }
     }
 
+    setDrawingXray(mode) {
+        if (this.displayOptions.set('drawingXray', mode)) {
+            this._hover?.askAgain();
+            this.requestUpdate();
+        }
+    }
+
+    /** Return whether this camera shows the hidden anchors of a committed dimension. */
+    showsXrayMeasure(viewport, measure) {
+        for (const end of [measure.a, measure.b]) {
+            if (!end?.xray) continue;
+            if (this.drawingXray === 'off' || !viewport.camera.isOrthographicCamera) return false;
+            const look = viewport.camera.getWorldDirection(this._viewportLook);
+            const [x, y, z] = end.xray;
+            if (look.x * x + look.y * y + look.z * z < 1 - 1e-8) return false;
+        }
+        return true;
+    }
+
+    /** Return members whose authored X-ray strokes this drawing viewport can show. */
+    xrayMembers(viewport) {
+        if (!this.isInDrawing || !viewport?.camera.isOrthographicCamera || this.drawingXray === 'off'
+                || this.edgeMode === 'none' || this.viewerOptions?.geometryMode?.endsWith('NoJoints')) {
+            return new Set();
+        }
+        const drawn = this.activeSceneMembers;
+        if (this.drawingXray === 'on') {
+            return drawn || new Set(this.memberMetadataByKey.keys());
+        }
+        const members = new Set();
+        for (const measure of viewport.spec.measurements || []) {
+            if (KigumiMeasurements.isDeleted(measure)) continue;
+            for (const end of [measure.a, measure.b]) {
+                if (end?.xray) members.add(end.timber);
+            }
+        }
+        if (!this._exportingDrawing && this.selectionManager.scope === viewport.id) {
+            const focus = this.selectionManager.csgFocus;
+            if (focus?.featureLabel) members.add(focus.timberKey);
+            const held = this.measureDraft?.heldEnd?.reference;
+            if (held?.timber) members.add(held.timber);
+        }
+        return drawn ? new Set([...members].filter((key) => drawn.has(key))) : members;
+    }
+
     setDrawingOption(option, enabled) {
         if (this.displayOptions.set(option, Boolean(enabled))) {
             if (option === 'colorReferenceFaces') {
@@ -273,7 +318,7 @@ export const DrawingsMixin = (Base) => class extends Base {
             const page = this.pageScreenRect(size.x, size.y);
             const views = [];
             this.renderViewports((viewport, rect) => {
-                const spec = { id: viewport.id, rect: viewport.spec.rect };
+                const spec = { id: viewport.id, rect: viewport.spec.rect, xrayMembers: [...this.xrayMembers(viewport)] };
                 const camera = viewport.camera;
                 if (camera.isOrthographicCamera) {
                     const axis = (x, y) => new THREE.Vector3(x, y, 0).transformDirection(camera.matrixWorld).toArray();

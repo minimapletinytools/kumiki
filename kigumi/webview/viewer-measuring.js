@@ -98,6 +98,7 @@ export const MeasuringMixin = (Base) => class extends Base {
             highlight: {
                 highlightMesh: message.highlightMesh,
                 highlightEdgeSegments: message.highlightEdgeSegments,
+                xrayLook: message.xrayLook,
             },
         };
     }
@@ -903,7 +904,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         this._drawWorkingViewportOutline(overlay, pageRect, element.offsetHeight);
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
-                if (!KigumiMeasurements.isDeleted(measure)) {
+                if (!KigumiMeasurements.isDeleted(measure) && this.showsXrayMeasure(viewport, measure)) {
                     this._drawMeasurement(overlay, viewport, pageRect, measure);
                 }
             }

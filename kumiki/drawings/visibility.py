@@ -22,6 +22,7 @@ from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, PlaneFrame
 from ..geometry import Line, Plane, Point
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
+from .xray import xray_from_view
 from .measure import ViewAxes
 from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 
@@ -232,6 +233,7 @@ def _end_on_depth(extent: FeatureExtent, transform: Transform, look: np.ndarray,
 
 def visible_by_view(
     anchors: Sequence[FeatureHandle], views: Mapping[str, ViewAxes], drawn: Sequence[CutTimber],
+    *, allow_xray: bool = True,
 ) -> Dict[str, List[FeatureHandle]]:
     """Return, per view, the anchors it can see some of.
 
@@ -244,7 +246,15 @@ def visible_by_view(
     for view, axes in views.items():
         look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
-        visible[view] = [handle for handle in anchors if id(handle.timber) in roots
-                         and nearest_visible_depth(handle, roots[id(handle.timber)], look, occluders, reach)
-                         is not None]
+
+        def eligible(handle: FeatureHandle) -> bool:
+            root = roots.get(id(handle.timber))
+            if root is None:
+                return False
+            blockers = occluders
+            if allow_xray and xray_from_view(handle.hit, handle.timber, look):
+                blockers = [other for other in occluders if other[0] is not root or other[1] is not handle.timber.transform]
+            return nearest_visible_depth(handle, root, look, blockers, reach) is not None
+
+        visible[view] = [handle for handle in anchors if eligible(handle)]
     return visible

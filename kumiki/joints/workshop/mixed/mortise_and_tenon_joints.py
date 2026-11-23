@@ -33,6 +33,7 @@ from kumiki.csg.cutcsg import (
     FeatureProperties,
     measured_against,
     prism_face_key,
+    END_CAP,
     HALF_SPACE_PLANE,
     shoulder_override,
 )
@@ -184,7 +185,7 @@ def _lay_out_tenon_wedge(params: WedgeParameters, shoulder_global: Transform, si
 
 
 def _flared_mortise(side_angle: Numeric, spread: int, size: V2, shoulder_global: Transform, inward_global: V3,
-                   start: Numeric, depth: Numeric | None) -> CutCSG:
+                   start: Numeric, depth: Numeric | None, bottom: FeatureProperties) -> CutCSG:
     """Intersect the four mortise walls with the entry and optional blind bottom.
 
     Rotate each spread wall about its intersection with the shoulder plane.
@@ -197,7 +198,7 @@ def _flared_mortise(side_angle: Numeric, spread: int, size: V2, shoulder_global:
         normal_global = shoulder_global.local_to_global_direction(normal)
         props = measured_against(FeatureProperties(), opposite) if opposite else FeatureProperties()
         return HalfSpace(normal=normal_global, offset=safe_dot_product(normal_global, shoulder_global.local_to_global(point)),
-                         feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, props)])
+                         feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, bottom if name == "mortise_bottom" else props)])
 
     cut: CutCSG = plane(along, start * along, "mortise_entry")
     if depth is not None:
@@ -230,7 +231,7 @@ class InsetShoulderReliefStyle(Enum):
 _TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 
-def _mortise_walls() -> List[FeatureOverride]:
+def _mortise_walls(bottom: FeatureProperties) -> List[FeatureOverride]:
     """The mortise hole's walls, each measured against the opposite one, and its bottom."""
     wall = FeatureProperties()
     return [
@@ -238,7 +239,7 @@ def _mortise_walls() -> List[FeatureOverride]:
         FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left", measured_against(wall, "mortise_right")),
         FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front", measured_against(wall, "mortise_back")),
         FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back", measured_against(wall, "mortise_front")),
-        FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
+        FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom", bottom),
     ]
 
 
@@ -619,20 +620,29 @@ def cut_mortise_and_tenon_joint(
     tenon_prism_local = adopt_csg(None, tenon_timber.transform, tenon_prism_cropped)
     shoulder_half_space_local = adopt_csg(None, tenon_timber.transform, shoulder_half_space_global)
 
+    # Show blind depth from the first long-face elevation that sees its axis lengthwise.
+    bottom = FeatureProperties()
+    if mortise_depth is not None:
+        for side in (TimberFace.FRONT, TimberFace.RIGHT):
+            side_normal = mortise_timber.get_face_direction_global(side)
+            if abs(float(safe_dot_product(side_normal, tenon_end_direction))) < 1e-8:
+                bottom = FeatureProperties(xray_from_faces=frozenset([side]))
+                break
     mortise_hole_prism_global: CutCSG
     if use_round_tenon:
         mortise_hole_prism_global = Cylinder(
             axis_direction=tenon_end_direction, radius=tenon_size[0] / 2, position=marking_origin_global,
             start_distance=-back_extension, end_distance=mortise_depth, label=CutCSGLabel("mortise_hole"),
+            feature_overrides=[FeatureOverride(END_CAP, properties=bottom)] if bottom.xray_from_faces else [],
         )
     elif wedge_parameters is not None and wedge_parameters.mortise_side_angle > 0:
         mortise_hole_prism_global = _flared_mortise(
             wedge_parameters.mortise_side_angle, spread_index, mortise_size, mortise_transform,
-            -shoulder_plane.normal, -back_extension, mortise_depth)
+            -shoulder_plane.normal, -back_extension, mortise_depth, bottom)
     else:
         mortise_hole_prism_global = RectangularPrism(
             size=mortise_size, transform=mortise_transform, start_distance=-back_extension, end_distance=mortise_depth,
-            feature_overrides=_mortise_walls(), label=CutCSGLabel("mortise_hole"),
+            feature_overrides=_mortise_walls(bottom), label=CutCSGLabel("mortise_hole"),
         )
 
     shoulder_notch_relief_geom = _inset_shoulder_relief(

@@ -1153,6 +1153,14 @@ class FauxTimber(Board):
                 waste = pieces[0] if len(pieces) == 1 else SolidUnion(pieces)
             top = bottom = None
 
+        if waste is not None:
+            from .csg.cutcsg import map_feature_properties
+            sides = {side: self.original.get_closest_oriented_face_from_global_direction(
+                self.get_face_direction_global(side)) for side in TimberFace}
+            waste = map_feature_properties(waste, lambda props: replace(
+                props, xray_from_faces=frozenset(sides[side] for side in props.xray_from_faces)
+            ) if props.xray_from_faces else props)
+
         return replace(cut, timber=self.original,
                        negative_csg=adopt_csg(self.transform, self.original.transform, waste) if waste is not None else None,
                        maybe_top_end_cut_distance_from_bottom=top,

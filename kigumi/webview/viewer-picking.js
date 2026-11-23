@@ -96,7 +96,7 @@ export const PickingMixin = (Base) => class extends Base {
             // The line the pointer went along, so features that lie in a void
             // rather than on a surface can be found at all. See _findMembersAlongRay.
             ray: along.ray,
-            ...this._pickContext(),
+            ...this._pickContext(along.camera),
             // The end already held, and which way we are looking. With these
             // the runner offers the feature that can finish the measurement
             // rather than the most specific one, and says whether it can.
@@ -169,10 +169,12 @@ export const PickingMixin = (Base) => class extends Base {
      * edge-on -- while the 3D view takes the surface the pointer is on. And in a drawing, the
      * members it draws, which are what can hide something; its faded context cannot.
      */
-    _pickContext() {
+    _pickContext(camera) {
         const drawn = this.isInDrawing ? this.activeSceneMembers : null;
         return {
             space: this.isInDrawing ? 'projected' : '3d',
+            xrayMembers: [...this.xrayMembers(this.viewports.find((view) => view.camera === camera))]
+                .filter((key) => !this.isMemberHidden(key) && !this.isMemberLocked(key)),
             drawnMembers: drawn ? Array.from(drawn) : null,
         };
     }
@@ -266,7 +268,7 @@ export const PickingMixin = (Base) => class extends Base {
                     ray: pickRay,
                     // Whatever the hover is showing is what the click takes.
                     candidateIndex: this._hover ? this._hover.asking : null,
-                    ...this._pickContext(),
+                    ...this._pickContext(pickCamera),
                     // The same question the hover asked, so the click resolves
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.

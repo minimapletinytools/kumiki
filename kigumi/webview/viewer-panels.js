@@ -218,6 +218,12 @@ export class ViewerSettingsPanel {
                 </fieldset>
                 <fieldset class="viewer-settings-subgroup">
                     <legend>${t('viewer.options.section.drawing')}</legend>
+                    <label><span class="xray-legend">${t('viewer.options.drawingXray')}</span>
+                        <select id="drawing-xray-mode" .value=${this.app.drawingXray}>
+                            ${['off', 'selection', 'on'].map((mode) =>
+                                html`<option value=${mode}>${t('viewer.options.drawingXray.' + mode)}</option>`)}
+                        </select>
+                    </label>
                     <label>
                         <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
                         ${t('viewer.options.drawingGhosts')}
@@ -342,6 +348,11 @@ export class ViewerSettingsPanel {
                 id: 'feature-parent-toggle', on: 'change',
                 apply: (el) => app.setShowFeatureParent(el.checked),
                 sync: (el) => { el.checked = Boolean(app.showFeatureParent); },
+            },
+            {
+                id: 'drawing-xray-mode', on: 'change',
+                apply: (el) => app.setDrawingXray(el.value),
+                sync: (el) => { el.value = app.drawingXray; },
             },
             {
                 id: 'drawing-ghosts-toggle', on: 'change',

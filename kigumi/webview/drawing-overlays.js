@@ -24,21 +24,21 @@ const SQUARE_DASH = 'if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) 
 // Dashes with round ends instead, measured in the pixels drawn both ways: along the line from
 // vLineDistance's change per pixel, across it from vUv.x's (-1 to 1 edge to edge). A width taken
 // from linewidth stretched each dash across the line wherever a drawing's sheet is zoomed.
-const ROUND_DASH = `
+const dashFragment = (dash, gap) => `
             float dashRadius = 1.0 / max( length( vec2( dFdx( vUv.x ), dFdy( vUv.x ) ) ), 1e-9 );
             float dashPerPixel = max( length( vec2( dFdx( vLineDistance ), dFdy( vLineDistance ) ) ), 1e-9 );
-            float dashPeriod = ${(2 * (DASH + GAP)).toFixed(2)} * dashRadius;
+            float dashPeriod = ${(2 * (dash + gap)).toFixed(2)} * dashRadius;
             float dashAlong = mod( ( vLineDistance + dashOffset ) / dashPerPixel + 0.5 * dashPeriod, dashPeriod ) - 0.5 * dashPeriod;
-            float dashBeyond = max( abs( dashAlong ) - ${(DASH - 1).toFixed(2)} * dashRadius, 0.0 );
+            float dashBeyond = max( abs( dashAlong ) - ${(dash - 1).toFixed(2)} * dashRadius, 0.0 );
             vec2 dashOffset2 = vec2( dashBeyond, vUv.x * dashRadius );
             if ( dot( dashOffset2, dashOffset2 ) > dashRadius * dashRadius ) discard;`;
 
 /** A dashed LineMaterial fragment shader drawing round-ended dashes measured on screen. */
-function roundDashShader(source) {
+function roundDashShader(source, dash = DASH, gap = GAP) {
     if (!source.includes(SQUARE_DASH)) {
         throw new Error('drawing-overlays: the line shader has no dash test to replace');
     }
-    return source.replace(SQUARE_DASH, ROUND_DASH);
+    return source.replace(SQUARE_DASH, dashFragment(dash, gap));
 }
 
 /**
@@ -97,7 +97,7 @@ class DrawingOverlays {
     constructor({ THREE, memberIds, resolution }) {
         this.THREE = THREE;
         this.memberIds = memberIds;
-        const dashed = (color) => {
+        const dashed = (color, dash = DASH, gap = GAP) => {
             const material = new THREE.LineMaterial({
                 color,
                 linewidth: LINE_WIDTH_PX,
@@ -108,13 +108,18 @@ class DrawingOverlays {
             });
             // This LineMaterial dashes only with the define set; `dashed` alone does nothing.
             material.defines.USE_DASH = '';
-            material.fragmentShader = roundDashShader(material.fragmentShader);
+            material.fragmentShader = roundDashShader(material.fragmentShader, dash, gap);
             // dFdx / dFdy: built in on WebGL2, an extension on WebGL1.
             material.extensions.derivatives = true;
             return material;
         };
         // What every member's lines are copied from.
         this.materials = { perfect: dashed(PERFECT_FACE_COLOR), centerplane: dashed(CENTERPLANE_COLOR) };
+        const xray = dashed(0x554b60, 6, 3);
+        xray.linewidth = 2.1;
+        xray.transparent = true;
+        xray.depthWrite = false;
+        this.materials.xray = xray;
         this._look = new THREE.Vector3();
     }
 
@@ -133,15 +138,18 @@ class DrawingOverlays {
             const distances = new THREE.InstancedInterleavedBuffer(anchoredLineDistances(plane.positions), 2, 1);
             geometry.setAttribute('instanceDistanceStart', new THREE.InterleavedBufferAttribute(distances, 1, 0));
             geometry.setAttribute('instanceDistanceEnd', new THREE.InterleavedBufferAttribute(distances, 1, 1));
-            object.renderOrder = 11;
+            object.renderOrder = option === 'drawingXray' ? 9 : 11;
             object.visible = false;
-            lines.push({ object, normal: new THREE.Vector3(...plane.normal), option });
+            lines.push({ object, normal: new THREE.Vector3(...plane.normal), option, memberKey });
         };
         for (const face of mesh.perfectFaces || []) {
             add(face, this.materials.perfect, 'showDrawingPerfectFaces');
         }
         for (const centerplane of mesh.centerplanes || []) {
             add(centerplane, this.materials.centerplane, 'showDrawingCenterplanes');
+        }
+        for (const outline of mesh.xrayLines || []) {
+            add(outline, this.materials.xray, 'drawingXray');
         }
         return lines;
     }
@@ -151,12 +159,15 @@ class DrawingOverlays {
      * each line's display option by name. Returns whether any is shown -- and so whether the
      * viewport needs its member id pass.
      */
-    showFor(bundles, camera, { inDrawing, options }) {
+    showFor(bundles, camera, { inDrawing, options, xrayMembers }) {
         const look = camera.getWorldDirection(this._look);
         let any = false;
         for (const bundle of bundles) {
             for (const line of bundle.drawingLines || []) {
-                line.object.visible = Boolean(inDrawing && options[line.option]) && drawnFacing(line.normal, look);
+                line.object.visible = inDrawing && (line.option === 'drawingXray'
+                    ? Boolean(camera.isOrthographicCamera && xrayMembers?.has(line.memberKey)
+                        && line.normal.dot(look) < -1 + 1e-8)
+                    : Boolean(options[line.option]) && drawnFacing(line.normal, look));
                 any = any || line.object.visible;
             }
         }
