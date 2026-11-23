@@ -611,7 +611,13 @@ function isBroken(status) {
         && BROKEN_REASONS.indexOf(status.reason) !== -1;
 }
 
+/** Return dimension text with the current formatted length or angle. */
+function formatMeasureLabel(label, value) {
+    return label == null ? value : label.replaceAll('{value}', () => value);
+}
+
 const KigumiMeasurements = {
+    formatMeasureLabel,
     BROKEN_REASONS,
     isBroken,
     DELETED_ORIGIN,
@@ -637,4 +643,4 @@ const KigumiMeasurements = {
     DEGENERATE_PIXELS,
 };
 
-export { BROKEN_REASONS, isBroken, DELETED_ORIGIN, isDeleted, measurementKey, offsetForPointer, alongForPointer, phantomSegment, anchorReference, normalizeKind, measureSpace, kindName, kindWire, hasDirection, measurementStatus, settledStatus, planeMatchesView, PLANE_MATCH_EPSILON, dimensionLayout, angleLayout, angleArcPoints, angleLabelPoint, DEGENERATE_PIXELS };
+export { formatMeasureLabel, BROKEN_REASONS, isBroken, DELETED_ORIGIN, isDeleted, measurementKey, offsetForPointer, alongForPointer, phantomSegment, anchorReference, normalizeKind, measureSpace, kindName, kindWire, hasDirection, measurementStatus, settledStatus, planeMatchesView, PLANE_MATCH_EPSILON, dimensionLayout, angleLayout, angleArcPoints, angleLabelPoint, DEGENERATE_PIXELS };

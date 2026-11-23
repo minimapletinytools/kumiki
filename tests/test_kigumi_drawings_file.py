@@ -331,6 +331,19 @@ class TestSaveDrawings:
         assert ".kigumi" in runner._drawings_file_path(example).parts
 
 
+@pytest.mark.parametrize(("label", "expected"), [
+    (None, "45mm"), ("lap_depth", "lap_depth"), ("lap_depth = {value}", "lap_depth = 45mm"),
+])
+def test_measurement_label_survives_a_placement_override(label, expected):
+    frame, faces = mortise_and_tenon_handles()
+    measure = Measure(faces["tenon_left"], faces["shoulder_edge"], label=label)
+    wire = present(runner._serialize_code_measure(measure, frame))
+    moved = {"a": wire["a"], "b": wire["b"], "placement": {"offset": 0.02}}
+    merged, = runner.merge_measurements([wire], [moved])
+    assert merged.get("label") == label
+    assert measure.format_label("45mm") == expected
+
+
 class TestMergeMeasurements:
     """Two tiers: from the file, and not, with the file overriding."""
 

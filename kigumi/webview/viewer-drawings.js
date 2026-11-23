@@ -450,7 +450,7 @@ export const DrawingsMixin = (Base) => class extends Base {
                         .map((anchor) => describeAnchor(anchor)).join('  \u2194  '),
                     status,
                     formatted: status.drawable
-                        ? (status.value.unit === 'angle'
+                        ? KigumiMeasurements.formatMeasureLabel(measure.label, status.value.unit === 'angle'
                             ? `${status.value.value.toFixed(1)}\u00b0`
                             : this.fmt(status.value.value))
                         : '',

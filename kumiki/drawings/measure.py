@@ -994,6 +994,13 @@ class Measure:
     #: The plane it is taken and drawn on; FROM_VIEWPORT by default. Not part of identity.
     plane: MeasurementPlaneSpec = FROM_VIEWPORT
 
+    #: Dimension text. None shows the value alone. Include {value} to insert the formatted measurement.
+    label: Optional[str] = None
+
+    def format_label(self, value: str) -> str:
+        """Return the dimension text with the caller’s formatted length or angle."""
+        return value if self.label is None else self.label.replace("{value}", value)
+
     def wire_anchors(
         self, frame: 'Frame',
     ) -> Optional[Tuple[FeaturePath, FeaturePath, Optional[MeasurementPlacement]]]:
