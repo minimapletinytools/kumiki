@@ -1,5 +1,6 @@
 ---
 // The home page, in each language (pages/index.astro, pages/ja/index.astro).
+import JointSketch from '../components/JointSketch.astro';
 import KigumiSlideshow from '../components/KigumiSlideshow.astro';
 import Layout from '../layouts/Layout.astro';
 import { appDownloads, kigumiVersion, marketplace } from '../kigumi-release';
@@ -12,8 +13,6 @@ const browserBuild = import.meta.env.PUBLIC_KIGUMI_TRY;
 const browserUrl = browserBuild === 'true' ? `${base}/try/` : 'https://kumiki.build/try/';
 const s = strings(lang).home;
 
-// The tabs ARE the navigation: the strip selects, the panel slides. Each one says how the
-// program works rather than what it is like.
 const featureImages = [
   { id: 'program', image: 'feature_code.png', second: 'oscarshed.png' },
   { id: 'preview', image: 'kigumi-dovetailed-sawhorse-parameters.webp', second: 'double_sawhorse_xray.png' },
@@ -33,7 +32,35 @@ const features = featureImages.map(({ id, image, second, beta }) => {
   };
 });
 
-const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/photos/${name}.png`, alt }));
+// Gallery tiles that take more than one cell of the mosaic.
+const tileShape: Record<string, string> = {
+  tinyhouse120_front: 'big',
+  oscarshed_built: 'tall',
+  round_crosslap_joint: 'tall',
+  timber_frame_shed: 'wide',
+  dropin_dovetail_butt_joint: 'wide',
+  splined_opposing_joint: 'wide',
+};
+const gallery = Object.entries(s.gallery).map(([name, alt]) => ({
+  src: `${base}/photos/${name}.png`,
+  alt,
+  shape: tileShape[name] ?? '',
+}));
+
+// Joint names for the ticker: kanji and romaji, the same in both languages.
+const jointNames = [
+  ['枘差し', 'Hozo-sashi'],
+  ['腰掛鎌継ぎ', 'Koshikake kama-tsugi'],
+  ['蟻落し', 'Ari-otoshi'],
+  ['金輪継ぎ', 'Kanawa-tsugi'],
+  ['車知栓', 'Shachi-sen'],
+  ['渡り腮', 'Watari-ago'],
+  ['割り楔枘', 'Warikusabi-hozo'],
+  ['大入れ', 'Oire'],
+  ['相欠き継ぎ', 'Aikaki-tsugi'],
+  ['雇い枘', 'Yatoi-hozo'],
+  ['組手', 'Kumite'],
+];
 ---
 <Layout
   title={s.title}
@@ -45,47 +72,84 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
   translated
   wide
 >
-  <div class="column">
-    <section class="hero">
-      <h1>{s.heroTitle}</h1>
-      <div class="hero-preview"><KigumiSlideshow lang={lang} /></div>
-      <div class="hero-copy">
-        <p class="tagline">{s.tagline}</p>
-        <div class="cta">
-          <a class="btn btn-primary" id="download" href={appDownloads.macArm}
-             data-mac={appDownloads.macArm} data-windows={appDownloads.windows} data-other={localePath(lang, '/install')}
-             data-windows-label={s.downloadWindows} data-other-label={s.getKigumi}>
-            {s.downloadMac}
-          </a>
-          {browserBuild !== 'false' && <a class="btn browser" href={browserUrl}>{s.tryInBrowser}</a>}
+  <section class="hero dark grid-bg">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="column hero-inner">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>{fill(s.eyebrow, { version: kigumiVersion })}</p>
+          <h1>{s.heroTitle}</h1>
+          <p class="tagline">{s.tagline}</p>
+          <div class="cta">
+            <a class="btn btn-primary" id="download" href={appDownloads.macArm}
+               data-mac={appDownloads.macArm} data-windows={appDownloads.windows} data-other={localePath(lang, '/install')}
+               data-windows-label={s.downloadWindows} data-other-label={s.getKigumi}>
+              <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M3 13h10"/></svg>
+              <span>{s.downloadMac}</span>
+            </a>
+            {browserBuild !== 'false' && <a class="btn btn-ghost" href={browserUrl}>{s.tryInBrowser} <span aria-hidden="true">→</span></a>}
+            <a class="btn btn-ghost" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
+              <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="fill" d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.3.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.6.8.6 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2"/></svg>
+              {s.github}
+            </a>
+          </div>
+          <p class="also" set:html={fill(s.also, { version: kigumiVersion, ...appDownloads, marketplace })} />
         </div>
-        <a class="btn btn-sm quiet github" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">{s.github}</a>
-        <p class="also" set:html={fill(s.also, { version: kigumiVersion, ...appDownloads, marketplace })} />
+        <div class="hero-sketch">
+          <JointSketch />
+        </div>
       </div>
-      <p class="community">
-        <span>{s.community}</span>
-        <a class="btn btn-sm quiet" href="https://discord.gg/cQhUG7WJ8" target="_blank" rel="noreferrer">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M7 5.5a16 16 0 0 1 10 0c1.8 2.2 3 5.8 3.5 10a11 11 0 0 1-4.5 2.8l-1.4-2a10 10 0 0 1-5.2 0l-1.4 2a11 11 0 0 1-4.5-2.8C4 11.3 5.2 7.7 7 5.5Z"/>
-            <circle cx="9" cy="11.5" r="1" fill="currentColor"/><circle cx="15" cy="11.5" r="1" fill="currentColor"/>
-          </svg>
-          Discord
-        </a>
-        <a class="btn btn-sm quiet" href="https://github.com/minimapletinytools/kumiki/discussions" target="_blank" rel="noreferrer">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 4h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2Z"/>
-            <path d="M20 8a2 2 0 0 1 1 2v6a2 2 0 0 1-2 2v3l-4-3h-4M7 9h6"/>
-          </svg>
-          GitHub Discussions
-        </a>
-      </p>
-    </section>
-  </div>
 
-  <section class="band" id="features">
-    <div class="band-inner">
-      <h2 class="features-title">{s.featuresTitle}</h2>
-      <div class="tabs" role="tablist" aria-label={s.featuresLabel}>
+      <div class="hero-stage">
+        <div class="window">
+          <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Kigumi</span></div>
+          <KigumiSlideshow lang={lang} />
+        </div>
+        <figure class="code-card" aria-hidden="true">
+          <figcaption><span class="file-dot"></span>my_cute_frame.py</figcaption>
+<pre><code><span class="d">@frame</span>
+<span class="k">def</span> <span class="f">my_cute_frame</span>(k: <span class="t">Optional</span>[<span class="t">Kiwari</span>] = <span class="k">None</span>) -&gt; <span class="t">Frame</span>:
+    side = <span class="f">create_axis_aligned_timber</span>(
+        length=<span class="f">mm</span>(<span class="n">600</span>), size=timber_size, ...)
+    joint = <span class="f">cut_mortise_and_tenon_joint_on_face_aligned_timbers</span>(
+        arrangement=<span class="t">ButtJointTimberArrangement</span>(
+            receiving_timber=side, butt_timber=cross, ...),
+        tenon_length=<span class="f">mm</span>(<span class="n">75</span>),
+        peg_parameters=peg_params)
+    <span class="k">return</span> <span class="t">Frame</span>.<span class="f">from_joints</span>([joint])</code></pre>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="ticker" aria-label={s.marqueeLabel}>
+    <div class="ticker-track">
+      {[0, 1].map((copy) => (
+        <ul aria-hidden={copy === 1 ? 'true' : undefined}>
+          {jointNames.map(([kanji, romaji]) => (
+            <li><span class="kanji" lang="ja">{kanji}</span><span class="romaji">{romaji}</span></li>
+          ))}
+        </ul>
+      ))}
+    </div>
+  </section>
+
+  <section class="column stats">
+    {s.stats.map((stat, i) => (
+      <div class="stat" data-reveal style={`--delay: ${i * 0.08}s`}>
+        <strong>{stat.value}</strong>
+        <span>{stat.label}</span>
+      </div>
+    ))}
+  </section>
+
+  <section class="features" id="features">
+    <div class="column">
+      <div class="section-head" data-reveal>
+        <p class="kicker">{s.featuresLabel}</p>
+        <h2>{s.featuresTitle}</h2>
+      </div>
+      <div class="tabs" role="tablist" aria-label={s.featuresLabel} data-reveal>
         {features.map((feature, i) => (
           <button
             class="tab"
@@ -95,104 +159,140 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
             aria-controls={`panel-${feature.id}`}
             aria-selected={i === 0 ? 'true' : 'false'}
             tabindex={i === 0 ? 0 : -1}
-            data-index={i}
           >
-            {feature.label}
+            <span class="tab-number">{String(i + 1).padStart(2, '0')}</span>
+            <span class="tab-label">{feature.label}</span>
             {feature.status && <span class="status">{feature.status}</span>}
           </button>
         ))}
       </div>
-      <div class="viewport" id="viewport">
-        <div class="track" id="track">
-          {features.map((feature, i) => (
-            <section
-              class="panel"
-              role="tabpanel"
-              id={`panel-${feature.id}`}
-              aria-labelledby={`tab-${feature.id}`}
-              inert={i !== 0}
-            >
-              <div class="panel-copy">
-                <p class="kicker">{feature.kicker}</p>
-                <h3 class="panel-heading">{feature.heading}</h3>
-                <p class="panel-body">{feature.body}</p>
-                <ul class="panel-points">
-                  {feature.points.map((point) => <li>{point}</li>)}
-                </ul>
-              </div>
-              <div class="panel-media">
-                <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" decoding="async" />
-                {feature.second && (
-                  <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" decoding="async" />
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
-      </div>
+      {features.map((feature, i) => (
+        <section
+          class="panel"
+          role="tabpanel"
+          id={`panel-${feature.id}`}
+          aria-labelledby={`tab-${feature.id}`}
+          hidden={i !== 0}
+        >
+          <div class="panel-copy">
+            <p class="kicker">{feature.kicker}</p>
+            <h3 class="panel-heading">{feature.heading}</h3>
+            <p class="panel-body">{feature.body}</p>
+            <ul class="panel-points">
+              {feature.points.map((point) => <li>{point}</li>)}
+            </ul>
+          </div>
+          <div class={`panel-media${feature.second ? ' has-second' : ''}`}>
+            <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" decoding="async" />
+            {feature.second && (
+              <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" decoding="async" />
+            )}
+          </div>
+        </section>
+      ))}
     </div>
   </section>
 
-  <div class="column">
-    <section class="gallery">
+  <section class="column gallery">
+    <div class="section-head split" data-reveal>
       <h2>{s.galleryTitle}</h2>
       <p class="section-lead">{s.galleryLead}</p>
-      <div class="grid">
-        {gallery.map((photo, i) => (
-          <figure>
-            <button class="thumb" type="button" data-index={i} aria-label={fill(s.galleryOpen, { alt: photo.alt })}>
-              <img src={photo.src} alt={photo.alt} loading="lazy" decoding="async" />
-            </button>
-          </figure>
-        ))}
-      </div>
-    </section>
+    </div>
+    <div class="mosaic">
+      {gallery.map((photo, i) => (
+        <figure class={`tile ${photo.shape}`} data-reveal style={`--delay: ${(i % 4) * 0.06}s`}>
+          <button class="thumb" type="button" data-index={i} aria-label={fill(s.galleryOpen, { alt: photo.alt })}>
+            <img src={photo.src} alt={photo.alt} loading="lazy" decoding="async" />
+            <span class="tile-caption" aria-hidden="true">{photo.alt}</span>
+          </button>
+        </figure>
+      ))}
+    </div>
+  </section>
 
-    <section class="agents" id="ai-agents">
-      <div class="agents-header">
+  <section class="agents dark grid-bg" id="ai-agents">
+    <div class="column agents-inner">
+      <div class="agents-copy" data-reveal>
+        <p class="kicker">AI</p>
         <h2>{s.agentsTitle}</h2>
         <p class="section-lead">{s.agentsLead}</p>
-      </div>
-      <div class="agents-ways">
-        <div>
-          <h3>{s.kigumiAgentTitle}</h3>
-          <p>{s.kigumiAgentBody}</p>
+        <div class="agents-ways">
+          <div class="way-card">
+            <span class="way-icon" aria-hidden="true">組</span>
+            <h3>{s.kigumiAgentTitle}</h3>
+            <p>{s.kigumiAgentBody}</p>
+          </div>
+          <div class="way-card">
+            <span class="way-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m8 8-4 4 4 4m8-8 4 4-4 4m-2.5-10-3 12"/></svg>
+            </span>
+            <h3>{s.ownAgentTitle}</h3>
+            <p set:html={fill(s.ownAgentBody, { instructions: 'https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md' })} />
+          </div>
         </div>
-        <div>
-          <h3>{s.ownAgentTitle}</h3>
-          <p set:html={fill(s.ownAgentBody, { instructions: 'https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md' })} />
-        </div>
       </div>
-      <figure class="prompt">
-        <figcaption>{s.promptCaption}</figcaption>
-        <blockquote>{s.prompt}</blockquote>
+      <figure class="chat" data-reveal style="--delay: 0.15s">
+        <figcaption class="chat-bar"><i></i><i></i><i></i><span>{s.promptCaption}</span></figcaption>
+        <div class="chat-body">
+          <div class="bubble user" data-reveal style="--delay: 0.4s">
+            <span class="who">{s.chatYou}</span>
+            <blockquote>{s.prompt}</blockquote>
+          </div>
+          <div class="bubble agent" data-reveal style="--delay: 1s">
+            <span class="who"><span class="agent-mark" aria-hidden="true">組</span>{s.kigumiAgentTitle}</span>
+            <p>{s.chatReply}</p>
+            <img src={`${base}/photos/sawhorsey.png`} alt={s.gallery.sawhorsey} loading="lazy" decoding="async" />
+          </div>
+        </div>
       </figure>
-    </section>
+    </div>
+  </section>
 
-    <section class="faq" id="faq">
+  <section class="column faq" id="faq">
+    <div class="faq-head" data-reveal>
+      <p class="kicker">FAQ</p>
       <h2>{s.faqTitle}</h2>
-      <div class="faq-list">
-        {s.faqs.map((faq) => (
-          <details class="faq-item">
-            <summary>
-              <span>{faq.question}</span>
-              <span class="faq-icon" aria-hidden="true"></span>
-            </summary>
-            <p>{faq.answer}</p>
-          </details>
-        ))}
-      </div>
-    </section>
-  </div>
+      <span class="faq-kanji" aria-hidden="true">問</span>
+    </div>
+    <div class="faq-list" data-reveal>
+      {s.faqs.map((faq) => (
+        <details class="faq-item">
+          <summary>
+            <span>{faq.question}</span>
+            <span class="faq-icon" aria-hidden="true"></span>
+          </summary>
+          <p>{faq.answer}</p>
+        </details>
+      ))}
+    </div>
+  </section>
 
-  <section class="band closing">
-    <div class="band-inner closing-inner">
+  <section class="closing">
+    <span class="closing-kanji" aria-hidden="true">木</span>
+    <div class="column closing-inner" data-reveal>
       <h2>{s.closingTitle}</h2>
       <p>{s.closingBody}</p>
       <div class="cta">
-        <a class="btn btn-primary" href={localePath(lang, '/install')}>{s.getStarted}</a>
-        <a class="btn btn-secondary" href="https://kumiki.build/docs/">{s.readDocs}</a>
+        <a class="btn btn-ink" href={localePath(lang, '/install')}>{s.getStarted} <span aria-hidden="true">→</span></a>
+        <a class="btn btn-outline" href="https://kumiki.build/docs/">{s.readDocs}</a>
       </div>
+      <p class="community">
+        <span>{s.community}</span>
+        <a href="https://discord.gg/cQhUG7WJ8" target="_blank" rel="noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 5.5a16 16 0 0 1 10 0c1.8 2.2 3 5.8 3.5 10a11 11 0 0 1-4.5 2.8l-1.4-2a10 10 0 0 1-5.2 0l-1.4 2a11 11 0 0 1-4.5-2.8C4 11.3 5.2 7.7 7 5.5Z"/>
+            <circle cx="9" cy="11.5" r="1" fill="currentColor"/><circle cx="15" cy="11.5" r="1" fill="currentColor"/>
+          </svg>
+          Discord
+        </a>
+        <a href="https://github.com/minimapletinytools/kumiki/discussions" target="_blank" rel="noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 4h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-1-2V6a2 2 0 0 1 2-2Z"/>
+            <path d="M20 8a2 2 0 0 1 1 2v6a2 2 0 0 1-2 2v3l-4-3h-4M7 9h6"/>
+          </svg>
+          GitHub Discussions
+        </a>
+      </p>
     </div>
   </section>
 
@@ -206,51 +306,22 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
 </Layout>
 
 <script>
-  // --- the sliding feature gallery -----------------------------------------
+  // --- feature tabs ----------------------------------------------------------
   const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.tab'));
   const panels = Array.from(document.querySelectorAll<HTMLElement>('.panel'));
-  const track = document.getElementById('track');
 
-  const viewport = document.getElementById('viewport');
-  let current = 0;
-
-  // All five panels stay laid out side by side -- that is what the track
-  // slides along -- so the viewport is told how tall the visible one is.
-  // Without this it would stand at the height of the tallest panel and the
-  // short ones would sit in a pool of whitespace.
-  function syncHeight() {
-    if (!viewport || !panels[current]) return;
-    viewport.style.height = `${panels[current].offsetHeight}px`;
-  }
-
-  // Measured rather than expressed as a percentage: the step is one panel plus
-  // the gutter between them, and Chrome rejects the calc() that would say so.
-  function slide() {
-    if (!track || panels.length === 0) return;
-    const step = panels.length > 1 ? panels[1].offsetLeft - panels[0].offsetLeft : 0;
-    track.style.transform = `translateX(${-current * step}px)`;
-  }
-
-  function select(index: number, focusTab = false) {
-    if (!track || tabs.length === 0) return;
+  function select(index: number, focusTab = false, updateHash = true) {
+    if (tabs.length === 0) return;
     const next = (index + tabs.length) % tabs.length;
-    current = next;
     tabs.forEach((tab, i) => {
       const on = i === next;
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
       tab.tabIndex = on ? 0 : -1;
     });
-    // inert rather than hidden: the off-screen panels must keep their place in
-    // the track, but their links and images should stay out of the tab order
-    // and off a screen reader.
-    panels.forEach((panel, i) => {
-      if (i === next) panel.removeAttribute('inert');
-      else panel.setAttribute('inert', '');
-    });
-    slide();
-    syncHeight();
+    panels.forEach((panel, i) => { panel.hidden = i !== next; });
     if (focusTab) tabs[next].focus();
-    history.replaceState(null, '', `#${panels[next].id.replace('panel-', '')}`);
+    tabs[next].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (updateHash) history.replaceState(null, '', `#${panels[next].id.replace('panel-', '')}`);
   }
 
   tabs.forEach((tab, i) => {
@@ -267,17 +338,10 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
   const wanted = window.location.hash.replace('#', '');
   if (wanted) {
     const found = panels.findIndex((panel) => panel.id === `panel-${wanted}`);
-    if (found >= 0) select(found);
-  }
-
-  // The panel grows when its images arrive and when the column reflows, and
-  // both happen after the height above was measured.
-  function reflow() { slide(); syncHeight(); }
-  reflow();
-  window.addEventListener('resize', reflow);
-  if (typeof ResizeObserver !== 'undefined') {
-    const observer = new ResizeObserver(reflow);
-    panels.forEach((panel) => observer.observe(panel));
+    if (found >= 0) {
+      select(found, false, false);
+      document.getElementById('features')?.scrollIntoView();
+    }
   }
 
   // --- gallery lightbox -----------------------------------------------------
@@ -301,12 +365,14 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
     if (lightboxCaption) lightboxCaption.textContent = img.alt;
     lightbox.hidden = false;
     document.body.style.overflow = 'hidden';
+    closeBtn?.focus();
   }
 
   function close() {
     if (!lightbox) return;
     lightbox.hidden = true;
     document.body.style.overflow = '';
+    gallery[currentIndex]?.focus();
   }
 
   gallery.forEach((btn, i) => btn.addEventListener('click', () => show(i)));
@@ -321,242 +387,544 @@ const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/
     if (e.key === 'ArrowLeft') show(currentIndex - 1);
     if (e.key === 'ArrowRight') show(currentIndex + 1);
   });
+
+  // --- the hero's code card follows the pointer a little --------------------
+  const stage = document.querySelector<HTMLElement>('.hero-stage');
+  if (stage && matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)').matches) {
+    stage.addEventListener('pointermove', (event) => {
+      const box = stage.getBoundingClientRect();
+      stage.style.setProperty('--px', String((event.clientX - box.left) / box.width - 0.5));
+      stage.style.setProperty('--py', String((event.clientY - box.top) / box.height - 0.5));
+    });
+    stage.addEventListener('pointerleave', () => {
+      stage.style.setProperty('--px', '0');
+      stage.style.setProperty('--py', '0');
+    });
+  }
 </script>
 
 <script>
   // The download button offers this computer's installer: Windows, a Mac, or the install page.
   const download = document.getElementById('download') as HTMLAnchorElement | null;
-  if (download) {
+  const label = download?.querySelector('span');
+  if (download && label) {
     const agent = navigator.userAgent;
     if (/Windows/.test(agent)) {
       download.href = download.dataset.windows ?? download.href;
-      download.textContent = download.dataset.windowsLabel ?? download.textContent;
+      label.textContent = download.dataset.windowsLabel ?? label.textContent;
     } else if (!/Macintosh|Mac OS X/.test(agent) || /iPhone|iPad/.test(agent)) {
       download.href = download.dataset.other ?? download.href;
-      download.textContent = download.dataset.otherLabel ?? download.textContent;
+      label.textContent = download.dataset.otherLabel ?? label.textContent;
     }
   }
 </script>
 
 <style>
   /* ── Hero ── */
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    grid-template-areas: "heading preview" "copy preview" "community community";
-    gap: 1.4rem 2.5rem;
-    align-items: center;
-    padding: 3rem 0 5rem;
+  .hero { position: relative; overflow: hidden; padding: clamp(3rem, 7vw, 5.5rem) 0 0; }
+  .hero-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(40rem 28rem at 82% 18%, rgba(212, 64, 31, 0.28), transparent 70%),
+      radial-gradient(50rem 30rem at 15% 95%, rgba(232, 196, 140, 0.16), transparent 70%);
   }
-  .hero h1 { grid-area: heading; align-self: end; font-size: clamp(2.3rem, 4.2vw, 3.15rem); text-wrap: balance; }
-  .hero-preview { grid-area: preview; min-width: 0; }
-  .hero-copy { grid-area: copy; align-self: start; }
-  .hero h1:lang(ja) { max-width: 11em; }
-  .tagline { margin: 0; font-size: 1.12rem; color: var(--ink-soft); max-width: 34rem; }
-  .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
-  .hero-copy .cta { flex-wrap: nowrap; gap: 0.5rem; }
-  .hero-copy .cta .btn { padding-inline: clamp(0.65rem, 1.4vw, 1.1rem); text-align: center; }
-  .browser { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-deep); }
-  .browser:hover { background: var(--accent); color: white; }
-  .quiet { color: var(--ink-soft); background: transparent; border-color: var(--rule); }
-  .quiet:hover { color: var(--ink); background: var(--sheet); border-color: var(--rule-strong); }
-  .github { margin-top: 0.75rem; }
-  /* Span both hero columns. */
-  .community {
-    grid-area: community;
+  .hero-inner { position: relative; }
+  .hero-top {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 2rem 3rem;
+    align-items: center;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.6rem;
+    padding: 0.35rem 0.9rem 0.35rem 0.7rem;
+    border: 1px solid var(--line-dark-strong);
+    border-radius: 999px;
+    background: rgba(243, 236, 224, 0.04);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--on-dark-soft);
+  }
+  .pulse { position: relative; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--shu-bright); }
+  .pulse::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--shu-bright);
+    animation: pulse 2s ease-out infinite;
+  }
+  @keyframes pulse { to { transform: scale(3); opacity: 0; } }
+  .hero h1 {
+    font-size: clamp(2.6rem, 5.2vw, 4.6rem);
+    line-height: 1.02;
+    color: var(--on-dark);
+    text-wrap: balance;
+  }
+  .hero h1:lang(ja) { font-size: clamp(2.2rem, 4.4vw, 3.8rem); line-height: 1.15; }
+  .tagline { margin-top: 1.6rem; font-size: 1.15rem; color: var(--on-dark-soft); max-width: 36rem; }
+  .cta { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 2.2rem; }
+  .btn-icon { width: 1.05em; height: 1.05em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .btn-icon .fill { fill: currentColor; stroke: none; }
+  .also { margin-top: 1.4rem; font-size: 0.88rem; color: var(--on-dark-faint); max-width: 34rem; }
+  .also :global(a) { color: var(--on-dark-soft); text-decoration: underline; text-decoration-color: var(--line-dark-strong); text-underline-offset: 0.2em; }
+  .also :global(a:hover) { color: var(--hinoki); }
+
+  .hero-sketch { position: relative; }
+
+  .hero-stage {
+    --px: 0;
+    --py: 0;
+    position: relative;
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    padding-left: clamp(0rem, 8vw, 7rem);
+    perspective: 2000px;
+  }
+  .window {
+    position: relative;
+    border-radius: 14px 14px 0 0;
+    overflow: hidden;
+    border: 1px solid var(--line-dark-strong);
+    border-bottom: 0;
+    background: var(--sumi-2);
+    box-shadow: var(--shadow-lg), 0 0 0 8px rgba(243, 236, 224, 0.03);
+    transform-origin: 50% 100%;
+  }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .window {
+        animation: tilt linear both;
+        animation-timeline: view();
+        animation-range: entry 10% cover 45%;
+      }
+    }
+  }
+  @keyframes tilt {
+    from { transform: rotateX(16deg) scale(0.94); }
+    to { transform: none; }
+  }
+  .window-bar {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    height: 2.3rem;
+    padding: 0 0.9rem;
+    border-bottom: 1px solid var(--line-dark);
+    background: var(--sumi-3);
+  }
+  .window-bar i, .chat-bar i { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: rgba(243, 236, 224, 0.16); }
+  .window-bar i:first-child, .chat-bar i:first-child { background: var(--shu); }
+  .window-bar span { margin-left: auto; margin-right: auto; padding-right: 3rem; font-family: var(--mono); font-size: 0.75rem; color: var(--on-dark-faint); }
+
+  .code-card {
+    position: absolute;
+    left: 0;
+    top: clamp(-3rem, -4vw, -1rem);
+    z-index: 2;
+    width: min(31rem, 52%);
+    margin: 0;
+    border-radius: 12px;
+    border: 1px solid var(--line-dark-strong);
+    background: rgba(28, 25, 22, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transform: translate(calc(var(--px) * -14px), calc(var(--py) * -10px)) rotate(-1.5deg);
+    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .code-card figcaption {
+    display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 1rem 0 0;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--rule);
-    color: var(--ink-soft);
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--line-dark);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--on-dark-soft);
   }
-  .community span { margin-right: 0.5rem; }
-  .community svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .also { margin-top: 1.1rem; font-size: 0.9rem; color: var(--ink-faint); max-width: 32rem; }
+  .file-dot { width: 0.5rem; height: 0.5rem; border-radius: 2px; background: var(--hinoki); }
+  .code-card pre {
+    margin: 0;
+    padding: 1rem 1.1rem 1.15rem;
+    overflow: hidden;
+    font-size: clamp(0.6rem, 0.95vw, 0.76rem);
+    line-height: 1.7;
+    color: #d9d1c4;
+    white-space: pre;
+  }
+  .code-card .k { color: #ff8a6a; }
+  .code-card .d { color: var(--hinoki); }
+  .code-card .f { color: #f2d29b; }
+  .code-card .t { color: #9fc6c1; }
+  .code-card .n { color: #ffb38a; }
+
+  /* ── Joint ticker ── */
+  .ticker {
+    overflow: hidden;
+    background: var(--sumi-2);
+    border-top: 1px solid var(--line-dark);
+    border-bottom: 1px solid var(--line-dark);
+    color: var(--on-dark);
+  }
+  .ticker-track { display: flex; width: max-content; }
+  .ticker ul { display: flex; margin: 0; padding: 0; list-style: none; }
+  .ticker li { display: flex; align-items: baseline; gap: 0.7rem; padding: 1.1rem 1.6rem; white-space: nowrap; }
+  .ticker li::after { content: '◆'; margin-left: 1.6rem; font-size: 0.55rem; color: var(--shu); align-self: center; }
+  .kanji { font-family: var(--serif); font-weight: 700; font-size: 1.35rem; color: var(--hinoki); }
+  .romaji { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--on-dark-faint); }
+  @media (prefers-reduced-motion: no-preference) {
+    .ticker-track { animation: ticker 60s linear infinite; }
+    .ticker:hover .ticker-track { animation-play-state: paused; }
+  }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+
+  /* ── Stats ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-top: clamp(3rem, 6vw, 4.5rem);
+    padding-bottom: clamp(3rem, 6vw, 4.5rem);
+  }
+  .stat { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.3rem 1.6rem; border-left: 1px solid var(--rule-strong); }
+  .stat:first-child { padding-left: 0; border-left: 0; }
+  .stat strong { font-family: var(--serif); font-weight: 800; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.1; color: var(--ink); }
+  .stat:nth-child(odd) strong { color: var(--shu); }
+  .stat span { font-size: 0.92rem; color: var(--ink-soft); }
+
+  /* ── Section heads ── */
+  .section-head { margin-bottom: 2.5rem; }
+  .section-head.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem 3rem;
+    align-items: end;
+  }
+  .section-lead { margin-top: 1rem; font-size: 1.08rem; color: var(--ink-soft); max-width: 40rem; }
+  .section-head.split .section-lead { margin-top: 0; }
 
   /* ── How it works ── */
-  .features-title { margin-bottom: 1.75rem; }
+  .features { padding: clamp(4rem, 9vw, 7rem) 0; background: var(--paper-2); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
   .tabs {
-    display: flex;
-    gap: 0.25rem 2rem;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--rule-strong);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.6rem;
   }
   .tab {
     appearance: none;
-    background: none;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    padding: 0.6rem 0 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding: 1rem 1.1rem 1.1rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--sheet);
     font: inherit;
-    font-size: 1rem;
-    color: var(--ink-soft);
+    text-align: left;
+    color: var(--ink);
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .tab:hover { color: var(--ink); }
-  .tab[aria-selected='true'] { color: var(--ink); font-weight: 500; border-bottom-color: var(--accent); }
-
-  .viewport { overflow: hidden; transition: height 0.3s ease; }
-  .track { display: flex; align-items: flex-start; gap: 4rem; transition: transform 0.45s cubic-bezier(0.3, 0.7, 0.2, 1); }
-  .panel {
-    flex: 0 0 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 3.5rem;
-    padding-top: 2.75rem;
-    align-items: start;
-  }
-  .panel-heading { font-family: var(--serif); font-size: clamp(1.45rem, 2.4vw, 1.9rem); font-weight: 700; line-height: 1.2; }
-  .panel-body { margin-top: 1rem; color: var(--ink-soft); }
-  .panel-points { list-style: none; padding: 0; margin: 1.5rem 0 0; }
-  .panel-points li {
-    padding: 0.6rem 0 0.6rem 1.4rem;
-    border-top: 1px solid var(--rule-strong);
     position: relative;
-    font-size: 0.95rem;
+    overflow: hidden;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   }
-  .panel-points li::before {
+  .tab::after {
     content: '';
     position: absolute;
-    left: 0.15rem;
-    top: 1.2rem;
-    width: 0.55rem;
-    height: 1px;
-    background: var(--accent);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--shu);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
-  .panel-media { display: grid; gap: 1rem; }
-  .plate-second { width: 55%; justify-self: end; }
+  .tab:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .tab[aria-selected='true'] { background: var(--sumi); border-color: var(--sumi); color: var(--on-dark); box-shadow: var(--shadow); }
+  .tab[aria-selected='true']::after { transform: scaleX(1); }
+  .tab-number { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint); }
+  .tab[aria-selected='true'] .tab-number { color: var(--shu-bright); }
+  .tab-label { font-weight: 600; line-height: 1.3; }
+  .tab .status { position: absolute; top: 0.8rem; right: 0.8rem; }
 
-  /* ── Gallery ── */
-  .gallery { padding: 5.5rem 0 1rem; }
-  .section-lead { margin-top: 0.75rem; color: var(--ink-soft); max-width: 40rem; }
-  .grid {
+  .panel {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    padding-top: 3rem;
+    align-items: center;
+  }
+  .panel[hidden] { display: none; }
+  .panel:not([hidden]) { animation: panel-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  @keyframes panel-in { from { opacity: 0; transform: translateY(14px); } }
+  .panel-heading { font-family: var(--serif); font-size: clamp(1.6rem, 2.8vw, 2.3rem); font-weight: 800; line-height: 1.15; }
+  .panel-body { margin-top: 1.1rem; color: var(--ink-soft); font-size: 1.05rem; }
+  .panel-points { list-style: none; padding: 0; margin: 1.75rem 0 0; counter-reset: point; }
+  .panel-points li {
+    counter-increment: point;
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    padding: 0.8rem 0;
+    border-top: 1px solid var(--rule-strong);
+    font-size: 0.97rem;
+  }
+  .panel-points li::before { content: counter(point, decimal-leading-zero); font-family: var(--mono); font-size: 0.75rem; color: var(--shu); padding-top: 0.2rem; }
+  .panel-media { position: relative; }
+  .panel-media.has-second { padding-bottom: 14%; }
+  .panel-media.has-second > .plate:first-child { width: 88%; margin-left: auto; }
+  .plate-second {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 46%;
+    box-shadow: var(--shadow-lg);
+    border: 4px solid var(--sheet);
+    transform: rotate(-2deg);
+  }
+
+  /* ── Gallery mosaic ── */
+  .gallery { padding-top: clamp(4.5rem, 9vw, 7rem); padding-bottom: clamp(4.5rem, 9vw, 7rem); }
+  .mosaic {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-    margin-top: 2rem;
+    grid-auto-rows: clamp(150px, 15vw, 200px);
+    grid-auto-flow: dense;
+    gap: 0.8rem;
   }
-  .grid figure { margin: 0; }
+  .tile { margin: 0; min-width: 0; }
+  .tile.big { grid-column: span 2; grid-row: span 2; }
+  .tile.tall { grid-row: span 2; }
+  .tile.wide { grid-column: span 2; }
   .thumb {
+    position: relative;
     display: block;
     width: 100%;
+    height: 100%;
     padding: 0;
-    border: 1px solid var(--rule-strong);
+    border: 1px solid var(--rule);
     border-radius: var(--radius);
     background: var(--sheet);
     overflow: hidden;
     cursor: zoom-in;
-    aspect-ratio: 4 / 3;
   }
-  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
-  .thumb:hover img { transform: scale(1.03); }
-
-  /* ── Agents ── */
-  .agents { padding: 5.5rem 0 1rem; }
-  .agents-ways {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 2.25rem;
-    border-top: 1px solid var(--rule-strong);
-  }
-  .agents-ways > div { padding: 1.5rem 2.5rem 0 0; }
-  .agents-ways > div + div { padding: 1.5rem 0 0 2.5rem; border-left: 1px solid var(--rule); }
-  .agents-ways p { margin-top: 0.6rem; color: var(--ink-soft); }
-  .prompt {
-    margin: 2.5rem 0 0;
-    padding: 1.4rem 1.6rem;
-    background: var(--sheet);
-    border: 1px solid var(--rule-strong);
-    border-left: 3px solid var(--accent);
-    border-radius: var(--radius);
-    max-width: 52rem;
-  }
-  .prompt figcaption { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 0.4rem; }
-  .prompt blockquote { margin: 0; font-family: var(--serif); font-size: 1.1rem; line-height: 1.65; }
-
-  /* ── FAQ ── */
-  .faq { padding: 5.5rem 0 5rem; max-width: 52rem; }
-  .faq-list { margin-top: 1.75rem; border-top: 1px solid var(--rule-strong); }
-  .faq-item { border-bottom: 1px solid var(--rule-strong); }
-  .faq-item summary {
-    list-style: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 1.1rem 0;
-    cursor: pointer;
-    font-weight: 500;
-  }
-  .faq-item summary::-webkit-details-marker { display: none; }
-  .faq-icon { position: relative; width: 0.8rem; height: 0.8rem; flex: none; }
-  .faq-icon::before, .faq-icon::after {
-    content: '';
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .thumb:hover img, .thumb:focus-visible img { transform: scale(1.06); }
+  .tile-caption {
     position: absolute;
     left: 0;
-    top: 50%;
-    width: 100%;
-    height: 1.5px;
-    background: var(--ink-soft);
-    transition: transform 0.2s ease;
+    right: 0;
+    bottom: 0;
+    padding: 2.5rem 1rem 0.8rem;
+    background: linear-gradient(transparent, rgba(19, 17, 15, 0.85));
+    color: var(--on-dark);
+    font-size: 0.85rem;
+    text-align: left;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
-  .faq-icon::after { transform: rotate(90deg); }
-  .faq-item[open] .faq-icon::after { transform: rotate(0deg); }
-  .faq-item p { padding: 0 2.5rem 1.3rem 0; color: var(--ink-soft); }
+  .thumb:hover .tile-caption, .thumb:focus-visible .tile-caption { transform: none; }
+
+  /* ── Agents ── */
+  .agents { position: relative; overflow: hidden; padding: clamp(4.5rem, 9vw, 7rem) 0; }
+  .agents::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(36rem 26rem at 80% 40%, rgba(212, 64, 31, 0.2), transparent 70%);
+    pointer-events: none;
+  }
+  .agents-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 6fr);
+    gap: clamp(2.5rem, 6vw, 5rem);
+    align-items: center;
+  }
+  .agents h2 { color: var(--on-dark); }
+  .agents .kicker { color: var(--shu-bright); }
+  .agents .section-lead { color: var(--on-dark-soft); }
+  .agents-ways { display: grid; gap: 1rem; margin-top: 2.2rem; }
+  .way-card {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0.3rem 1rem;
+    padding: 1.2rem 1.3rem;
+    border: 1px solid var(--line-dark);
+    border-radius: var(--radius);
+    background: rgba(243, 236, 224, 0.03);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .way-card:hover { border-color: var(--line-dark-strong); background: rgba(243, 236, 224, 0.06); }
+  .way-icon {
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 8px;
+    background: rgba(212, 64, 31, 0.15);
+    color: var(--shu-bright);
+    font-family: var(--serif);
+    font-size: 1.15rem;
+  }
+  .way-icon svg { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .way-card h3 { color: var(--on-dark); }
+  .way-card p { color: var(--on-dark-soft); font-size: 0.95rem; }
+
+  .chat {
+    margin: 0;
+    border: 1px solid var(--line-dark-strong);
+    border-radius: 14px;
+    background: var(--sumi-2);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .chat-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--line-dark);
+    background: var(--sumi-3);
+  }
+  .chat-bar span { margin-left: 0.6rem; font-family: var(--mono); font-size: 0.75rem; color: var(--on-dark-faint); }
+  .chat-body { display: flex; flex-direction: column; gap: 1.1rem; padding: 1.4rem; }
+  .bubble { max-width: 90%; border-radius: 14px; padding: 0.9rem 1.1rem 1rem; }
+  .who { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.35rem; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .bubble.user { align-self: flex-end; background: var(--shu); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.user .who { color: rgba(255, 255, 255, 0.75); }
+  .bubble.user blockquote { margin: 0; font-size: 0.95rem; line-height: 1.55; }
+  .bubble.agent { align-self: flex-start; background: var(--sumi-3); border: 1px solid var(--line-dark); border-bottom-left-radius: 4px; }
+  .bubble.agent .who { color: var(--hinoki); }
+  .bubble.agent p { font-size: 0.95rem; color: var(--on-dark); }
+  .bubble.agent img { display: block; width: 100%; margin-top: 0.8rem; border-radius: 8px; background: var(--sheet); }
+  .agent-mark { display: inline-grid; place-items: center; width: 1.1rem; height: 1.1rem; border-radius: 3px; background: var(--shu); color: #fff; font-family: var(--serif); font-size: 0.65rem; letter-spacing: 0; }
+
+  /* ── FAQ ── */
+  .faq {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    padding-top: clamp(4.5rem, 9vw, 7rem);
+    padding-bottom: clamp(4.5rem, 9vw, 7rem);
+  }
+  .faq-head { position: sticky; top: 6rem; align-self: start; }
+  .faq-kanji {
+    display: block;
+    margin-top: 1.5rem;
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(6rem, 14vw, 11rem);
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--rule-strong);
+  }
 
   /* ── Closing ── */
-  .closing-inner { text-align: center; }
-  .closing-inner p { margin: 1rem auto 0; color: var(--ink-soft); max-width: 34rem; }
-  .closing-inner .cta { justify-content: center; }
+  .closing {
+    position: relative;
+    overflow: hidden;
+    background: var(--shu);
+    color: #fff6ea;
+    padding: clamp(4.5rem, 10vw, 8rem) 0;
+  }
+  .closing-kanji {
+    position: absolute;
+    right: -2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(16rem, 38vw, 34rem);
+    line-height: 1;
+    color: rgba(19, 17, 15, 0.12);
+    pointer-events: none;
+    user-select: none;
+  }
+  .closing-inner { position: relative; }
+  .closing h2 { font-size: clamp(2.3rem, 5.5vw, 4.4rem); max-width: 14em; text-wrap: balance; color: #fff6ea; }
+  .closing-inner > p { margin-top: 1.4rem; max-width: 36rem; font-size: 1.12rem; color: rgba(255, 246, 234, 0.85); }
+  .btn-ink { background: var(--sumi); color: var(--on-dark); }
+  .btn-ink:hover { background: #000; color: #fff; }
+  .btn-outline { background: transparent; color: #fff6ea; border-color: rgba(255, 246, 234, 0.5); }
+  .btn-outline:hover { border-color: #fff6ea; background: rgba(255, 246, 234, 0.1); color: #fff6ea; }
+  .community {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1.4rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 246, 234, 0.3);
+    color: rgba(255, 246, 234, 0.85);
+    font-size: 0.95rem;
+  }
+  .community a { display: inline-flex; align-items: center; gap: 0.45rem; color: #fff6ea; font-weight: 500; }
+  .community svg { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
   /* ── Lightbox ── */
   .lightbox {
     position: fixed;
     inset: 0;
-    z-index: 50;
-    background: rgba(20, 21, 24, 0.92);
+    z-index: 60;
+    background: rgba(19, 17, 15, 0.94);
+    backdrop-filter: blur(6px);
     display: grid;
     place-items: center;
     padding: 3rem 4rem;
   }
   .lightbox[hidden] { display: none; }
-  .lightbox-image { max-width: 100%; max-height: calc(100vh - 8rem); border-radius: var(--radius); background: var(--sheet); }
-  .lightbox-caption { position: absolute; bottom: 1.25rem; left: 0; right: 0; text-align: center; color: #d9dad6; font-size: 0.9rem; }
+  .lightbox-image { max-width: 100%; max-height: calc(100vh - 8rem); border-radius: var(--radius); background: var(--sheet); box-shadow: var(--shadow-lg); }
+  .lightbox-caption { position: absolute; bottom: 1.25rem; left: 0; right: 0; text-align: center; color: var(--on-dark-soft); font-size: 0.9rem; }
   .lightbox button {
     position: absolute;
-    background: none;
-    border: 0;
-    color: #fff;
-    font-size: 2.4rem;
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border: 1px solid var(--line-dark-strong);
+    border-radius: 50%;
+    background: rgba(243, 236, 224, 0.05);
+    color: var(--on-dark);
+    font-size: 1.8rem;
     line-height: 1;
     cursor: pointer;
-    padding: 0.5rem 0.8rem;
   }
-  .lightbox-close { top: 0.75rem; right: 1rem; }
-  .lightbox-prev { left: 0.75rem; top: 50%; transform: translateY(-50%); }
-  .lightbox-next { right: 0.75rem; top: 50%; transform: translateY(-50%); }
+  .lightbox button:hover { background: var(--shu); border-color: var(--shu); }
+  .lightbox-close { top: 1rem; right: 1rem; }
+  .lightbox-prev { left: 1rem; top: 50%; transform: translateY(-50%); }
+  .lightbox-next { right: 1rem; top: 50%; transform: translateY(-50%); }
 
   /* ── Narrow screens ── */
+  @media (max-width: 1000px) {
+    .tabs { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 0.4rem; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scrollbar-width: none; }
+    .tab { flex: 0 0 auto; min-width: 11rem; scroll-snap-align: start; }
+  }
   @media (max-width: 900px) {
-    .hero, .panel { grid-template-columns: 1fr; gap: 2rem; }
-    .hero { grid-template-areas: "heading" "preview" "copy" "community"; gap: 1.4rem; padding: 1.5rem 0 3.5rem; }
-    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .agents-ways { grid-template-columns: 1fr; }
-    .agents-ways > div, .agents-ways > div + div { padding: 1.5rem 0 0; border-left: 0; }
-    .agents-ways > div + div { margin-top: 1.5rem; border-top: 1px solid var(--rule); }
-    .band-inner { padding: 3.5rem 1.5rem; }
-    .gallery, .agents, .faq { padding-top: 3.5rem; }
+    .hero-top { grid-template-columns: 1fr; }
+    .hero-sketch { max-width: 26rem; margin: 0 auto; width: 100%; }
+    .hero-stage { padding-left: 0; display: flex; flex-direction: column-reverse; gap: 1.2rem; }
+    .code-card { position: relative; top: 0; width: 100%; transform: none; }
+    .code-card pre { font-size: 0.68rem; overflow-x: auto; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 0; }
+    .stat:nth-child(3) { padding-left: 0; border-left: 0; }
+    .section-head.split { grid-template-columns: 1fr; }
+    .panel, .agents-inner, .faq { grid-template-columns: 1fr; }
+    .faq-head { position: static; }
+    .faq-kanji { display: none; }
+    .mosaic { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 38vw; }
   }
   @media (max-width: 560px) {
-    .community span { flex-basis: 100%; }
-    .tabs { gap: 0 1.25rem; }
-    .column, .band-inner { padding-left: 1rem; padding-right: 1rem; }
+    .cta .btn { flex: 1 1 100%; }
+    .stat { padding: 0 0 0 1rem; }
+    .stat:nth-child(odd) { padding-left: 0; border-left: 0; }
+    .bubble { max-width: 100%; }
+    .lightbox { padding: 3rem 1rem; }
   }
 </style>

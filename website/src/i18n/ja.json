@@ -47,6 +47,7 @@
   "home": {
     "title": "Kumiki — 木組み・木工の継手と仕口のためのプログラマブル CAD",
     "description": "Kumiki は、木組みや木工の継手・仕口をコードで設計するためのオープンソース Python ライブラリです。パラメトリックな継手と、Mac、Windows、VS Code、ブラウザで動くリアルタイム 3D ビューア Kigumi を備えています。",
+    "eyebrow": "無料・オープンソース · Kigumi {version}",
     "heroTitle": "コードで設計する、木組みと木工のための CAD",
     "tagline": "Kumiki は、木組みと木工のためのオープンソース Python ライブラリです。設計はただのプログラムで、どの継手も、つなぐ材に合わせてパラメトリックに寸法が決まります。すべてがコードでできているので、Kumiki の架構は AI エージェントの手を借りて設計できます。",
     "downloadMac": "Mac 版をダウンロード",
@@ -56,6 +57,13 @@
     "github": "GitHub で見る",
     "community": "コミュニティに参加",
     "also": "Kigumi {version}：<a href=\"{macArm}\">Mac（Apple シリコン）</a>、<a href=\"{macIntel}\">Mac（Intel）</a>、<a href=\"{windows}\">Windows</a>、または <a href=\"{marketplace}\">VS Code 拡張機能</a>。無料のオープンソースです。",
+    "marqueeLabel": "Kumiki の継手・仕口",
+    "stats": [
+      { "value": "30+", "label": "種類以上のパラメトリックな継手・仕口" },
+      { "value": "4", "label": "Kigumi が動く場所：Mac、Windows、VS Code、ブラウザ" },
+      { "value": "STEP", "label": "と STL・OBJ・3MF で書き出し、CNC やレンダリング、3D プリントに" },
+      { "value": "MCP", "label": "サーバーで、自分のエージェントが架構をビルドして見られる" }
+    ],
     "slideshow": {
       "label": "Kigumi の画面",
       "previous": "前の画像",
@@ -169,6 +177,8 @@
     "ownAgentBody": "Claude Code や Codex なども架構を書けます。<a href=\"{instructions}\">設計の手引き（英語）</a>を渡し、アプリで Kigumi の MCP サーバーを有効にすれば、架構をビルドして見られるようになります。",
     "promptCaption": "たとえば",
     "prompt": "かわいい馬（作業台）を作って。1′×2′ の範囲に水平な足が 2 本あって、その上に垂直な脚が 2 本立ち、2 本の脚の上に水平な梁が載っている。2 本の脚の真ん中を貫でつないでほしい。全部、角の込み栓を打った枘でつないでね！",
+    "chatYou": "あなた",
+    "chatReply": "馬ができました。6 本の材を、込み栓を打った枘でつないでいます。",
     "faqTitle": "よくある質問",
     "faqs": [
       {

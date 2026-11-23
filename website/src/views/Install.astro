@@ -22,29 +22,39 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
   lang={lang}
   translated
 >
-  <article class="install">
+  <Fragment slot="masthead">
+    <p class="kicker">Kigumi {kigumiVersion}</p>
     <h1>{s.heading}</h1>
     <p class="lead">{s.lead}</p>
     {tryKigumi && <a class="btn btn-primary try" href={`${base}/try/`}>{home.tryInBrowser}</a>}
-
     <nav class="ways" aria-label={s.waysLabel}>
       <a href="#app">
+        <span class="way-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+        </span>
         <strong>{s.ways.app}</strong>
         <span>{s.ways.appBlurb}</span>
       </a>
       {tryKigumi && (
         <a href="#browser">
+          <span class="way-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3Z"/></svg>
+          </span>
           <strong>{s.ways.browser}</strong>
           <span>{s.ways.browserBlurb}</span>
         </a>
       )}
       <a href="#vscode">
+        <span class="way-glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m8 8-4 4 4 4m8-8 4 4-4 4m-2.5-10-3 12"/></svg>
+        </span>
         <strong>{s.ways.vscode}</strong>
         <span>{s.ways.vscodeBlurb}</span>
       </a>
     </nav>
-
-    <section id="app" class="way">
+  </Fragment>
+  <article class="install">
+    <section id="app" class="way" data-reveal>
       <h2>{s.app.heading}</h2>
       <ol class="steps">
         <li>
@@ -72,14 +82,14 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
     </section>
 
     {tryKigumi && (
-      <section id="browser" class="way">
+      <section id="browser" class="way" data-reveal>
         <h2>{s.browser.heading}</h2>
         <p set:html={fill(s.browser.body, values)} />
         <a class="btn btn-secondary btn-sm" href={`${base}/try/`}>{s.browser.button}</a>
       </section>
     )}
 
-    <section id="vscode" class="way">
+    <section id="vscode" class="way" data-reveal>
       <h2>{s.vscode.heading}</h2>
       <ol class="steps">
         <li>
@@ -101,7 +111,7 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
       </ol>
     </section>
 
-    <section class="way ai">
+    <section class="way ai" data-reveal>
       <h2>{s.ai.heading}</h2>
       <p set:html={fill(s.ai.body, values)} />
       <figure class="prompt">
@@ -113,76 +123,101 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
 </Layout>
 
 <style>
-  .install { max-width: 46rem; margin: 0 auto; padding: 2.5rem 0 1rem; }
-  .lead { margin-top: 1rem; font-size: 1.12rem; color: var(--ink-soft); }
-  .try { margin-top: 1.5rem; }
-
+  .try { margin-top: 1.8rem; }
   .ways {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    margin-top: 2.5rem;
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--radius);
-    background: var(--sheet);
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.75rem;
+    margin-top: 2.8rem;
+    max-width: 60rem;
   }
-  .ways a { padding: 1rem 1.2rem 1.1rem; color: var(--ink); }
-  .ways a + a { border-left: 1px solid var(--rule); }
-  .ways a:hover { text-decoration: none; background: var(--accent-tint); }
-  .ways strong { display: block; font-weight: 600; color: var(--accent); }
-  .ways span { display: block; margin-top: 0.25rem; font-size: 0.9rem; color: var(--ink-soft); }
+  .ways a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1.2rem 1.3rem 1.3rem;
+    border: 1px solid var(--line-dark-strong);
+    border-radius: var(--radius);
+    background: rgba(243, 236, 224, 0.04);
+    color: var(--on-dark);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  }
+  .ways a:hover { text-decoration: none; border-color: var(--shu-bright); background: rgba(212, 64, 31, 0.12); transform: translateY(-3px); }
+  .way-glyph {
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    background: rgba(212, 64, 31, 0.15);
+    color: var(--shu-bright);
+  }
+  .way-glyph svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .ways strong { font-weight: 600; font-size: 1.05rem; }
+  .ways span:last-child { font-size: 0.9rem; color: var(--on-dark-soft); }
 
-  .way { margin-top: 4rem; scroll-margin-top: 1.5rem; }
+  .install { max-width: 48rem; margin: 0 auto; padding: 1rem 0 1rem; }
+  .way { padding-top: clamp(3.5rem, 7vw, 5rem); scroll-margin-top: 4rem; }
+  .way h2 { font-size: clamp(1.9rem, 3.5vw, 2.6rem); }
   .way > p { margin-top: 1rem; color: var(--ink-soft); }
   .way > .btn { margin-top: 1.25rem; }
 
-  /* A sequence, so numbered: a counter in the margin, on a rule. */
-  .steps { list-style: none; counter-reset: step; padding: 0; margin: 1.75rem 0 0; }
+  .steps { list-style: none; counter-reset: step; padding: 0; margin: 2rem 0 0; }
   .steps li {
     counter-increment: step;
     position: relative;
-    padding: 0 0 2rem 3rem;
-    border-left: 1px solid var(--rule-strong);
-    margin-left: 0.9rem;
+    padding: 0 0 2.2rem 3.6rem;
   }
-  .steps li:last-child { padding-bottom: 0; border-left-color: transparent; }
-  .steps li::before {
-    content: counter(step);
+  .steps li::after {
+    content: '';
     position: absolute;
-    left: -0.9rem;
-    top: -0.1rem;
-    width: 1.8rem;
-    height: 1.8rem;
+    left: 1.2rem;
+    top: 2.6rem;
+    bottom: 0.2rem;
+    width: 2px;
+    background: repeating-linear-gradient(var(--rule-strong) 0 6px, transparent 6px 11px);
+  }
+  .steps li:last-child { padding-bottom: 0; }
+  .steps li:last-child::after { display: none; }
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: -0.25rem;
+    width: 2.4rem;
+    height: 2.4rem;
     display: grid;
     place-items: center;
-    border-radius: 50%;
-    background: var(--paper);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    font-size: 0.85rem;
-    font-weight: 600;
+    border-radius: 8px;
+    background: var(--sumi);
+    color: var(--hinoki);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    transform: rotate(-3deg);
   }
-  .steps p { margin-top: 0.45rem; color: var(--ink-soft); }
-  .downloads { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .steps li:first-child::before { background: var(--shu); color: #fff; }
+  .steps h3 { font-size: 1.15rem; }
+  .steps p { margin-top: 0.5rem; color: var(--ink-soft); }
+  .downloads { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.9rem 0 0.3rem; }
 
   code {
     background: var(--sheet);
     border: 1px solid var(--rule);
-    border-radius: 3px;
-    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
   }
 
   .prompt {
-    margin: 1.75rem 0 0;
-    padding: 1.3rem 1.5rem;
-    background: var(--sheet);
-    border: 1px solid var(--rule-strong);
-    border-left: 3px solid var(--accent);
+    position: relative;
+    margin: 2rem 0 0;
+    padding: 1.5rem 1.7rem;
+    background: var(--sumi);
+    color: var(--on-dark);
     border-radius: var(--radius);
+    box-shadow: var(--shadow);
   }
-  .prompt figcaption { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 0.4rem; }
-  .prompt blockquote { margin: 0; font-family: var(--serif); font-size: 1.05rem; line-height: 1.65; }
-
-  @media (max-width: 640px) {
-    .ways a + a { border-left: 0; border-top: 1px solid var(--rule); }
-  }
+  .prompt figcaption { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--shu-bright); margin-bottom: 0.6rem; }
+  .prompt blockquote { margin: 0; font-family: var(--serif); font-size: 1.12rem; line-height: 1.7; }
 </style>

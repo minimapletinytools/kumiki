@@ -13,10 +13,12 @@ interface Props {
 const { title, description, canonicalPath, heading, updated } = Astro.props;
 ---
 <Layout title={title} description={description} canonicalPath={canonicalPath}>
-  <article class="legal">
+  <Fragment slot="masthead">
     <p class="kicker">Legal</p>
     <h1>{heading}</h1>
-    <p class="updated">Last updated {updated}</p>
+    <p class="lead">Last updated {updated}</p>
+  </Fragment>
+  <article class="legal">
     <div class="prose">
       <slot />
     </div>
@@ -27,18 +29,10 @@ const { title, description, canonicalPath, heading, updated } = Astro.props;
   .legal {
     max-width: 720px;
     margin: 0 auto;
-    padding: 3rem 0 2rem;
-  }
-  .legal h1 {
-    font-size: clamp(2rem, 4vw, 2.6rem);
-    margin: 0 0 0.4rem;
-  }
-  .updated {
-    color: var(--ink-soft);
-    margin: 0 0 2rem;
+    padding: 2.5rem 0 2rem;
   }
   .prose :global(h2) {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     margin: 2.2rem 0 0.7rem;
   }
   .prose :global(h3) {

@@ -47,6 +47,7 @@
   "home": {
     "title": "Kumiki — Programmatic CAD for Timber Framing & Woodworking Joinery",
     "description": "Kumiki is an open-source Python library for designing timber frames and woodworking joinery in code, with parametric joints and a live 3D viewer, Kigumi, for Mac, Windows, VS Code and the web.",
+    "eyebrow": "Free and open source · Kigumi {version}",
     "heroTitle": "Programmatic Timber Framing and Woodworking CAD",
     "tagline": "Kumiki is an open-source Python library for timber framing and woodworking. Designs are just programs and every joint is parametrically sized to the timbers it joins. Since everything is built from code, kumiki frames can be authored with support from AI agents.",
     "downloadMac": "Download for Mac",
@@ -56,6 +57,13 @@
     "github": "View on GitHub",
     "community": "Join the community",
     "also": "Kigumi {version} for <a href=\"{macArm}\">Mac (Apple silicon)</a>, <a href=\"{macIntel}\">Mac (Intel)</a> and <a href=\"{windows}\">Windows</a>, or as a <a href=\"{marketplace}\">VS Code extension</a>. Free and open source.",
+    "marqueeLabel": "Joints in Kumiki",
+    "stats": [
+      { "value": "30+", "label": "parametric timber joints" },
+      { "value": "4", "label": "places to run Kigumi: Mac, Windows, VS Code and the browser" },
+      { "value": "STEP", "label": "and STL, OBJ and 3MF export, for CNC, rendering and 3D printing" },
+      { "value": "MCP", "label": "server, so your own agent can build frames and see them" }
+    ],
     "slideshow": {
       "label": "Inside Kigumi",
       "previous": "Previous screenshot",
@@ -169,6 +177,8 @@
     "ownAgentBody": "Claude Code, Codex and others can write frames too. Give them the <a href=\"{instructions}\">authoring instructions</a>, and turn on Kigumi’s MCP server in the app so they can build frames and see them.",
     "promptCaption": "For example",
     "prompt": "Make me a cute saw horse. It has 2 horizontal feet on a 1′×2′ footprint, with two vertical legs on top of the feet, and a horizontal beam resting on top of the 2 legs. There should also be a stretcher connecting the 2 legs in the middle. Join everything with mortise and tenon joinery with square pegs please!",
+    "chatYou": "You",
+    "chatReply": "Here’s your sawhorse: six timbers, joined with pegged mortise and tenons.",
     "faqTitle": "Questions",
     "faqs": [
       {

@@ -114,40 +114,43 @@ const categories = data.map((cat) => {
   lang={lang}
   translated
 >
-  <article class="joints-page">
+  <Fragment slot="masthead">
     <p class="kicker">{s.kicker}</p>
     <h1>{s.heading}</h1>
     <p class="lead">{s.lead}</p>
-
     <nav class="cat-nav" aria-label={s.categoriesLabel}>
-      {categories.map((cat) => (
+      {categories.map((cat, i) => (
         <a href={`#${cat.id}`}>
+          <span class="cat-number">{String(i + 1).padStart(2, '0')}</span>
           <strong>{cat.heading}</strong>
-          <span>{cat.kicker}</span>
+          <span class="cat-kicker">{cat.kicker}</span>
         </a>
       ))}
     </nav>
-
-    {categories.map((cat) => (
+  </Fragment>
+  <article class="joints-page">
+    {categories.map((cat, i) => (
       <section id={cat.id} class="cat-section">
-        <div class="cat-grid">
-          <div class="cat-copy">
+        <div class={`cat-grid${i % 2 ? ' flip' : ''}`}>
+          <div class="cat-copy" data-reveal>
+            <span class="cat-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
             <p class="kicker">{cat.kicker}</p>
             <h2>{cat.heading}</h2>
             <p class="cat-body">{cat.body}</p>
             <ul class="joint-list">
               {cat.joints.map((j) => (
                 <li>
-                  <div class="joint-header">
-                    <a href={j.href}>{j.name}</a>
-                    <span class="jp">{j.jp}</span>
+                  <span class="jp" lang="ja">{j.jp.split(' / ')[0]}</span>
+                  <div class="joint-text">
+                    <a href={j.href}>{j.name} <span aria-hidden="true">→</span></a>
+                    <span class="romaji">{j.jp.split(' / ')[1]}</span>
+                    <code>{j.fn}</code>
                   </div>
-                  <code>{j.fn}</code>
                 </li>
               ))}
             </ul>
           </div>
-          <div class="cat-media">
+          <div class="cat-media" data-reveal style="--delay: 0.1s">
             <img class="plate" src={cat.image} alt={cat.imageAlt} loading="lazy" decoding="async" />
             {cat.second && (
               <img class="plate plate-second" src={cat.second} alt={cat.secondAlt} loading="lazy" decoding="async" />
@@ -157,7 +160,7 @@ const categories = data.map((cat) => {
       </section>
     ))}
 
-    <section class="comparison" id="comparison">
+    <section class="comparison" id="comparison" data-reveal>
       <h2>{s.comparisonTitle}</h2>
       <p class="section-lead">{s.comparisonLead}</p>
       <div class="table-wrap">
@@ -179,7 +182,7 @@ const categories = data.map((cat) => {
       </div>
     </section>
 
-    <section class="faq-section" id="faq">
+    <section class="faq-section" id="faq" data-reveal>
       <h2>{s.faqTitle}</h2>
       <div class="faq-list">
         {s.faqs.map((faq) => (
@@ -204,186 +207,126 @@ const categories = data.map((cat) => {
 </Layout>
 
 <style>
-  .joints-page {
-    padding: 2.5rem 0 2rem;
-  }
-  .lead {
-    margin-top: 1.2rem;
-    font-size: 1.12rem;
-    color: var(--ink-soft);
-    max-width: 44rem;
-  }
+  .masthead-inner .lead { max-width: 46rem; }
   .cat-nav {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.75rem;
-    margin: 2.25rem 0 3.5rem;
+    margin-top: 3rem;
   }
   .cat-nav a {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-    padding: 0.9rem 1.1rem;
-    background: var(--sheet);
-    border: 1px solid var(--rule-strong);
+    gap: 0.3rem;
+    padding: 1.1rem 1.2rem 1.2rem;
+    border: 1px solid var(--line-dark-strong);
     border-radius: var(--radius);
-    color: var(--ink);
+    background: rgba(243, 236, 224, 0.04);
+    color: var(--on-dark);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   }
-  .cat-nav a:hover {
-    border-color: var(--accent);
-    text-decoration: none;
-  }
-  .cat-nav span {
-    font-size: 0.85rem;
-    color: var(--ink-faint);
-  }
-  .cat-section {
-    padding: 3.25rem 0;
-    border-top: 1px solid var(--rule-strong);
-  }
+  .cat-nav a:hover { text-decoration: none; border-color: var(--shu-bright); background: rgba(212, 64, 31, 0.12); transform: translateY(-3px); }
+  .cat-number { font-family: var(--mono); font-size: 0.75rem; color: var(--shu-bright); }
+  .cat-nav strong { font-weight: 600; }
+  .cat-kicker { font-size: 0.85rem; color: var(--on-dark-faint); }
+
+  .joints-page { padding: 1rem 0 2rem; }
+  .cat-section { padding: clamp(3.5rem, 8vw, 6rem) 0; border-bottom: 1px solid var(--rule); scroll-margin-top: 4rem; }
   .cat-grid {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    gap: 3rem;
-    align-items: start;
+    gap: clamp(2rem, 5vw, 4.5rem);
+    align-items: center;
   }
-  .cat-body {
-    margin-top: 0.9rem;
-    color: var(--ink-soft);
-  }
-  .joint-list {
-    list-style: none;
-    padding: 0;
-    margin: 1.5rem 0 0;
-  }
-  .joint-list li {
-    padding: 0.75rem 0;
-    border-top: 1px solid var(--rule);
-  }
-  .joint-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    font-weight: 500;
-  }
-  .jp {
-    font-size: 0.85rem;
-    color: var(--ink-faint);
-    font-weight: 400;
-  }
-  .joint-list code {
+  .cat-grid.flip .cat-copy { order: 2; }
+  .cat-copy { position: relative; }
+  .cat-index {
     display: block;
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
-    color: var(--ink-soft);
-    word-break: break-all;
+    margin-bottom: 0.6rem;
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: clamp(3.5rem, 6vw, 5rem);
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--shu);
   }
-  .cat-media {
-    display: grid;
-    gap: 1rem;
+  .cat-body { margin-top: 1rem; color: var(--ink-soft); font-size: 1.05rem; }
+  .joint-list { list-style: none; padding: 0; margin: 1.8rem 0 0; display: grid; gap: 0.6rem; }
+  .joint-list li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.95rem 1.1rem;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--shu);
+    border-radius: var(--radius-sm);
+    background: var(--sheet);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
+  .joint-list li:hover { box-shadow: var(--shadow); transform: translateX(3px); }
+  .jp {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+    color: var(--shu);
+  }
+  .joint-text { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+  .joint-text a { font-weight: 600; color: var(--ink); }
+  .joint-text a:hover { color: var(--accent); }
+  .romaji { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.05em; color: var(--ink-faint); }
+  .joint-list code { margin-top: 0.35rem; font-size: 0.74rem; color: var(--ink-soft); word-break: break-all; }
+  .cat-media { position: relative; padding-bottom: 12%; }
+  .cat-media > .plate:first-child { width: 90%; }
+  .flip .cat-media > .plate:first-child { margin-left: auto; }
   .plate-second {
-    width: 60%;
-    justify-self: end;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 50%;
+    border: 4px solid var(--sheet);
+    box-shadow: var(--shadow-lg);
+    transform: rotate(2deg);
   }
-  .comparison {
-    padding: 3.5rem 0 1rem;
-    border-top: 1px solid var(--rule-strong);
-  }
-  .section-lead {
-    margin-top: 0.6rem;
-    color: var(--ink-soft);
-    max-width: 40rem;
-  }
+  .flip .plate-second { right: auto; left: 0; transform: rotate(-2deg); }
+
+  .comparison { padding: clamp(4rem, 8vw, 6rem) 0 1rem; }
+  .section-lead { margin-top: 1rem; color: var(--ink-soft); max-width: 42rem; font-size: 1.05rem; }
   .table-wrap {
-    margin-top: 1.75rem;
+    margin-top: 2rem;
     overflow-x: auto;
     background: var(--sheet);
-    border: 1px solid var(--rule-strong);
+    border: 1px solid var(--rule);
     border-radius: var(--radius);
+    box-shadow: var(--shadow);
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.93rem;
-    text-align: left;
-  }
-  th, td {
-    padding: 0.85rem 1rem;
-    border-bottom: 1px solid var(--rule);
-    vertical-align: top;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; text-align: left; min-width: 44rem; }
+  th, td { padding: 1rem 1.1rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
   th {
-    font-weight: 600;
-    color: var(--ink);
-    background: var(--paper);
-    border-bottom: 1px solid var(--rule-strong);
-  }
-  tr:last-child td {
-    border-bottom: 0;
-  }
-  .faq-section {
-    padding: 3.5rem 0 2rem;
-    max-width: 52rem;
-  }
-  .faq-list {
-    margin-top: 1.5rem;
-    border-top: 1px solid var(--rule-strong);
-  }
-  .faq-item {
-    border-bottom: 1px solid var(--rule-strong);
-  }
-  .faq-item summary {
-    list-style: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 1.05rem 0;
-    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.72rem;
     font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--paper);
   }
-  .faq-item summary::-webkit-details-marker {
-    display: none;
-  }
-  .faq-icon {
-    position: relative;
-    width: 0.8rem;
-    height: 0.8rem;
-    flex: none;
-  }
-  .faq-icon::before, .faq-icon::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 100%;
-    height: 1.5px;
-    background: var(--ink-soft);
-    transition: transform 0.2s ease;
-  }
-  .faq-icon::after {
-    transform: rotate(90deg);
-  }
-  .faq-item[open] .faq-icon::after {
-    transform: rotate(0deg);
-  }
-  .faq-item p {
-    padding: 0 2rem 1.2rem 0;
-    color: var(--ink-soft);
-  }
-  .cta-row {
-    display: flex;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-    margin-top: 2rem;
-  }
+  th:nth-child(2) { background: var(--sumi); color: var(--hinoki); }
+  td:nth-child(2) { background: #fdf3ec; color: var(--ink); font-weight: 500; box-shadow: inset 3px 0 0 var(--shu); }
+  td:nth-child(n + 3) { color: var(--ink-faint); }
+  tr:last-child td { border-bottom: 0; }
+
+  .faq-section { padding: clamp(4rem, 8vw, 6rem) 0 2rem; max-width: 54rem; }
+  .faq-list { margin-top: 2rem; }
+  .cta-row { display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 2.5rem; }
+
   @media (max-width: 900px) {
-    .cat-grid {
-      grid-template-columns: 1fr;
-      gap: 2rem;
-    }
+    .cat-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cat-grid { grid-template-columns: 1fr; }
+    .cat-grid.flip .cat-copy { order: 0; }
+  }
+  @media (max-width: 480px) {
+    .cat-nav { grid-template-columns: 1fr; }
   }
 </style>

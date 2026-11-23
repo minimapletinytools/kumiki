@@ -6,6 +6,8 @@ import { type Lang, localePath, strings } from '../i18n';
 interface Props { lang: Lang }
 const { lang } = Astro.props;
 const s = strings(lang).about;
+const home = strings(lang).home;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <Layout
   title={s.title}
@@ -15,10 +17,16 @@ const s = strings(lang).about;
   lang={lang}
   translated
 >
-  <section class="about">
+  <Fragment slot="masthead">
+    <p class="kicker">Kumiki · 組木</p>
     <h1>{s.heading}</h1>
-
-    <div class="prose">
+  </Fragment>
+  <section class="about">
+    <figure class="photo" data-reveal>
+      <img src={`${base}/photos/oscarshed_built.png`} alt={home.gallery.oscarshed_built} loading="lazy" decoding="async" />
+      <figcaption>{home.gallery.oscarshed_built}</figcaption>
+    </figure>
+    <div class="prose" data-reveal>
       {s.paragraphs.map((paragraph) => <p set:html={paragraph} />)}
     </div>
 
@@ -35,26 +43,30 @@ const s = strings(lang).about;
 
 <style>
   .about {
-    max-width: 660px;
-    margin: 0 auto;
-    padding: 3rem 0 2rem;
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: start;
+    padding: clamp(2.5rem, 6vw, 4.5rem) 0 2rem;
   }
-  .about h1 {
-    font-size: clamp(2.1rem, 4vw, 2.9rem);
-    margin: 0 0 1.8rem;
+  .photo { grid-row: span 2; margin: 0; position: sticky; top: 6rem; transform: rotate(-2deg); }
+  .photo img { display: block; width: 100%; height: auto; border: 6px solid var(--sheet); border-radius: 4px; box-shadow: var(--shadow-lg); }
+  .photo figcaption { margin-top: 0.9rem; font-size: 0.85rem; color: var(--ink-faint); text-align: center; }
+  .prose p { color: var(--ink-soft); font-size: 1.12rem; line-height: 1.75; margin: 0 0 1.4rem; }
+  .prose p:first-child::first-letter {
+    float: left;
+    margin: 0.35rem 0.7rem 0 0;
+    font-family: var(--serif);
+    font-weight: 800;
+    font-size: 4.2rem;
+    line-height: 0.8;
+    color: var(--shu);
   }
-  .prose p {
-    color: var(--ink-soft);
-    font-size: 1.05rem;
-    margin: 0 0 1.2rem;
-  }
-  .prose strong {
-    color: var(--ink);
-  }
-  .cta-row {
-    display: flex;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-    margin-top: 2rem;
+  .prose :global(strong) { color: var(--ink); }
+  .cta-row { grid-column: 2; display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: -0.5rem; }
+  @media (max-width: 800px) {
+    .about { grid-template-columns: 1fr; }
+    .photo { position: static; max-width: 20rem; margin: 0 auto; }
+    .cta-row { grid-column: 1; }
   }
 </style>
