@@ -206,6 +206,7 @@ remaining = {
 } - set(CORE_ORDER) - set(SUPPORTING_ORDER)
 
 nav = mkdocs_gen_files.Nav()
+nav["Overview"] = "index.md"
 
 for module_leaf in CORE_ORDER:
     if module_leaf not in imports_by_module:
@@ -238,6 +239,15 @@ for module_leaf in SUPPORTING_ORDER:
 for dotted in sorted(remaining):
     link = _write_page(dotted, imports_by_module[dotted])
     nav["Supporting Reference", _display_name(dotted.split(".")[-1])] = link
+
+with mkdocs_gen_files.open(REFERENCE_ROOT / "index.md", "w") as index:
+    index.write("<!-- 🤖🤖🤖🤖🤖🤖 -->\n# API Reference\n\n")
+    index.write("Browse Kumiki’s public Python classes and functions by module.\n")
+    for item in nav.items():
+        if item.filename is None:
+            index.write(f"\n## {item.title}\n\n")
+        elif item.filename != "index.md":
+            index.write(f"- [{item.title}]({item.filename})\n")
 
 with mkdocs_gen_files.open(REFERENCE_ROOT / "SUMMARY.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())

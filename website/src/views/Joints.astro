@@ -131,9 +131,9 @@ const categories = data.map((cat) => {
   const words = s.categories[cat.id as keyof typeof s.categories];
   return { ...cat, ...words, joints: cat.joints.map((joint, i) => ({ ...joint, name: words.joints[i] })) };
 });
-const featured = new Set(data.flatMap(cat => cat.joints.flatMap(joint => joint.drawing ? [joint.drawing.src] : [])));
-const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
-  .map(name => drawing(name)).filter(plate => !featured.has(plate.src));
+const gallery = (Object.keys(s.drawingTitles) as DrawingName[])
+  .map(name => drawing(name))
+  .sort((a, b) => a.alt.localeCompare(b.alt, lang));
 ---
 <Layout
   title={s.title}
@@ -157,6 +157,20 @@ const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
         </a>
       ))}
     </nav>
+
+    <section class="cat-section" id="drawings" aria-labelledby="drawing-gallery-title">
+      <h2 id="drawing-gallery-title">{s.galleryHeading}</h2>
+      <ul class="drawing-gallery">
+        {gallery.map(({ src, alt }) => (
+          <li>
+            <a href={src}>
+              <img src={src} alt="" loading="lazy" decoding="async" />
+              <span>{alt}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
 
     {categories.map((cat) => (
       <section id={cat.id} class="cat-section">
@@ -191,20 +205,6 @@ const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
         </div>
       </section>
     ))}
-
-    <section class="cat-section" id="drawings">
-      <h2>{s.moreDrawings}</h2>
-      <ul class="drawing-gallery">
-        {moreDrawings.map(({ src, alt }) => (
-          <li>
-            <a href={src}>
-              <img src={src} alt="" loading="lazy" decoding="async" />
-              <span>{alt}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
 
     <section class="comparison" id="comparison">
       <h2>{s.comparisonTitle}</h2>
@@ -339,8 +339,19 @@ const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
     padding: 0;
     list-style: none;
   }
-  .drawing-gallery a { display: grid; gap: 0.45rem; cursor: zoom-in; }
-  .drawing-gallery img { width: 100%; height: auto; }
+  .drawing-gallery a {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    color: var(--ink);
+    cursor: zoom-in;
+  }
+  .drawing-gallery a:hover, .drawing-gallery a:focus-visible { border-color: var(--accent); }
+  .drawing-gallery img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: white; }
+  .drawing-gallery span { display: block; padding: 0.6rem 0.85rem; border-top: 1px solid var(--rule); }
   .cat-media {
     display: grid;
     gap: 1rem;
