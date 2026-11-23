@@ -313,7 +313,10 @@ def cut_plain_tongue_and_fork_joint_on_plane_aligned_timbers(
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
 ) -> Joint:
-    """Compatibility alias for `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`."""
+    """Compatibility alias for `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`.
+
+    [![Tongue and fork](../../../assets/joint-drawings/tongue-and-fork.svg)](../../../assets/joint-drawings/tongue-and-fork.svg)
+    """
     return cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,

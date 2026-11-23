@@ -135,6 +135,9 @@ def cut_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distanc
     Both timbers are end cut to the far face of the other, so the corner reads flush on
     both outside faces.
 
+    [![Through dovetail corner](../../../assets/joint-drawings/through-dovetails.svg)](../../../assets/joint-drawings/through-dovetails.svg)
+    [![Half-blind dovetail corner](../../../assets/joint-drawings/half-blind-dovetails.svg)](../../../assets/joint-drawings/half-blind-dovetails.svg)
+
     Args:
         arrangement: Corner arrangement. timber1 carries the dovetails and timber2 the
             sockets; the timbers must be plane aligned, not parallel, and flush across

@@ -385,9 +385,11 @@ def cut_mortise_and_tenon_joint(
     when depth is omitted.
 
     The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
-    and round peg and deepens the mortise to show the configurable cutter's layout.
+    and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon size and position, mortise depth and tip clearance, and peg layout](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and tip clearance](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+
+    [![Angled rectangular tenon](../../../assets/joint-drawings/angled-tenon.svg)](../../../assets/joint-drawings/angled-tenon.svg)
     """
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
@@ -1074,6 +1076,8 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
 ) -> Joint:
     """
     Creates a mortise and tenon joint for plane-aligned timbers.
+
+    [![Angled tenon](../../../assets/joint-drawings/angled-tenon.svg)](../../../assets/joint-drawings/angled-tenon.svg)
     """
     arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
@@ -1168,6 +1172,8 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
 ) -> Joint:
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers.
+
+    [![Mortise and tenon](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
     """
     arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
 
@@ -1201,6 +1207,8 @@ def cut_round_mortise_and_tenon_joint(
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint with any orientation.
+
+    [![Angled round tenon](../../../assets/joint-drawings/angled-round-tenon.svg)](../../../assets/joint-drawings/angled-round-tenon.svg)
     """
     return cut_mortise_and_tenon_joint(
         arrangement=arrangement,
@@ -1227,6 +1235,8 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint for plane-aligned timbers.
+
+    [![Angled round tenon](../../../assets/joint-drawings/angled-round-tenon.svg)](../../../assets/joint-drawings/angled-round-tenon.svg)
     """
     return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
@@ -1255,6 +1265,8 @@ def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
 ) -> Joint:
     """
     Creates a mortise and tenon corner joint on plane-aligned timbers.
+
+    [![Corner mortise and tenon](../../../assets/joint-drawings/corner-tenon.svg)](../../../assets/joint-drawings/corner-tenon.svg)
     """
     arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
@@ -1381,6 +1393,8 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     The tenon is sized as in cut_mortise_and_tenon_joint_on_plane_aligned_timbers: by
     tenon_width_relative_to_joint and tenon_height_relative_to_joint, or by the deprecated tenon_size.
+
+    [![Tusked through tenon](../../../assets/joint-drawings/tusked-tenon.svg)](../../../assets/joint-drawings/tusked-tenon.svg)
     """
     arrangement_check(arrangement.check_plane_aligned(), arrangement)
     tenon_size = _resolve_tenon_size_relative_to_joint(

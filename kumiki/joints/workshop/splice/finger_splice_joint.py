@@ -21,6 +21,8 @@ def cut_uniform_finger_splice_joint(
     the taper. taper_angle is the angle of each flank
     to the grain, in radians. Zero gives straight fingers. The center of the overlap is the
     projected world-space splice_point, or the midpoint of the selected ends when omitted.
+
+    [![Tapered finger splice](../../../assets/joint-drawings/finger-splice.svg)](../../../assets/joint-drawings/finger-splice.svg)
     """
     arrangement_check(arrangement.check_face_aligned_and_parallel_axis(), arrangement)
     first, second = arrangement.timber1, arrangement.timber2

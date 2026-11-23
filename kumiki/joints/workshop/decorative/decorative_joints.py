@@ -124,6 +124,8 @@ def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]
     Cuts a roundover of radius `radius` along edges of timber.
     Short edges (edges on the timber ends) are at the declared length of the timber rather than the maybe_end_cut length (which is not known here).
     Note, this does not check if round radii overlap.
+
+    [![Roundover](../../../assets/joint-drawings/roundover.svg)](../../../assets/joint-drawings/roundover.svg)
     """
     assert edges, "cut_practice_roundover_decoration needs at least one edge to round over"
 
@@ -160,6 +162,8 @@ def cut_practice_rounded_end_decoration(
     gentle bowed/bullnose end profile, visible as a curved outline when looking
     straight at `rounded_face` (the arc's plane is perpendicular to
     `rounded_face`'s normal, i.e. that normal is the cylinder's own axis).
+
+    [![Rounded end](../../../assets/joint-drawings/rounded-end.svg)](../../../assets/joint-drawings/rounded-end.svg)
     """
     if safe_compare(distance_from_end, radius, Comparison.LT):
         warnings.warn(
@@ -240,6 +244,8 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     ______________◜  ←scallop_height
                 ↑
                 scallop_width
+
+    [![Rafter tail scallop](../../../assets/joint-drawings/rafter-scallop.svg)](../../../assets/joint-drawings/rafter-scallop.svg)
     """
     assert safe_compare(scallop_length, 0, Comparison.GT), "scallop_length must be positive"
     assert safe_compare(scallop_height, 0, Comparison.GT), "scallop_height must be positive"
@@ -303,6 +309,8 @@ def cut_practice_path_extrusion_corner_end_decoration(
     |________|__ +x
     ^
     cut_corner
+
+    [![Carved end profile](../../../assets/joint-drawings/carved-path.svg)](../../../assets/joint-drawings/carved-path.svg)
     """
     assert len(cut_path) > 0, "cut_path must have at least one segment"
 
@@ -394,6 +402,8 @@ def cut_practice_straight_angled_end_cut_decoration(
     ____________
     front_face  \\      <-timber_end
     _____________\\
+
+    [![Straight angled end cut](../../../assets/joint-drawings/angled-end.svg)](../../../assets/joint-drawings/angled-end.svg)
     """
     timber_end_face = timber_end.to.face()
     assert timber_end_face in (TimberFace.TOP, TimberFace.BOTTOM), (

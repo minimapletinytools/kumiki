@@ -13,6 +13,16 @@ const { lang } = Astro.props;
 const s = strings(lang).joints;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
+const drawingAssets = import.meta.glob<string>('../../../docs/assets/joint-drawings/*.svg', {
+  eager: true, query: '?url', import: 'default',
+});
+type DrawingName = keyof typeof s.drawingTitles;
+function drawing(name: DrawingName, height = 428) {
+  const src = drawingAssets[`../../../docs/assets/joint-drawings/${name}.svg`];
+  if (!src) throw new Error(`Missing joint drawing: ${name}`);
+  return { src, alt: s.drawingTitles[name], height };
+}
+
 const data = [
   {
     id: 'mortise-and-tenon',
@@ -28,11 +38,13 @@ const data = [
       {
         jp: '車知栓仕口 / Shachi-sen',
         fn: 'cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers',
+        drawing: drawing('wedged-half-dovetail', 856),
         href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
       },
       {
         jp: '割り楔枘 / Warikusabi-hozo',
         fn: 'cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers',
+        drawing: drawing('tusked-tenon', 856),
         href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/',
       },
     ],
@@ -51,11 +63,13 @@ const data = [
       {
         jp: '大入れ仕口 / Oire-shiguchi',
         fn: 'cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers',
+        drawing: drawing('drop-in-housing'),
         href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
       },
       {
         jp: '雇い枘差し / Yatoi-hozo',
         fn: 'cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers',
+        drawing: drawing('splined-double-butt', 856),
         href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
       },
     ],
@@ -80,6 +94,7 @@ const data = [
       {
         jp: '相欠き継ぎ / Aikaki-tsugi',
         fn: 'cut_basic_plain_splice_lap_joint_on_aligned_timbers',
+        drawing: drawing('splice-lap'),
         href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
       },
     ],
@@ -92,6 +107,7 @@ const data = [
       {
         jp: '箱相欠き車知栓仕口 / Hako Aikaki Shachi-sen',
         fn: 'cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers',
+        drawing: drawing('keyed-miter', 856),
         href: 'https://kumiki.build/docs/reference/joints/workshop/corner/',
       },
       {
@@ -103,6 +119,7 @@ const data = [
       {
         jp: '渡り腮 / Watari-ago',
         fn: 'cut_basic_plain_cross_lap_joint_on_face_aligned_timbers',
+        drawing: drawing('cross-lap'),
         href: 'https://kumiki.build/docs/reference/joints/workshop/cross/',
       },
     ],
@@ -114,6 +131,9 @@ const categories = data.map((cat) => {
   const words = s.categories[cat.id as keyof typeof s.categories];
   return { ...cat, ...words, joints: cat.joints.map((joint, i) => ({ ...joint, name: words.joints[i] })) };
 });
+const featured = new Set(data.flatMap(cat => cat.joints.map(joint => joint.drawing.src)));
+const moreDrawings = (Object.keys(s.drawingTitles) as DrawingName[])
+  .map(name => drawing(name)).filter(plate => !featured.has(plate.src));
 ---
 <Layout
   title={s.title}
@@ -171,6 +191,20 @@ const categories = data.map((cat) => {
         </div>
       </section>
     ))}
+
+    <section class="cat-section" id="drawings">
+      <h2>{s.moreDrawings}</h2>
+      <ul class="drawing-gallery">
+        {moreDrawings.map(({ src, alt }) => (
+          <li>
+            <a href={src}>
+              <img src={src} alt="" loading="lazy" decoding="async" />
+              <span>{alt}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
 
     <section class="comparison" id="comparison">
       <h2>{s.comparisonTitle}</h2>
@@ -297,6 +331,16 @@ const categories = data.map((cat) => {
   }
   .dimensioned-joint { display: block; margin-top: 0.75rem; cursor: zoom-in; }
   .dimensioned-joint img { height: auto; }
+  .drawing-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .drawing-gallery a { display: grid; gap: 0.45rem; cursor: zoom-in; }
+  .drawing-gallery img { width: 100%; height: auto; }
   .cat-media {
     display: grid;
     gap: 1rem;

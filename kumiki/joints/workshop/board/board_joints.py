@@ -74,6 +74,8 @@ def cut_tongue_and_groove_joint(
     The groove board must overlap the tongue board by at least tongue_depth so
     enough wood is available to cut the groove.
 
+    [![Tongue and groove](../../../assets/joint-drawings/tongue-and-groove.svg)](../../../assets/joint-drawings/tongue-and-groove.svg)
+
     Args:
         tongue_board: Board with the protruding tongue on one of its side faces.
         groove_board: Board with the recessed groove that receives the tongue.
@@ -296,6 +298,8 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
 
     The boards are all expected to be the same thickness and coplanar and form a "rectangle" shape.
 
+    [![Board in a grooved frame](../../../assets/joint-drawings/grooved-frame.svg)](../../../assets/joint-drawings/grooved-frame.svg)
+
     Args:
         boards: Panel of boards to be fitted into the grooves.
         frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges. The function will do its best to guess which side the grooves go based on the relative position of the boards and frame timbers.
@@ -435,6 +439,8 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
 ) -> Joint:
     """
     cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
+
+    [![Sliding dovetail](../../../assets/joint-drawings/sliding-dovetail.svg)](../../../assets/joint-drawings/sliding-dovetail.svg)
 
     Args:
         arrangement:

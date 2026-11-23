@@ -1,20 +1,20 @@
-"""Render the pilot joint reference figures. Run with python -m tools.render_joint_docs."""
+"""Render the joint reference figures. Run with python -m tools.render_joint_docs."""
 
-from dataclasses import replace
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import numpy as np
 
-from kumiki import CutTimber, Frame, Measure, PegShape, create_v2, mm
+from kumiki import CutTimber, Frame, Measure, create_v2, mm
 from kumiki.csg.cutcsg import OwnedFeatureHit, SolidUnion, adopt_csg
 from kumiki.csg.feature_paths import FeatureHandle, find_csg_by_labels, find_feature
 from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 from kumiki.drawings.svg import DrawingSolid, render_svg_view
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
-from kumiki.geometry import Line, Plane, Point, intersect_line_plane, intersect_planes
-from kumiki.joints.workshop.basic_joints import _basic_peg, _basic_tenon_dimensions
+from kumiki.geometry import Plane, Point, intersect_line_plane, intersect_planes
+from kumiki.joints.workshop.basic_joints import _basic_tenon_dimensions
 from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint
+from kumiki.timber import CSGAccessory
 from kumiki.rule import as_ndarray, format_angle, format_length
 from patterns.basic_joints_patterns import (
     example_basic_dropin_dovetail_butt_joint,
@@ -25,7 +25,7 @@ from patterns.basic_joints_patterns import (
 
 
 OUT = Path(__file__).resolve().parents[1] / "docs/assets/joint-drawings"
-# All basic patterns use the canonical 4 × 5 × 48 inch timbers.
+# Field widths and camera presets are shared across the reference figures.
 WIDTH, HEIGHT = 560, 380
 FIELD_WIDTH = 0.34
 SPLICE_OVERVIEW_WIDTH = 0.60
@@ -104,13 +104,13 @@ def annotate(view, measure, ends, project, offset, caption_at=None):
     text = ET.SubElement(group, 'text', transform=f'translate({x:.2f} {y:.2f}) rotate({angle:.2f})',
                          attrib={'text-anchor': 'middle', 'font-size': '15', 'stroke': 'white',
                                  'stroke-width': '4', 'paint-order': 'stroke', 'stroke-linejoin': 'round'})
-    text.text = measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
+    text.text = measure if isinstance(measure, str) else measure.format_label(format_length(float(np.linalg.norm(ends[1] - ends[0]))))
 
 
-def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1), field_width=FIELD_WIDTH):
+def panel(sheet, slot, title, cut: CutTimber | CSGAccessory, preset, center, dimensions, *, xray=False, up_hint=(0, 0, 1), field_width=FIELD_WIDTH, companions=(), mesh_outline=False):
     """Draw a cut member at a preset angle with optional X-ray edges."""
-    transform = cut.timber.transform
-    root = cut.render_timber_with_cuts_csg_local()
+    transform = cut.timber.transform if isinstance(cut, CutTimber) else cut.transform
+    root = cut.render_timber_with_cuts_csg_local() if isinstance(cut, CutTimber) else cut.get_csg_local()
     solid = DrawingSolid(root, transform)
     toward = np.array(preset) / np.linalg.norm(preset)
     right = np.cross(up_hint, toward)
@@ -118,7 +118,23 @@ def panel(sheet, slot, title, cut: CutTimber, preset, center, dimensions, *, xra
     up = np.cross(toward, right)
     camera = dict(center=center, right=right, up=up, width=field_width, height=field_width * HEIGHT / WIDTH)
     appearance = dict(surface='#f0dfbf', edge='#5d4b36', opacity=0.28 if xray else 1, edgeOpacity=1, width=1.5)
-    view = render_svg_view({title: solid}, set(), camera, WIDTH, HEIGHT, appearances={title: appearance},
+    if mesh_outline:
+        # Use the finished surface silhouette where several intersecting roundovers share a corner.
+        from kumiki.csg.triangles import triangulate_cutcsg
+        mesh = triangulate_cutcsg(root).mesh
+        facing = mesh.face_normals @ solid.rotation.T @ toward > 1e-8
+        adjacent = mesh.face_adjacency
+        boundary = facing[adjacent[:, 0]] != facing[adjacent[:, 1]]
+        sharp = mesh.face_adjacency_angles > np.deg2rad(35)
+        solid.lines = [('profile', *mesh.vertices[edge]) for edge in mesh.face_adjacency_edges[boundary | sharp]]
+        solid.rims.clear()
+        solid.patches.clear()
+    solids = {title: solid}
+    appearances = {title: appearance}
+    for name, body, pose in companions:
+        solids[name] = DrawingSolid(body, pose)
+        appearances[name] = {**appearance, 'surface': '#d4c5a9'}
+    view = render_svg_view(solids, set(), camera, WIDTH, HEIGHT, appearances=appearances,
                            edge_mode='xray' if xray else 'noOverlay')
     row, column = divmod(slot, 2)
     top = row * (HEIGHT + 48)
@@ -157,15 +173,13 @@ def save(root, name):
     ET.ElementTree(root).write(OUT / name, encoding='utf-8', xml_declaration=True)
 
 
-def pegged_example():
-    """Offset the basic pattern's tenon and peg, leaving clearance behind the tip."""
+def offset_tenon_example():
+    """Offset the basic pattern's tenon and leave clearance beyond its tip."""
     arrangement = create_canonical_example_butt_joint_timbers()
     size, length, entry_face = _basic_tenon_dimensions(arrangement)
-    arrangement, peg = _basic_peg(arrangement, size, length)
-    peg = replace(peg, shape=PegShape.ROUND, size=mm(9), peg_positions=[(peg.peg_positions[0][0], mm(26))])
     return cut_mortise_and_tenon_joint(
         arrangement, tenon_size=size, tenon_length=length, tenon_position=create_v2(mm(20), mm(10)),
-        mortise_depth=length + mm(16), peg_parameters=peg, set_mortise_shoulder_parallel_to_face=entry_face,
+        mortise_depth=length + mm(16), set_mortise_shoulder_parallel_to_face=entry_face,
         mortise_shoulder_distance_from_centerline_or_centerplane=arrangement.receiving_timber.get_size_in_face_normal_axis(entry_face) / 2,
     )
 
@@ -194,14 +208,13 @@ def guide(view, project, a, b, color):
 
 
 def mortise_and_tenon(joint):
-    """Draw the square-shouldered pilot with a round peg in tenon position space."""
+    """Draw the offset tenon, its shoulder datums and the stopped mortise."""
     frame = Frame.from_joints([joint])
     cuts = {ct.timber.ticket.path: ct for ct in frame.cut_timbers}
     tenon, socket = cuts['butt_timber'], cuts['receiving_timber']
 
-    pegged = 'peg_0' in joint.jointAccessories
-    waste = ('tenon_cut', 'tenon_waste') if pegged else ('tenon_waste',)
-    mortise = ('mortise_cut', 'mortise_hole') if pegged else ('mortise_hole',)
+    waste = ('tenon_waste',)
+    mortise = ('mortise_hole',)
 
     def cheek(name):
         return feature(tenon, (*waste, 'tenon'), 'tenon_' + name)
@@ -244,7 +257,7 @@ def mortise_and_tenon(joint):
         annotate(view, Measure(stock_planes[i], tenon_planes[i], label=f'tenon_position[{i}]'),
                  [foot, tenon_center], project, (119, -90)[i], ((298, 30), (462, 230))[i])
 
-    title = 'Peg and tip clearance · mortise plan' if pegged else 'Tip clearance · mortise plan'
+    title = 'Tip clearance · mortise plan'
     view, project = panel(root, 3, title, socket, PLAN, (0, 0, 0), [], xray=True, up_hint=(0, 1, 0))
     mouth_point = crossing(tenon_axis, plane_of(shoulder))
     tip_point = crossing(tenon_axis, plane_of(tip))
@@ -258,18 +271,12 @@ def mortise_and_tenon(joint):
     annotate(view, Measure(tip, floor, label='mortise_depth − tenon_length'), [tip_point, floor_point],
              project, -108, (415, 50))
 
-    if not pegged:
-        return root
-    bore = feature(socket, ('mortise_cut', 'peg_hole_0'), 'peg_hole_axis')
-    bore_axis = world_geometry(bore)
-    if not isinstance(bore_axis, Line):
-        raise ValueError("The peg layout requires a round bore")
-    peg_point = crossing(bore_axis, plane_of(tenon_planes[0]))
-    lateral_offset = local_y * ((peg_point - mouth_point) @ local_y)
-    annotate(view, Measure(shoulder, bore, label='peg_positions[0][0]'),
-             [mouth_point + lateral_offset, peg_point], project, 163, (141, 345))
-    annotate(view, Measure(tenon_planes[1], bore, label='peg_positions[0][1]'),
-             [peg_point - lateral_offset, peg_point], project, -68, (348, 345))
+    receiver_mid = feature(socket, STOCK, 'ptw.centerplane_front_back')
+    on_mid = crossing(tenon_axis, plane_of(receiver_mid))
+    guide(view, project, on_mid - local_y * half_width * 1.4, on_mid + local_y * half_width * 1.4, '#756a5a')
+    annotate(view, Measure(shoulder, receiver_mid, label='mortise_shoulder_distance_from_centerline_or_centerplane'),
+             [mouth_point, on_mid], project, 80, (280, 345))
+
     return root
 
 
@@ -362,6 +369,16 @@ def scarf(joint):
     root = sheet('Kanawa-tsugi scarf', 'Side elevation of the oblique scarf with a detail of the stub tenon and dado.')
     view, project = panel(root, 0, 'Scarf profile', first, SIDE, center, [], field_width=SPLICE_OVERVIEW_WIDTH)
     annotate(view, Measure(*ends, label='scarf_length'), stations, project, -99)
+    waste = first.cuts[0].negative_csg
+    profile = find_csg_by_labels(waste, ('scarf_waste', 'scarf_profile')) if waste is not None else None
+    if not isinstance(profile, SolidUnion):
+        raise ValueError('The scarf needs its dado profile')
+    dado = primitive_features(first, profile.children[0])
+    midheight = feature(first, STOCK, 'ptw.centerplane_left_right')
+    dado_height = Measure(midheight, dado['side.2'], label='dado_height')
+    face_stations(dado_height)
+    annotate(view, dado_height, [stations[0], foot_on_plane(stations[0], plane_of(dado['side.2']))],
+             project, -35, (450, 103))
     # The square key seats against the short step between the two oblique lands.
     key = joint.jointAccessories['peg']
     key_faces = primitive_features(first, adopt_csg(key.transform, first.timber.transform, key.get_csg_local()))
@@ -394,7 +411,7 @@ def annotate_plan_angle(view, measure, vertex, reference, flank, caption):
     ET.SubElement(group, 'path', d=arc, fill='none', stroke=INK, attrib={'stroke-width': '1.8'})
     line(group, (start + stop) / 2, (caption[0], caption[1] + 6), WITNESS)
     ET.SubElement(group, 'text', x=str(caption[0]), y=str(caption[1]),
-                  attrib={'text-anchor': 'middle', 'font-size': '15'}).text = measure.format_label(format_angle(abs(turn)))
+                  attrib={'text-anchor': 'middle', 'font-size': '15'}).text = measure if isinstance(measure, str) else measure.format_label(format_angle(abs(turn)))
 
 
 def dovetail(joint):
@@ -429,8 +446,11 @@ def dovetail(joint):
 
 
 if __name__ == '__main__':
-    save(mortise_and_tenon(pegged_example()), 'mortise-and-tenon.svg')
+    save(mortise_and_tenon(offset_tenon_example()), 'mortise-and-tenon.svg')
     save(tongue_and_fork(example_basic_tongue_and_fork_joint()), 'tongue-and-fork.svg')
     save(gooseneck(example_basic_lapped_gooseneck_joint()), 'lapped-gooseneck.svg')
     save(scarf(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint()), 'kanawa-tsugi.svg')
     save(dovetail(example_basic_dropin_dovetail_butt_joint()), 'drop-in-dovetail.svg')
+    from tools.joint_doc_patterns import CATALOG, render_entry
+    for entry in CATALOG:
+        render_entry(entry)

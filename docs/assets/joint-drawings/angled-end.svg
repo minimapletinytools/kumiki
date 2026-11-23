@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Straight angled end cut</title>
+  <desc>Straight angled end cut</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Angled end" fill="#f0dfbf" fill-opacity="1" d="M250.41798 1812.5228 L250.41798 314.83863 L427.9101 212.36351 Z M427.9101 1710.0477 L250.41798 1812.5228 L427.9101 212.36351 Z M309.58202 65.16137 L309.58202 1641.7309 L132.0899 1744.206 Z M309.58202 65.16137 L132.0899 1744.206 L132.0899 167.63649 Z M309.58202 1641.7309 L309.58202 65.16137 L427.9101 212.36351 Z M309.58202 1641.7309 L427.9101 212.36351 L427.9101 1710.0477 Z M250.41798 1812.5228 L132.0899 1744.206 L132.0899 167.63649 Z M250.41798 314.83863 L250.41798 1812.5228 L132.0899 167.63649 Z M250.41798 1812.5228 L132.0899 1744.206 L309.58202 1641.7309 Z M250.41798 1812.5228 L309.58202 1641.7309 L427.9101 1710.0477 Z M427.9101 212.36351 L250.41798 314.83863 L132.0899 167.63649 Z M427.9101 212.36351 L132.0899 167.63649 L309.58202 65.16137 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Angled end" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M427.9101 212.36351 L250.41798 314.83863" />
+        <path data-feature="rptw.right" d="M250.41798 314.83863 L250.41798 1812.5228" />
+        <path data-feature="rptw.right" d="M250.41798 1812.5228 L427.9101 1710.0477" />
+        <path data-feature="rptw.right" d="M427.9101 1710.0477 L427.9101 212.36351" />
+        <path data-feature="rptw.left" d="M132.0899 1744.206 L132.0899 167.63649" />
+        <path data-feature="rptw.left" d="M132.0899 167.63649 L309.58202 65.16137" />
+        <path data-feature="rptw.front" d="M309.58202 65.16137 L427.9101 212.36351" />
+        <path data-feature="rptw.back" d="M132.0899 1744.206 L250.41798 1812.5228" />
+        <path data-feature="rptw.back" d="M250.41798 314.83863 L132.0899 167.63649" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="284.00" y1="190.00" x2="318.00" y2="190.00" />
+      <line x1="317.00" y1="193.00" x2="311.00" y2="187.00" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="284.00" y1="87.52" x2="318.00" y2="87.52" />
+      <line x1="317.00" y1="90.52" x2="311.00" y2="84.52" />
+      <line x1="314.00" y1="190.00" x2="314.00" y2="87.52" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="314.00" y1="138.76" x2="280.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 37.00) rotate(0.00)">position_from_end</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Angled end</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Cut angle" fill="#f0dfbf" fill-opacity="1" d="M196.32941 2072.5882 L196.32941 141.69276 L363.67059 238.30724 Z M196.32941 2072.5882 L363.67059 238.30724 L363.67059 2072.5882 Z M363.67059 2072.5882 L196.32941 2072.5882 L196.32941 141.69276 Z M363.67059 238.30724 L363.67059 2072.5882 L196.32941 141.69276 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Cut angle" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M363.67059 238.30724 L363.67059 2072.5882" />
+        <path data-feature="rptw.right" d="M363.67059 2072.5882 L363.67059 238.30724" />
+        <path data-feature="rptw.left" d="M196.32941 141.69276 L196.32941 2072.5882" />
+        <path data-feature="rptw.left" d="M196.32941 2072.5882 L196.32941 141.69276" />
+        <path data-feature="rptw.front" d="M196.32941 2072.5882 L196.32941 1247.9541" />
+        <path data-feature="rptw.front" d="M196.32941 141.69276 L363.67059 238.30724" />
+        <path data-feature="rptw.back" d="M196.32941 2072.5882 L363.67059 2072.5882" />
+        <path data-feature="rptw.back" d="M363.67059 238.30724 L196.32941 141.69276" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="280.00" y1="190.00" x2="363.67" y2="190.00" />
+      <path stroke-width="1.8" d="M345.26 190.00 A65.26 65.26 0 0 1 336.52 222.63" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="340.89" y1="206.32" x2="393.00" y2="96.00" />
+      <text text-anchor="middle" font-size="15" x="393" y="90">angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Cut angle</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

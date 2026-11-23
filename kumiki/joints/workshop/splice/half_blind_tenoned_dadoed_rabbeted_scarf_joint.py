@@ -331,7 +331,10 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     rebated_shoulder_depth: Optional[Numeric] = None,
     rebated_shoulder_length: Optional[Numeric] = None,
 ) -> Joint:
-    """Compatibility alias for cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers."""
+    """Compatibility alias for cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers.
+
+    [![Kanawa tsugi](../../../assets/joint-drawings/kanawa-tsugi.svg)](../../../assets/joint-drawings/kanawa-tsugi.svg)
+    """
     actual_depth = rebated_shoulder_depth if rebated_shoulder_depth is not None else stepped_shoulder_depth
     actual_length = rebated_shoulder_length if rebated_shoulder_length is not None else stepped_shoulder_length
     assert actual_depth is not None, "rebated_shoulder_depth (or stepped_shoulder_depth) must be provided"

@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Through dovetail corner</title>
+  <desc>Through dovetail corner</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Tail layout" fill="#f0dfbf" fill-opacity="1" d="M2288.0941 5.227451 L2288.0941 339.9098 L384.58824 339.9098 Z M384.58824 5.227451 L2288.0941 5.227451 L384.58824 339.9098 Z M384.58824 106.32941 L384.58824 238.80784 L175.41176 273.67059 Z M175.41176 71.466667 L384.58824 106.32941 L175.41176 273.67059 Z M384.58824 106.32941 L1786.0706 339.9098 L1747.121 339.9098 Z M384.58824 106.32941 L1747.121 339.9098 L384.58824 339.9098 Z M175.41176 71.466667 L384.58824 106.32941 L384.58824 238.80784 Z M175.41176 71.466667 L384.58824 238.80784 L175.41176 273.67059 Z M2288.0941 339.9098 L1786.0706 339.9098 L384.58824 106.32941 Z M2288.0941 339.9098 L384.58824 106.32941 L384.58824 5.227451 Z M2288.0941 339.9098 L384.58824 5.227451 L2288.0941 5.227451 Z M384.58824 238.80784 L175.41176 273.67059 L175.41176 71.466667 Z M384.58824 106.32941 L384.58824 238.80784 L175.41176 71.466667 Z M384.58824 238.80784 L175.41176 273.67059 L175.41176 71.466667 Z M384.58824 238.80784 L175.41176 71.466667 L384.58824 106.32941 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Tail layout" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M2288.0941 5.227451 L478.28588 5.227451" />
+        <path data-feature="rptw.right" d="M478.28588 5.227451 L384.58824 5.227451" />
+        <path data-feature="rptw.right" d="M384.58824 5.227451 L2288.0941 5.227451" />
+        <path data-feature="rptw.left" d="M384.58824 339.9098 L2288.0941 339.9098" />
+        <path data-feature="rptw.left" d="M2288.0941 339.9098 L384.58824 339.9098" />
+        <path data-feature="rptw.front" d="M2288.0941 339.9098 L2288.0941 5.227451" />
+        <path data-feature="rptw.front" d="M384.58824 5.227451 L384.58824 106.32941" />
+        <path data-feature="rptw.front" d="M384.58824 238.80784 L384.58824 339.9098" />
+        <path data-feature="rptw.front" d="M175.41176 273.67059 L384.58824 238.80784" />
+        <path data-feature="rptw.front" d="M384.58824 106.32941 L175.41176 71.466667" />
+        <path data-feature="rptw.front" d="M175.41176 71.466667 L175.41176 273.67059" />
+        <path data-feature="rptw.back" d="M1786.0706 339.9098 L1747.121 339.9098" />
+        <path data-feature="rptw.back" d="M1747.121 339.9098 L942.80516 339.9098" />
+        <path data-feature="rptw.back" d="M384.58824 339.9098 L384.58824 238.80784" />
+        <path data-feature="rptw.back" d="M2288.0941 339.9098 L1786.0706 339.9098" />
+        <path data-feature="dovetail_front" d="M175.41176 273.67059 L175.41176 235.06765" />
+        <path data-feature="dovetail_front" d="M175.41176 235.06765 L175.41176 71.466667" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="380.59" y1="238.81" x2="346.59" y2="238.81" />
+      <line x1="353.59" y1="241.81" x2="347.59" y2="235.81" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="380.59" y1="106.33" x2="346.59" y2="106.33" />
+      <line x1="353.59" y1="109.33" x2="347.59" y2="103.33" />
+      <line x1="350.59" y1="238.81" x2="350.59" y2="106.33" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="350.59" y1="172.57" x2="280.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 37.00) rotate(0.00)">dovetails[0].small_width</text>
+    </g>
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="384.59" y1="106.33" x2="175.41" y2="106.33" />
+      <path stroke-width="1.8" d="M221.43 106.33 A163.16 163.16 0 0 1 223.65 79.51" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="222.54" y1="92.92" x2="396.00" y2="61.00" />
+      <text text-anchor="middle" font-size="15" x="396" y="55">dovetails[0].angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Tail layout</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Through socket" fill="#f0dfbf" fill-opacity="1" d="M280 124.52978 L132.0899 39.133845 L1625.9819 -823.36511 Z M1773.892 -737.96918 L280 124.52978 L1625.9819 -823.36511 Z M132.0899 312.40084 L1625.9819 -550.09812 L1773.892 -464.70218 Z M132.0899 312.40084 L1773.892 -464.70218 L280 397.79678 Z M1773.892 -518.78627 L1773.892 -464.70218 L280 397.79678 Z M280 343.71269 L1773.892 -518.78627 L280 397.79678 Z M1773.892 -737.96918 L1773.892 -518.78627 L427.9101 258.31675 Z M427.9101 39.133845 L1773.892 -737.96918 L427.9101 258.31675 Z M427.9101 39.133845 L427.9101 93.217939 L280 178.61388 Z M280 124.52978 L427.9101 39.133845 L280 178.61388 Z M1625.9819 -740.81571 L132.0899 121.68325 L132.0899 39.133845 Z M1625.9819 -740.81571 L132.0899 39.133845 L1625.9819 -823.36511 Z M280 36.287314 L1625.9819 -740.81571 L1625.9819 -550.09812 Z M280 36.287314 L1625.9819 -550.09812 L280 227.00491 Z M280 144.4555 L280 227.00491 L132.0899 312.40084 Z M280 144.4555 L132.0899 312.40084 L132.0899 229.85144 Z M1773.892 -464.70218 L1625.9819 -550.09812 L1625.9819 -823.36511 Z M1773.892 -464.70218 L1625.9819 -823.36511 L1773.892 -737.96918 Z M427.9101 258.31675 L280 144.4555 L280 36.287314 Z M427.9101 258.31675 L280 36.287314 L427.9101 93.217939 Z M427.9101 258.31675 L280 343.71269 L132.0899 229.85144 Z M427.9101 258.31675 L132.0899 229.85144 L280 144.4555 Z M132.0899 121.68325 L280 36.287314 L427.9101 93.217939 Z M280 178.61388 L132.0899 121.68325 L427.9101 93.217939 Z M280 343.71269 L280 397.79678 L132.0899 312.40084 Z M280 343.71269 L132.0899 312.40084 L132.0899 229.85144 Z M280 124.52978 L280 178.61388 L132.0899 121.68325 Z M280 124.52978 L132.0899 121.68325 L132.0899 39.133845 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Through socket" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M1625.9819 -823.36511 L132.0899 39.133845" />
+        <path data-feature="rptw.right" d="M132.0899 39.133845 L280 124.52978" />
+        <path data-feature="rptw.right" d="M280 124.52978 L1773.892 -737.96918" />
+        <path data-feature="rptw.right" d="M1773.892 -737.96918 L1625.9819 -823.36511" />
+        <path data-feature="rptw.left" d="M1773.892 -464.70218 L280 397.79678" />
+        <path data-feature="rptw.left" d="M280 397.79678 L132.0899 312.40084" />
+        <path data-feature="rptw.front" d="M1773.892 -464.70218 L1773.892 -518.78627" />
+        <path data-feature="rptw.front" d="M427.9101 258.31675 L280 343.71269" />
+        <path data-feature="rptw.front" d="M280 343.71269 L280 397.79678" />
+        <path data-feature="rptw.front" d="M1773.892 -518.78627 L1773.892 -737.96918" />
+        <path data-feature="rptw.front" d="M1773.892 -737.96918 L427.9101 39.133845" />
+        <path data-feature="rptw.front" d="M427.9101 93.217939 L427.9101 258.31675" />
+        <path data-feature="rptw.front" d="M280 178.61388 L427.9101 93.217939" />
+        <path data-feature="rptw.front" d="M427.9101 39.133845 L280 124.52978" />
+        <path data-feature="rptw.front" d="M280 124.52978 L280 178.61388" />
+        <path data-feature="rptw.back" d="M132.0899 121.68325 L132.0899 39.133845" />
+        <path data-feature="rptw.back" d="M132.0899 312.40084 L132.0899 229.85144" />
+        <path data-feature="rptw.back" d="M132.0899 229.85144 L244.50158 164.95053" />
+        <path data-feature="rptw.top" d="M1773.892 -737.96918 L1773.892 -464.70218" />
+        <path data-feature="cap.0" d="M427.9101 258.31675 L305.35602 163.97457" />
+        <path data-feature="side.1" d="M280 343.71269 L132.0899 229.85144" />
+        <path data-feature="side.3" d="M132.0899 121.68325 L280 178.61388" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="90.37" x2="242.00" y2="90.37" />
+      <line x1="249.00" y1="93.37" x2="243.00" y2="87.37" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="-46.26" x2="242.00" y2="-46.26" />
+      <line x1="249.00" y1="-43.26" x2="243.00" y2="-49.26" />
+      <line x1="246.00" y1="90.37" x2="246.00" y2="-46.26" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="246.00" y1="22.05" x2="140.00" y2="22.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 37.00) rotate(0.00)">distances[0]</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="282.00" y1="32.82" x2="299.00" y2="3.38" />
+      <line x1="292.90" y1="7.94" x2="301.10" y2="5.74" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="429.91" y1="118.22" x2="446.91" y2="88.77" />
+      <line x1="440.81" y1="93.34" x2="449.01" y2="91.14" />
+      <line x1="297.00" y1="6.84" x2="444.91" y2="92.24" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="370.96" y1="49.54" x2="420.00" y2="42.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 37.00) rotate(0.00)">pin board thickness</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Through socket</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

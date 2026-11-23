@@ -16,6 +16,8 @@ def cut_uniform_finger_corner_joint(
     to mark fixed widths inward from front_face_on_timber1, leaving any remainder at
     the far face. Timber1 keeps the first finger. The default front face follows the
     cross product of the two outward end directions.
+
+    [![Box corner](../../../assets/joint-drawings/finger-corner.svg)](../../../assets/joint-drawings/finger-corner.svg)
     """
     arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
     arrangement_check(arrangement.check_plane_aligned(), arrangement)

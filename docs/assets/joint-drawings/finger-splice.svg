@@ -1,0 +1,111 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Tapered finger splice</title>
+  <desc>Tapered finger splice</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Finger pitch at mid-length" fill="#f0dfbf" fill-opacity="1" d="M-150.76923 135.29231 L-150.76923 9.0769231 L352.36923 9.0769231 Z M352.36923 72.4 L-150.76923 135.29231 L352.36923 9.0769231 Z M-150.76923 280.03077 L-150.76923 135.29231 L207.63077 90.492308 Z M207.63077 235.23077 L-150.76923 280.03077 L207.63077 90.492308 Z M207.63077 144.76923 L352.36923 162.86154 L352.36923 217.13846 Z M207.63077 235.23077 L207.63077 144.76923 L352.36923 217.13846 Z M-150.76923 370.92308 L-150.76923 280.03077 L207.63077 235.23077 Z M207.63077 370.92308 L-150.76923 370.92308 L207.63077 235.23077 Z M207.63077 370.92308 L207.63077 289.50769 L352.36923 307.6 Z M352.36923 370.92308 L207.63077 370.92308 L352.36923 307.6 Z M-150.76923 370.92308 L-150.76923 244.70769 L40.887185 268.66474 Z M-150.76923 370.92308 L40.887185 268.66474 L352.36923 307.6 Z M-150.76923 370.92308 L352.36923 307.6 L352.36923 370.92308 Z M-150.76923 244.70769 L-150.76923 99.969231 L207.63077 144.76923 Z M-150.76923 244.70769 L207.63077 144.76923 L207.63077 289.50769 Z M-150.76923 99.969231 L-150.76923 9.0769231 L207.63077 9.0769231 Z M-150.76923 99.969231 L207.63077 9.0769231 L207.63077 144.76923 Z M207.63077 235.23077 L207.63077 144.76923 L352.36923 162.86154 Z M207.63077 235.23077 L352.36923 162.86154 L352.36923 217.13846 Z M207.63077 90.492308 L207.63077 9.0769231 L352.36923 9.0769231 Z M207.63077 90.492308 L352.36923 9.0769231 L352.36923 72.4 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Finger pitch at mid-length" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M352.36923 9.0769231 L-150.76923 9.0769231" />
+        <path data-feature="rptw.right" d="M-150.76923 9.0769231 L-150.76923 135.29231" />
+        <path data-feature="rptw.right" d="M207.63077 90.492308 L352.36923 72.4" />
+        <path data-feature="rptw.right" d="M352.36923 72.4 L352.36923 9.0769231" />
+        <path data-feature="rptw.right" d="M-150.76923 135.29231 L-150.76923 280.03077" />
+        <path data-feature="rptw.right" d="M207.63077 144.76923 L207.63077 90.492308" />
+        <path data-feature="rptw.right" d="M352.36923 217.13846 L352.36923 162.86154" />
+        <path data-feature="rptw.right" d="M352.36923 162.86154 L207.63077 144.76923" />
+        <path data-feature="rptw.right" d="M207.63077 235.23077 L352.36923 217.13846" />
+        <path data-feature="rptw.right" d="M-150.76923 280.03077 L-150.76923 370.92308" />
+        <path data-feature="rptw.right" d="M-150.76923 370.92308 L207.63077 370.92308" />
+        <path data-feature="rptw.right" d="M207.63077 289.50769 L207.63077 235.23077" />
+        <path data-feature="rptw.right" d="M352.36923 307.6 L207.63077 289.50769" />
+        <path data-feature="rptw.right" d="M207.63077 370.92308 L352.36923 370.92308" />
+        <path data-feature="rptw.right" d="M352.36923 370.92308 L352.36923 307.6" />
+        <path data-feature="rptw.left" d="M-150.76923 9.0769231 L207.63077 9.0769231" />
+        <path data-feature="rptw.left" d="M207.63077 90.492308 L207.63077 144.76923" />
+        <path data-feature="rptw.left" d="M352.36923 162.86154 L352.36923 217.13846" />
+        <path data-feature="rptw.left" d="M352.36923 217.13846 L207.63077 235.23077" />
+        <path data-feature="rptw.left" d="M352.36923 9.0769231 L352.36923 72.4" />
+        <path data-feature="rptw.left" d="M352.36923 72.4 L207.63077 90.492308" />
+        <path data-feature="rptw.front" d="M352.36923 370.92308 L-150.76923 370.92308" />
+        <path data-feature="rptw.bottom" d="M-150.76923 370.92308 L-150.76923 9.0769231" />
+        <path data-feature="side.1" d="M214.42187 234.38188 L352.36923 217.13846" />
+        <path data-feature="side.1" d="M207.63077 235.23077 L214.42187 234.38188" />
+        <path data-feature="side.1" d="M210.85908 90.088769 L352.36923 72.4" />
+        <path data-feature="side.1" d="M207.63077 90.492308 L210.85908 90.088769" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="298.55" x2="242.00" y2="298.55" />
+      <line x1="249.00" y1="301.55" x2="243.00" y2="295.55" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="276.00" y1="226.18" x2="242.00" y2="226.18" />
+      <line x1="249.00" y1="229.18" x2="243.00" y2="223.18" />
+      <line x1="246.00" y1="298.55" x2="246.00" y2="226.18" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="246.00" y1="262.37" x2="140.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(140.00 355.00) rotate(0.00)">span / finger_count</text>
+    </g>
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="207.63" y1="239.23" x2="207.63" y2="273.23" />
+      <line x1="204.63" y1="272.23" x2="210.63" y2="266.23" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="352.37" y1="239.23" x2="352.37" y2="273.23" />
+      <line x1="349.37" y1="272.23" x2="355.37" y2="266.23" />
+      <line x1="207.63" y1="269.23" x2="352.37" y2="269.23" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="280.00" y1="269.23" x2="420.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(420.00 355.00) rotate(0.00)">finger_length</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">Finger pitch at mid-length</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Taper at the flank" fill="#f0dfbf" fill-opacity="1" d="M352.36923 9.0769231 L710.76923 9.0769231 L710.76923 370.92308 Z M352.36923 370.92308 L352.36923 9.0769231 L710.76923 370.92308 Z M207.63077 90.492308 L352.36923 72.4 L352.36923 162.86154 Z M207.63077 144.76923 L207.63077 90.492308 L352.36923 162.86154 Z M352.36923 217.13846 L352.36923 307.6 L316.6441 303.13436 Z M207.63077 235.23077 L352.36923 217.13846 L316.6441 303.13436 Z M207.63077 289.50769 L207.63077 235.23077 L316.6441 303.13436 Z M352.36923 162.86154 L352.36923 9.0769231 L710.76923 9.0769231 Z M352.36923 162.86154 L710.76923 9.0769231 L710.76923 207.66154 Z M207.63077 90.492308 L352.36923 72.4 L352.36923 162.86154 Z M207.63077 90.492308 L352.36923 162.86154 L207.63077 144.76923 Z M352.36923 307.6 L352.36923 162.86154 L710.76923 207.66154 Z M352.36923 307.6 L710.76923 207.66154 L710.76923 352.4 Z M207.63077 235.23077 L352.36923 217.13846 L352.36923 307.6 Z M207.63077 235.23077 L352.36923 307.6 L207.63077 289.50769 Z M352.36923 307.6 L710.76923 352.4 L710.76923 370.92308 Z M352.36923 307.6 L710.76923 370.92308 L352.36923 370.92308 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Taper at the flank" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M710.76923 370.92308 L710.76923 9.0769231" />
+        <path data-feature="rptw.right" d="M710.76923 9.0769231 L352.36923 9.0769231" />
+        <path data-feature="rptw.right" d="M352.36923 9.0769231 L352.36923 72.4" />
+        <path data-feature="rptw.right" d="M352.36923 162.86154 L352.36923 217.13846" />
+        <path data-feature="rptw.right" d="M352.36923 307.6 L352.36923 370.92308" />
+        <path data-feature="rptw.right" d="M352.36923 370.92308 L710.76923 370.92308" />
+        <path data-feature="rptw.right" d="M352.36923 72.4 L207.63077 90.492308" />
+        <path data-feature="rptw.right" d="M207.63077 90.492308 L207.63077 144.76923" />
+        <path data-feature="rptw.right" d="M207.63077 144.76923 L352.36923 162.86154" />
+        <path data-feature="rptw.right" d="M316.6441 303.13436 L352.36923 307.6" />
+        <path data-feature="rptw.right" d="M352.36923 217.13846 L207.63077 235.23077" />
+        <path data-feature="rptw.right" d="M207.63077 235.23077 L207.63077 289.50769" />
+        <path data-feature="rptw.right" d="M207.63077 289.50769 L316.6441 303.13436" />
+        <path data-feature="rptw.left" d="M352.36923 72.4 L352.36923 9.0769231" />
+        <path data-feature="rptw.left" d="M710.76923 9.0769231 L710.76923 207.66154" />
+        <path data-feature="rptw.left" d="M207.63077 144.76923 L207.63077 94.288462" />
+        <path data-feature="rptw.left" d="M352.36923 217.13846 L352.36923 162.86154" />
+        <path data-feature="rptw.left" d="M710.76923 207.66154 L710.76923 352.4" />
+        <path data-feature="rptw.left" d="M207.63077 235.23077 L352.36923 217.13846" />
+        <path data-feature="rptw.left" d="M710.76923 365.8381 L710.76923 370.92308" />
+        <path data-feature="rptw.left" d="M710.76923 370.92308 L352.36923 370.92308" />
+        <path data-feature="rptw.left" d="M352.36923 370.92308 L352.36923 307.6" />
+        <path data-feature="side.1" d="M207.63077 289.50769 L352.36923 307.6" />
+        <path data-feature="side.2" d="M352.36923 311.00308 L352.36923 370.92308" />
+        <path data-feature="side.2" d="M352.36923 307.6 L352.36923 311.00308" />
+        <path data-feature="side.3" d="M347.35952 217.76467 L207.63077 235.23077" />
+        <path data-feature="side.3" d="M352.36923 217.13846 L347.35952 217.76467" />
+        <path data-feature="side.3" d="M343.79673 73.471562 L207.63077 90.492308" />
+        <path data-feature="side.3" d="M352.36923 72.4 L343.79673 73.471562" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" fill="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="207.63" y1="235.23" x2="352.37" y2="235.23" />
+      <path stroke-width="1.8" d="M320.53 235.23 A112.90 112.90 0 0 0 319.65 221.23" fill="none" stroke="#174e8c" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="320.09" y1="228.23" x2="365.00" y2="66.00" />
+      <text text-anchor="middle" font-size="15" x="365" y="60">taper_angle</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Taper at the flank</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

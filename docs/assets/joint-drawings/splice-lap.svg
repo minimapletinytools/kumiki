@@ -1,0 +1,87 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg font-family="system-ui, sans-serif" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 428">
+  <title>Splice lap</title>
+  <desc>Splice lap</desc>
+  <rect width="100%" height="100%" fill="white" />
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="0" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="First lap" fill="#f0dfbf" fill-opacity="1" d="M1566.8179 -621.2614 L1714.728 -535.86546 L442.70111 198.53959 Z M294.79101 113.14366 L1566.8179 -621.2614 L442.70111 198.53959 Z M294.79101 113.14366 L353.95505 147.30203 L206.04495 232.69797 Z M146.88091 198.53959 L294.79101 113.14366 L206.04495 232.69797 Z M1566.8179 -484.6279 L1625.9819 -450.46952 L206.04495 369.33147 Z M1566.8179 -484.6279 L206.04495 369.33147 L187.84735 358.82508 Z M1566.8179 -484.6279 L187.84735 358.82508 L146.88091 335.17309 Z M353.95505 283.93553 L1625.9819 -450.46952 L1714.728 -399.23196 Z M353.95505 283.93553 L1714.728 -399.23196 L442.70111 335.17309 Z M1566.8179 -484.6279 L146.88091 335.17309 L146.88091 198.53959 Z M1566.8179 -484.6279 L146.88091 198.53959 L1566.8179 -621.2614 Z M1714.728 -535.86546 L1714.728 -399.23196 L442.70111 335.17309 Z M442.70111 198.53959 L1714.728 -535.86546 L442.70111 335.17309 Z M1714.728 -535.86546 L1714.728 -399.23196 L1566.8179 -484.6279 Z M1714.728 -535.86546 L1566.8179 -484.6279 L1566.8179 -621.2614 Z M442.70111 198.53959 L442.70111 335.17309 L353.95505 283.93553 Z M442.70111 198.53959 L353.95505 283.93553 L353.95505 147.30203 Z M353.95505 283.93553 L206.04495 369.33147 L206.04495 232.69797 Z M353.95505 283.93553 L206.04495 232.69797 L353.95505 147.30203 Z M206.04495 369.33147 L146.88091 335.17309 L146.88091 198.53959 Z M206.04495 369.33147 L146.88091 198.53959 L206.04495 232.69797 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="First lap" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M442.70111 198.53959 L1714.728 -535.86546" />
+        <path data-feature="rptw.right" d="M1714.728 -535.86546 L1566.8179 -621.2614" />
+        <path data-feature="rptw.right" d="M1566.8179 -621.2614 L294.79101 113.14366" />
+        <path data-feature="rptw.right" d="M353.95505 147.30203 L442.70111 198.53959" />
+        <path data-feature="rptw.right" d="M206.04495 232.69797 L353.95505 147.30203" />
+        <path data-feature="rptw.right" d="M294.79101 113.14366 L146.88091 198.53959" />
+        <path data-feature="rptw.right" d="M146.88091 198.53959 L206.04495 232.69797" />
+        <path data-feature="rptw.left" d="M353.95505 283.93553 L206.04495 369.33147" />
+        <path data-feature="rptw.left" d="M206.04495 369.33147 L187.84735 358.82508" />
+        <path data-feature="rptw.left" d="M187.84735 358.82508 L146.88091 335.17309" />
+        <path data-feature="rptw.left" d="M1714.728 -399.23196 L442.70111 335.17309" />
+        <path data-feature="rptw.left" d="M442.70111 335.17309 L353.95505 283.93553" />
+        <path data-feature="rptw.front" d="M146.88091 335.17309 L146.88091 198.53959" />
+        <path data-feature="rptw.front" d="M146.88091 198.53959 L1566.8179 -621.2614" />
+        <path data-feature="rptw.back" d="M442.70111 335.17309 L1249.9431 -130.8883" />
+        <path data-feature="rptw.back" d="M1249.9431 -130.8883 L1714.728 -399.23196" />
+        <path data-feature="rptw.back" d="M1714.728 -399.23196 L1714.728 -535.86546" />
+        <path data-feature="rptw.back" d="M442.70111 198.53959 L442.70111 335.17309" />
+        <path data-feature="cap.0" d="M353.95505 283.93553 L353.95505 147.30203" />
+        <path data-feature="side.1" d="M206.04495 369.33147 L206.04495 232.69797" />
+        <path data-feature="side.0" d="M206.04495 369.33147 L146.88091 335.17309" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="208.04" y1="236.16" x2="225.04" y2="265.61" />
+      <line x1="221.95" y1="266.24" x2="224.14" y2="258.04" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="355.96" y1="150.77" x2="372.96" y2="180.21" />
+      <line x1="369.86" y1="180.84" x2="372.05" y2="172.65" />
+      <line x1="223.04" y1="262.14" x2="370.96" y2="176.75" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="297.00" y1="219.44" x2="280.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 355.00) rotate(0.00)">lap_length</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="19" y="31" fill="#463a2c">First lap</text>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 380" x="560" y="47" width="560" height="380" overflow="hidden">
+    <g class="member-fills">
+      <path data-member="Mating lap" fill="#f0dfbf" fill-opacity="1" d="M1655.5639 -740.81571 L1744.31 -689.57815 L176.46293 215.61878 Z M87.716869 164.38122 L1655.5639 -740.81571 L176.46293 215.61878 Z M383.53707 164.38122 L324.37303 130.22284 L1744.31 -689.57815 Z M1803.474 -655.41977 L383.53707 164.38122 L1744.31 -689.57815 Z M87.716869 301.01472 L1655.5639 -604.18221 L1744.31 -552.94465 Z M87.716869 301.01472 L1744.31 -552.94465 L176.46293 352.25228 Z M324.37303 266.85634 L1744.31 -552.94465 L1803.474 -518.78627 Z M324.37303 266.85634 L1803.474 -518.78627 L383.53707 301.01472 Z M1803.474 -655.41977 L1803.474 -518.78627 L383.53707 301.01472 Z M383.53707 164.38122 L1803.474 -655.41977 L383.53707 301.01472 Z M1655.5639 -604.18221 L87.716869 301.01472 L87.716869 164.38122 Z M1655.5639 -604.18221 L87.716869 164.38122 L1655.5639 -740.81571 Z M1803.474 -518.78627 L1655.5639 -604.18221 L1655.5639 -740.81571 Z M1803.474 -518.78627 L1655.5639 -740.81571 L1803.474 -655.41977 Z M383.53707 301.01472 L324.37303 266.85634 L324.37303 130.22284 Z M383.53707 301.01472 L324.37303 130.22284 L383.53707 164.38122 Z M324.37303 266.85634 L176.46293 352.25228 L176.46293 215.61878 Z M324.37303 266.85634 L176.46293 215.61878 L324.37303 130.22284 Z M176.46293 352.25228 L87.716869 301.01472 L87.716869 164.38122 Z M176.46293 352.25228 L87.716869 164.38122 L176.46293 215.61878 Z" />
+    </g>
+    <g class="face-fills" />
+    <g class="edges" fill="none" stroke-linejoin="round">
+      <g data-member="Mating lap" stroke="#5d4b36" stroke-opacity="1" stroke-width="1.5">
+        <path data-feature="rptw.right" d="M176.46293 215.61878 L324.37303 130.22284" />
+        <path data-feature="rptw.right" d="M1744.31 -689.57815 L1655.5639 -740.81571" />
+        <path data-feature="rptw.right" d="M1655.5639 -740.81571 L87.716869 164.38122" />
+        <path data-feature="rptw.right" d="M87.716869 164.38122 L176.46293 215.61878" />
+        <path data-feature="rptw.right" d="M324.37303 130.22284 L383.53707 164.38122" />
+        <path data-feature="rptw.right" d="M383.53707 164.38122 L1803.474 -655.41977" />
+        <path data-feature="rptw.right" d="M1803.474 -655.41977 L1744.31 -689.57815" />
+        <path data-feature="rptw.left" d="M324.37303 266.85634 L176.46293 352.25228" />
+        <path data-feature="rptw.left" d="M176.46293 352.25228 L87.716869 301.01472" />
+        <path data-feature="rptw.left" d="M1803.474 -518.78627 L383.53707 301.01472" />
+        <path data-feature="rptw.left" d="M383.53707 301.01472 L324.37303 266.85634" />
+        <path data-feature="rptw.front" d="M1803.474 -518.78627 L1803.474 -655.41977" />
+        <path data-feature="rptw.front" d="M383.53707 164.38122 L383.53707 301.01472" />
+        <path data-feature="rptw.back" d="M87.716869 301.01472 L87.716869 164.38122" />
+        <path data-feature="rptw.top" d="M1655.5639 -740.81571 L1803.474 -655.41977" />
+        <path data-feature="cap.1" d="M324.37303 266.85634 L324.37303 130.22284" />
+        <path data-feature="side.3" d="M176.46293 352.25228 L176.46293 215.61878" />
+      </g>
+    </g>
+    <g class="references" fill="none" />
+    <g class="dimension" stroke-width="1.3" fill="#174e8c" stroke="#174e8c">
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="174.46" y1="219.08" x2="157.46" y2="248.53" />
+      <line x1="155.36" y1="246.16" x2="163.56" y2="243.97" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="233.63" y1="253.24" x2="216.63" y2="282.69" />
+      <line x1="214.53" y1="280.32" x2="222.73" y2="278.12" />
+      <line x1="159.46" y1="245.06" x2="218.63" y2="279.22" />
+      <line stroke="#2677bc" stroke-dasharray="1 3" stroke-linecap="round" stroke-width="1.45" x1="189.04" y1="262.14" x2="280.00" y2="340.00" />
+      <text text-anchor="middle" font-size="15" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round" transform="translate(280.00 355.00) rotate(0.00)">lap_depth</text>
+    </g>
+  </svg>
+  <text font-size="20" font-weight="600" x="579" y="31" fill="#463a2c">Mating lap</text>
+  <path d="M0 46H1120 M560 0v428" stroke="#d1c8b8" />
+</svg>

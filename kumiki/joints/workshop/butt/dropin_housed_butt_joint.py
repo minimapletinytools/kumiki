@@ -57,6 +57,8 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
     Only the housing timber is cut to receive the square end of the housed timber.
     The housed timber drops into the pocket along the housing face normal.
 
+    [![Drop-in housed butt](../../../assets/joint-drawings/drop-in-housing.svg)](../../../assets/joint-drawings/drop-in-housing.svg)
+
     Args:
         arrangement: Butt joint arrangement where butt_timber is the housed timber,
             receiving_timber receives the housing pocket socket, butt_timber_end is the cut end,

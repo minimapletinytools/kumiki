@@ -148,6 +148,9 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
     The tongue's neck is the dovetail's narrow face, at its origin, and it widens toward its tip
     along +y -- so the dovetail timber should lie on the -y side of the dovetail shape origin, and it tapers towards +y.
     Between the dovetail's ends, everything of the dovetail timber past the narrow face in +y is cut away except the tongue. That face is the joint's shoulder.
+
+    [![Free sliding dovetail](../../../assets/joint-drawings/free-sliding-dovetail.svg)](../../../assets/joint-drawings/free-sliding-dovetail.svg)
+    [![Free tapered dovetail](../../../assets/joint-drawings/free-tapered-dovetail.svg)](../../../assets/joint-drawings/free-tapered-dovetail.svg)
     """
     dovetail = dovetail.through(dovetail_timber, receiving_timber)
     # create a convex polygon extrusion from `dovetail`

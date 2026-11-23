@@ -69,6 +69,8 @@ def cut_basic_practice_simplified_rice_dumping_joint(arrangement: TriCornerArran
     """Size cheeks and tenon widths from the narrowest timber across the rail plane.
 
     The shallower rail limits the rail inset and tenon thickness.
+
+    [![Three-way mitered tenon](../../../assets/joint-drawings/rice-dumpling.svg)](../../../assets/joint-drawings/rice-dumpling.svg)
     """
     post, rail, receiver = arrangement.timber1, arrangement.timber2, arrangement.timber3
     width = min(*post.size,
@@ -92,7 +94,10 @@ def _square_finger_count(span: Numeric, thickness: Numeric) -> int:
 
 
 def cut_basic_finger_corner_joint(arrangement: CornerJointTimberArrangement) -> Joint:
-    """Cut a box corner with equal fingers roughly as wide as the boards' average thickness."""
+    """Cut a box corner with equal fingers roughly as wide as the boards' average thickness.
+
+    [![Box corner](../../../assets/joint-drawings/finger-corner.svg)](../../../assets/joint-drawings/finger-corner.svg)
+    """
     first, second = arrangement.timber1, arrangement.timber2
     first_face = first.get_closest_oriented_long_face_from_global_direction(second.get_length_direction_global())
     second_face = second.get_closest_oriented_long_face_from_global_direction(first.get_length_direction_global())
@@ -108,6 +113,8 @@ def cut_basic_finger_splice_joint(
 
     Measure finger width halfway along the overlap. Start from the specified front face,
     or lay out across the wider section axis. splice_point sets the overlap center in world space.
+
+    [![Tapered finger splice](../../../assets/joint-drawings/finger-splice.svg)](../../../assets/joint-drawings/finger-splice.svg)
     """
     first = arrangement.timber1
     face = arrangement.front_face_on_timber1
@@ -126,6 +133,8 @@ def cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Jo
 
     Convenience wrapper with no additional sizing logic. See `cut_plain_miter_joint` for details.
 
+    [![Angled miter](../../../assets/joint-drawings/angled-miter.svg)](../../../assets/joint-drawings/angled-miter.svg)
+
     Args:
         arrangement: Corner joint arrangement specifying the two timbers and their ends.
 
@@ -141,6 +150,8 @@ def cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJoint
 
     Timbers must be orthogonal. Convenience wrapper; see
     `cut_plain_miter_joint_on_face_aligned_timbers` for details.
+
+    [![Right-angle miter](../../../assets/joint-drawings/right-angle-miter.svg)](../../../assets/joint-drawings/right-angle-miter.svg)
 
     Args:
         arrangement: Corner joint arrangement. Timbers must be face-aligned and orthogonal.
@@ -193,7 +204,10 @@ def cut_basic_tongue_and_fork_joint_on_plane_aligned_timbers(
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
 ) -> Joint:
-    """Compatibility alias for `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers`."""
+    """Compatibility alias for `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers`.
+
+    [![Tongue and fork](../../../assets/joint-drawings/tongue-and-fork.svg)](../../../assets/joint-drawings/tongue-and-fork.svg)
+    """
     return cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
@@ -212,6 +226,8 @@ def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
 
     Convenience wrapper around `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers`. Timbers must be
     plane-aligned and non-parallel. The receiving (tongue) timber is not end-cut.
+
+    [![Tongue-and-fork butt](../../../assets/joint-drawings/fork-butt.svg)](../../../assets/joint-drawings/fork-butt.svg)
 
     Args:
         arrangement: Butt arrangement where butt_timber is fork and receiving_timber is tongue.
@@ -241,6 +257,8 @@ def cut_basic_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint
     receiving timber. Works at any non-parallel angle. The receiving timber is not cut.
     Convenience wrapper; see `cut_plain_butt_joint` for details.
 
+    [![Angled butt joint](../../../assets/joint-drawings/angled-butt.svg)](../../../assets/joint-drawings/angled-butt.svg)
+
     Args:
         arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.
 
@@ -256,6 +274,8 @@ def cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTim
 
     The receiving timber is not cut. Convenience wrapper; see
     `cut_plain_butt_joint_on_face_aligned_timbers` for details.
+
+    [![Face-aligned butt joint](../../../assets/joint-drawings/plain-butt.svg)](../../../assets/joint-drawings/plain-butt.svg)
 
     Args:
         arrangement: Butt joint arrangement. Timbers must be face-aligned and orthogonal.
@@ -275,6 +295,8 @@ def cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJoin
     Convenience wrapper with no additional sizing logic. See
     `cut_plain_butt_splice_joint_on_aligned_timbers` for details.
 
+    [![Butt splice](../../../assets/joint-drawings/butt-splice.svg)](../../../assets/joint-drawings/butt-splice.svg)
+
     Args:
         arrangement: Splice joint arrangement. Timbers must be face-aligned with parallel axes.
 
@@ -288,13 +310,19 @@ def cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJoin
 
 @deprecated("Use cut_basic_plain_cross_lap_joint instead")
 def cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
-    """Forward to the general basic cross lap."""
+    """Forward to the general basic cross lap.
+
+    [![Cross lap](../../../assets/joint-drawings/cross-lap.svg)](../../../assets/joint-drawings/cross-lap.svg)
+    """
     return cut_basic_plain_cross_lap_joint(arrangement)
 
 
 @deprecated("Use cut_basic_plain_cross_lap_house_joint instead")
 def cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
-    """Forward to the general basic housing."""
+    """Forward to the general basic housing.
+
+    [![Cross lap house](../../../assets/joint-drawings/cross-lap-house.svg)](../../../assets/joint-drawings/cross-lap-house.svg)
+    """
     return cut_basic_plain_cross_lap_house_joint(arrangement)
 
 
@@ -310,6 +338,8 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     - distance from shoulder = 30 mm
     - lateral offset = 0
     - peg size = 15 mm
+
+    [![Splined opposing double butt](../../../assets/joint-drawings/splined-double-butt.svg)](../../../assets/joint-drawings/splined-double-butt.svg)
 
     Args:
         arrangement: Double butt joint arrangement with butt_timber_1, butt_timber_2,
@@ -337,6 +367,8 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers_with_st
       half as deep as the timber left there, centred in it;
     - one on each side of the spline, centred between it and the timber's edge, half that gap wide
       and half the slot's depth deep, centred on the spline's depth.
+
+    [![Splined joint with stub tenons](../../../assets/joint-drawings/splined-stub-tenons.svg)](../../../assets/joint-drawings/splined-stub-tenons.svg)
 
     Args:
         arrangement: Double butt joint arrangement, as for the basic joint.
@@ -468,6 +500,8 @@ def cut_basic_plain_splice_lap_joint_on_aligned_timbers(
     by `arrangement.front_face_on_timber1` (defaults to FRONT if None).
     For full control over dimensions, use `cut_plain_splice_lap_joint_on_aligned_timbers` directly.
 
+    [![Splice lap](../../../assets/joint-drawings/splice-lap.svg)](../../../assets/joint-drawings/splice-lap.svg)
+
     Args:
         arrangement: Splice joint arrangement. Timbers must be face-aligned with parallel axes.
                      `front_face_on_timber1` specifies the lap cut face on timber1.
@@ -551,7 +585,10 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
     tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd,
     use_peg: bool = False,
 ) -> Joint:
-    """Cut the basic stopped tenon using individual face-aligned timbers."""
+    """Cut the basic stopped tenon using individual face-aligned timbers.
+
+    [![Mortise and tenon](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    """
     arrangement = ButtJointTimberArrangement(tenon_timber, mortise_timber, tenon_end)
     error = arrangement.check_face_aligned_and_orthogonal()
     assert error is None, error
@@ -577,6 +614,8 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
     slope and its narrow end (wedge_small_height) is 1/8 of the tenon's size in the
     dovetail axis. For a joint without one, or for full control over sizing, use
     `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` directly.
+
+    [![Wedged half-dovetail](../../../assets/joint-drawings/wedged-half-dovetail.svg)](../../../assets/joint-drawings/wedged-half-dovetail.svg)
 
     Args:
         tenon_timber: The timber that will receive the dovetail tenon cut.
@@ -716,6 +755,8 @@ def cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
     All housing dimensions (housing_length and housing_width) are auto-calculated from the
     housed timber's size. For full control, use `cut_dropin_housed_butt_joint_on_face_aligned_timbers` directly.
 
+    [![Drop-in housed butt](../../../assets/joint-drawings/drop-in-housing.svg)](../../../assets/joint-drawings/drop-in-housing.svg)
+
     Args:
         housed_timber: The timber with the housed end.
         receiving_timber: The timber that receives the housing pocket.
@@ -758,6 +799,8 @@ def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     mechanical strength. All lap and key dimensions are auto-calculated. For full control,
     use `cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers` directly.
 
+    [![Mitered and keyed lap](../../../assets/joint-drawings/keyed-miter.svg)](../../../assets/joint-drawings/keyed-miter.svg)
+
     Args:
         arrangement: Corner joint arrangement. Timbers must be plane-aligned and
             `front_face_on_timber1` must specify the reference miter face on timber1.
@@ -787,6 +830,8 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
     1/3 of the butt timber's size along the front-face axis, and 4/5 of its size along the
     top-face axis. For full control over sizing, use
     `cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers` directly.
+
+    [![Tusked through tenon](../../../assets/joint-drawings/tusked-tenon.svg)](../../../assets/joint-drawings/tusked-tenon.svg)
 
     Args:
         arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
@@ -835,25 +880,37 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
 
 def cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint:
-    """Cut a half-depth corner lap on plane-aligned timbers."""
+    """Cut a half-depth corner lap on plane-aligned timbers.
+
+    [![Corner lap](../../../assets/joint-drawings/corner-lap.svg)](../../../assets/joint-drawings/corner-lap.svg)
+    """
     from .corner.plain_corner_lap_joint import cut_plain_corner_lap_joint_on_plane_aligned_timbers
     return cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement)
 
 
 def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint:
-    """Cut an equal cross lap with the default scribe relief."""
+    """Cut an equal cross lap with the default scribe relief.
+
+    [![Cross lap](../../../assets/joint-drawings/cross-lap.svg)](../../../assets/joint-drawings/cross-lap.svg)
+    """
     return cut_plain_cross_lap_joint(arrangement)
 
 
 def cut_basic_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
-    """Cut a housing in the first timber for the second timber."""
+    """Cut a housing in the first timber for the second timber.
+
+    [![Cross-lap housing](../../../assets/joint-drawings/cross-lap-house.svg)](../../../assets/joint-drawings/cross-lap-house.svg)
+    """
     return cut_plain_cross_lap_house_joint(arrangement)
 
 
 def cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(
     timbers: List[TimberLike], starting_face_on_first_timber: TimberFace,
 ) -> Joint:
-    """Cut a chain of cross laps with uniformly spaced cut boundaries."""
+    """Cut a chain of cross laps with uniformly spaced cut boundaries.
+
+    [![Multiple cross lap](../../../assets/joint-drawings/multi-cross-lap.svg)](../../../assets/joint-drawings/multi-cross-lap.svg)
+    """
     from .cross.multi_cross_lap_joint import cut_multi_cross_lap_joint_on_plane_aligned_timbers
     return cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers, starting_face_on_first_timber)
 
@@ -967,9 +1024,11 @@ def cut_basic_mortise_and_tenon_joint(
     timber dimension; reduce both to fit the receiving face. The shoulder follows that entry face.
 
     The drawing uses the basic pattern's stock and tenon dimensions. It offsets the tenon
-    and round peg and deepens the mortise to show the configurable cutter's layout.
+    and deepens the mortise to show the configurable cutter's layout.
 
-    [![Tenon size and position, mortise depth and tip clearance, and peg layout](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+    [![Tenon size and position, mortise depth and tip clearance](../../../assets/joint-drawings/mortise-and-tenon.svg)](../../../assets/joint-drawings/mortise-and-tenon.svg)
+
+    [![Angled rectangular tenon](../../../assets/joint-drawings/angled-tenon.svg)](../../../assets/joint-drawings/angled-tenon.svg)
     """
     from .mixed import cut_mortise_and_tenon_joint
     size, length, face = _basic_tenon_dimensions(arrangement)
@@ -988,6 +1047,8 @@ def cut_basic_round_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangem
 
     Start with a third of the smallest cross-section dimension of either timber
     and reduce it to fit the entry face.
+
+    [![Angled round tenon](../../../assets/joint-drawings/angled-round-tenon.svg)](../../../assets/joint-drawings/angled-round-tenon.svg)
     """
     from .mixed import cut_round_mortise_and_tenon_joint
     size, length, face = _basic_tenon_dimensions(arrangement, round_tenon=True)
@@ -1000,7 +1061,10 @@ def cut_basic_round_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangem
 def cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement, *, use_peg: bool = False,
 ) -> Joint:
-    """Cut a centered stopped corner tenon with shoulders on both sides."""
+    """Cut a centered stopped corner tenon with shoulders on both sides.
+
+    [![Corner mortise and tenon](../../../assets/joint-drawings/corner-tenon.svg)](../../../assets/joint-drawings/corner-tenon.svg)
+    """
     from .mixed import cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers
     butt = ButtJointTimberArrangement(arrangement.timber1, arrangement.timber2,
                                      arrangement.timber1_end, front_face_on_butt_timber=arrangement.front_face_on_timber1)
@@ -1021,7 +1085,10 @@ def cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
 
 
 def cut_basic_tongue_and_groove_joint(tongue_board: Board, groove_board: Board) -> Joint:
-    """Cut a tongue within the shared thickness and overlap of two boards."""
+    """Cut a tongue within the shared thickness and overlap of two boards.
+
+    [![Tongue and groove](../../../assets/joint-drawings/tongue-and-groove.svg)](../../../assets/joint-drawings/tongue-and-groove.svg)
+    """
     from .board import cut_tongue_and_groove_joint
     other = tongue_board.transform.global_to_local(groove_board.transform.position)
     low = max(-tongue_board.size[1] / 2, other[1] - groove_board.size[1] / 2)
@@ -1034,7 +1101,10 @@ def cut_basic_tongue_and_groove_joint(tongue_board: Board, groove_board: Board) 
 
 
 def cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement) -> Joint:
-    """Cut a centered, untapered sliding dovetail with a 1:6 flare."""
+    """Cut a centered, untapered sliding dovetail with a 1:6 flare.
+
+    [![Sliding dovetail](../../../assets/joint-drawings/sliding-dovetail.svg)](../../../assets/joint-drawings/sliding-dovetail.svg)
+    """
     from .board.board_joints import cut_practice_sliding_dovetail_joint_on_orthogonal_boards, _lateral_positive_dovetail_face
     from kumiki.measuring import locate_face
     butt, receiving = arrangement.butt_timber, arrangement.receiving_timber
@@ -1059,6 +1129,9 @@ def cut_basic_dovetail_corner_joint(
     """Cut evenly spaced dovetails, deriving their count and sizes from the timbers.
 
     Use a 1:6 flare, reduced when a narrow layout cannot accommodate that slope.
+
+    [![Through dovetail corner](../../../assets/joint-drawings/through-dovetails.svg)](../../../assets/joint-drawings/through-dovetails.svg)
+    [![Half-blind dovetail corner](../../../assets/joint-drawings/half-blind-dovetails.svg)](../../../assets/joint-drawings/half-blind-dovetails.svg)
     """
     from .corner.dovetail_corner_joint import cut_dovetail_corner_joint, SingleDovetailSizeParameter
     if arrangement.front_face_on_timber1 is None:
@@ -1084,7 +1157,10 @@ def cut_basic_dovetail_corner_joint(
 
 
 def cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]) -> Joint:
-    """Round selected edges with a radius one quarter of their smallest adjacent dimension."""
+    """Round selected edges with a radius one quarter of their smallest adjacent dimension.
+
+    [![Roundover](../../../assets/joint-drawings/roundover.svg)](../../../assets/joint-drawings/roundover.svg)
+    """
     from .decorative.decorative_joints import cut_practice_roundover_decoration, _EDGE_ADJACENT_FACES
     assert edges, "Select at least one edge"
     dimensions = [timber.get_size_in_face_normal_axis(face) for edge in edges for face in _EDGE_ADJACENT_FACES[edge]]
@@ -1094,7 +1170,10 @@ def cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[Timbe
 def cut_basic_practice_rounded_end_decoration(
     timber: BlockLike, rounded_face: TimberFace, rounded_end: TimberFace,
 ) -> Joint:
-    """Cut a centered semicircular end spanning the selected profile."""
+    """Cut a centered semicircular end spanning the selected profile.
+
+    [![Rounded end](../../../assets/joint-drawings/rounded-end.svg)](../../../assets/joint-drawings/rounded-end.svg)
+    """
     from .decorative.decorative_joints import cut_practice_rounded_end_decoration
     span_face = rounded_end.rotate_about(rounded_face)
     radius = max(timber.get_half_rough_size_in_face_normal_axis(span_face),
@@ -1105,7 +1184,10 @@ def cut_basic_practice_rounded_end_decoration(
 def cut_basic_practice_rafter_tail_scallop_corner_end_decoration(
     timber: BlockLike, short_edge: TimberShortEdge,
 ) -> Joint:
-    """Cut a quarter-depth scallop extending one profile depth along the timber."""
+    """Cut a quarter-depth scallop extending one profile depth along the timber.
+
+    [![Rafter tail scallop](../../../assets/joint-drawings/rafter-scallop.svg)](../../../assets/joint-drawings/rafter-scallop.svg)
+    """
     from .decorative.decorative_joints import cut_practice_rafter_tail_scallop_corner_end_decoration
     depth = timber.get_size_in_face_normal_axis(short_edge.long_face)
     return cut_practice_rafter_tail_scallop_corner_end_decoration(

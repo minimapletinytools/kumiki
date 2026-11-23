@@ -29,6 +29,8 @@ def cut_practice_simplified_rice_dumping_joint(
     On timber 2, measure the offset from the outside face opposite the post. Its tenon
     is flush with the inside face toward timber 3. For all tenons, Y is the thickness
     normal to the face used for the offset and X is the width along that face.
+
+    [![Three-way mitered tenon](../../../assets/joint-drawings/rice-dumpling.svg)](../../../assets/joint-drawings/rice-dumpling.svg)
     """
     corner_global = arrangement.locate_outside_corner_global()
     warn_if_arrangement_timbers_imperfect(arrangement)

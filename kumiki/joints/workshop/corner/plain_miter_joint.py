@@ -17,6 +17,8 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     Both ends are cut by the same bisecting plane so they meet flush at the corner.
     Works for any angle including parallel timbers (parallel produces a perpendicular end cut).
 
+    [![Angled miter](../../../assets/joint-drawings/angled-miter.svg)](../../../assets/joint-drawings/angled-miter.svg)
+
     Args:
         arrangement: Corner joint arrangement with timber1, timber2, timber1_end, timber2_end.
 
@@ -173,6 +175,8 @@ def cut_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimber
 
     Like `cut_plain_miter_joint`, but requires the timbers to be orthogonal (perpendicular
     length axes). This is the common case for timber-frame corners.
+
+    [![Right-angle miter](../../../assets/joint-drawings/right-angle-miter.svg)](../../../assets/joint-drawings/right-angle-miter.svg)
 
     Args:
         arrangement: Corner joint arrangement with timber1, timber2, timber1_end, timber2_end.
