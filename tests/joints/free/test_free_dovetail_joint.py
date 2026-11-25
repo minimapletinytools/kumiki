@@ -167,3 +167,20 @@ class TestFreeDovetailJoint:
         frame = Frame.from_joints([cut_free_dovetail_joint(_post(), _beam(), _dovetail())])
 
         assert len(frame.cut_timbers) == 2
+
+
+def test_an_open_tapered_dovetail_ends_past_where_it_crosses_a_long_timber_not_past_its_whole_box():
+    # Across the beam at 20 degrees to y, closing 113 mm along: the beam's ends reach 171 mm along it,
+    # but the dovetail only passes through the beam within about 60 mm of the post.
+    origin = Transform(position=create_v3(0, 0, mm(50)),
+                       orientation=Orientation.from_x_and_y(create_v3(cos(degrees(20)), -sin(degrees(20)), 0),
+                                                            create_v3(0, 0, -1)))
+    shape = FreeDovetailShape(origin=origin, width=mm(40), depth=mm(30), dovetail_angle=degrees(15),
+                              taper_angle=degrees(10))
+    beam, post = _beam(), _post()
+    ends = shape.through(post, beam)
+    closes = mm(20) / tan(degrees(10))
+    assert ends.forward_length < closes and ends.backward_length < mm(100)
+    joint = cut_free_dovetail_joint(post, beam, shape)
+    cut_beam = CutTimber(beam, cuts=[joint.cuttings["receiving_timber"]])
+    assert not _has(cut_beam, 0, 0, 35) and _has(cut_beam, 0, 0, 10)

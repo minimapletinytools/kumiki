@@ -4,7 +4,11 @@ Contains functions for creating joints with flexible geometry matching.
 """
 
 from dataclasses import dataclass, replace
-from typing import Optional
+import itertools
+import math
+from typing import Optional, Tuple
+
+import numpy as np
 
 from kumiki.timber import *
 from kumiki.timber import _get_rough_size_and_offset
@@ -59,6 +63,40 @@ _DOVETAIL_FEATURES = [*_DOVETAIL_FACES, *_DOVETAIL_EDGES]
 _END_CLEARANCE = mm(5)
 
 
+def _crossing_reach(shape: 'FreeDovetailShape', timber: TimberLike) -> Optional[Tuple[float, float]]:
+    """Return how far along the dovetail (its z, from its origin) it passes through `timber`'s rough box, or None if it misses.
+
+    The dovetail is taken uncropped and tapering both ways, so past where the taper closes it is nothing.
+    """
+    def floats(vector) -> np.ndarray:
+        return np.array([float(value) for value in vector])
+
+    axes = np.array([[float(value) for value in row] for row in shape.origin.orientation.matrix.tolist()])
+    origin = floats(shape.origin.position)
+    taper, flare = math.tan(float(shape.taper_angle)), math.tan(float(shape.dovetail_angle))
+    half, depth = float(shape.width) / 2, float(shape.depth)
+    # Half-spaces a . (x, y, z) <= b in the dovetail's frame: neck, wide face, both flanks, then the box.
+    rows = [((0, -1, 0), 0), ((0, 1, 0), depth), ((1, -flare, taper), half), ((-1, -flare, taper), half)]
+    size, offset = _get_rough_size_and_offset(timber)
+    timber_axes = np.array([[float(value) for value in row] for row in timber.transform.orientation.matrix.tolist()])
+    centre = floats(timber.transform.local_to_global(create_v3(offset[0], offset[1], timber.length / 2)))
+    for k, extent in enumerate((float(size[0]), float(size[1]), float(timber.length))):
+        u = timber_axes[:, k]
+        along, at = u @ axes, u @ (origin - centre)
+        rows += [(tuple(along), extent / 2 - at), (tuple(-along), extent / 2 + at)]
+    a = np.array([row for row, _ in rows], dtype=float)
+    b = np.array([bound for _, bound in rows], dtype=float)
+    reach = []
+    for chosen in itertools.combinations(range(len(rows)), 3):
+        corner_rows = a[list(chosen)]
+        if abs(np.linalg.det(corner_rows)) < 1e-12:
+            continue
+        corner = np.linalg.solve(corner_rows, b[list(chosen)])
+        if np.all(a @ corner <= b + 1e-9):
+            reach.append(float(corner[2]))
+    return (min(reach), max(reach)) if reach else None
+
+
 def _rough_box_corners(timber: TimberLike) -> List[V3]:
     """The eight corners of `timber`'s rough box over its length, in world space."""
     size, offset = _get_rough_size_and_offset(timber)
@@ -99,20 +137,38 @@ class FreeDovetailShape:
                 and safe_compare(self._half_width_at(-self.backward_length), 0, Comparison.GT), \
                 "the taper closes the dovetail to nothing within its length"
 
-    def through(self, *timbers: TimberLike) -> 'FreeDovetailShape':
-        """This dovetail with each open (None) end run just past `timbers`' rough bounding boxes."""
+    def through(self, dovetail_timber: TimberLike, receiving_timber: TimberLike) -> 'FreeDovetailShape':
+        """This dovetail with each open (None) end run just past the material it cuts.
+
+        That is all of `dovetail_timber`'s rough box, which its shoulder waste covers, and the stretch
+        where the dovetail passes through `receiving_timber`'s (all of that box if it misses it). An
+        end that would land past where the taper closes stops short of it instead.
+        """
         if self.forward_length is not None and self.backward_length is not None:
             return self
         along = self.origin.orientation.matrix[:, 2]
-        reach = [safe_dot_product(corner - self.origin.position, along)
-                 for timber in timbers for corner in _rough_box_corners(timber)]
-        # A little past the farthest corner, so an end never lands on a timber's face.
+
+        def corner_reach(timber: TimberLike) -> List[Numeric]:
+            return [safe_dot_product(corner - self.origin.position, along) for corner in _rough_box_corners(timber)]
+
+        crossing = _crossing_reach(self, receiving_timber)
+        reach = corner_reach(dovetail_timber) + (list(crossing) if crossing else corner_reach(receiving_timber))
+        farthest, nearest = max(max(reach), scalar(0)), max(-min(reach), scalar(0))
+        # Where the taper closes: forward for a positive taper, backward for a negative one.
+        closes = None if safe_zero_test(self.taper_angle) else self.width / (2 * tan(self.taper_angle))
+
+        def end(needed: Numeric, limit: Optional[Numeric]) -> Numeric:
+            # A little past the material, so an end never lands on a timber's face, and short of the close.
+            if limit is not None and needed < limit < needed + _END_CLEARANCE:
+                return (needed + limit) / 2
+            return needed + _END_CLEARANCE
+
         forward = self.forward_length
         if forward is None:
-            forward = max(max(reach), scalar(0)) + _END_CLEARANCE
+            forward = end(farthest, closes if closes is not None and closes > 0 else None)
         backward = self.backward_length
         if backward is None:
-            backward = max(-min(reach), scalar(0)) + _END_CLEARANCE
+            backward = end(nearest, -closes if closes is not None and closes < 0 else None)
         return replace(self, forward_length=forward, backward_length=backward)
 
     def _half_width_at(self, z: Numeric) -> Numeric:
