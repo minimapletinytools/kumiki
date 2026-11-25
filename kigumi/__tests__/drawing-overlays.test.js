@@ -31,6 +31,25 @@ describe('which of a drawing\'s planes are drawn', () => {
         expect(overlays.showFor(bundles, camera, {
             inDrawing: false, options: { showDrawingPerfectFaces: true, showDrawingCenterplanes: true } })).toBe(false);
     });
+
+    test('where measured, only a line a dimension in the view goes to', () => {
+        const overlays = Object.create(DrawingOverlays.prototype);
+        overlays._look = look;
+        const camera = { getWorldDirection: () => look };
+        const line = (measuredAs) => ({ option: 'showDrawingPerfectFaces', normal: vector(1, 0, 0), measuredAs,
+            object: { visible: false } });
+        const front = line('post#0|ptw.front'), back = line('post#0|ptw.back');
+        const bundles = [{ drawingLines: [front, back] }];
+        const options = { showDrawingPerfectFaces: 'measured' };
+
+        overlays.showFor(bundles, camera, { inDrawing: true, options, measured: new Set(['post#0|ptw.front']) });
+        expect([front.object.visible, back.object.visible]).toEqual([true, false]);
+        overlays.showFor(bundles, camera, { inDrawing: true, options: { showDrawingPerfectFaces: 'on' }, measured: new Set() });
+        expect([front.object.visible, back.object.visible]).toEqual([true, true]);
+        overlays.showFor(bundles, camera, { inDrawing: true, options: { showDrawingPerfectFaces: 'off' },
+            measured: new Set(['post#0|ptw.front']) });
+        expect([front.object.visible, back.object.visible]).toEqual([false, false]);
+    });
 });
 
 describe('dots on one line fall in step', () => {

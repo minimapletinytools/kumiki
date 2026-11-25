@@ -228,14 +228,14 @@ export class ViewerSettingsPanel {
                         <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
                         ${t('viewer.options.drawingGhosts')}
                     </label>
-                    <label>
-                        <input id="drawing-centerplanes-toggle" type="checkbox" .checked=${this.app.showDrawingCenterplanes}>
-                        ${t('viewer.options.drawingCenterplanes')}
-                    </label>
-                    <label>
-                        <input id="drawing-perfect-faces-toggle" type="checkbox" .checked=${this.app.showDrawingPerfectFaces}>
-                        ${t('viewer.options.drawingPerfectFaces')}
-                    </label>
+                    ${[['drawing-centerplanes-mode', 'showDrawingCenterplanes', 'viewer.options.drawingCenterplanes'],
+                        ['drawing-perfect-faces-mode', 'showDrawingPerfectFaces', 'viewer.options.drawingPerfectFaces']]
+                        .map(([id, option, label]) => html`<label>${t(label)}
+                            <select id=${id} .value=${this.app[option]}>
+                                ${['off', 'measured', 'on'].map((mode) =>
+                                    html`<option value=${mode}>${t('viewer.options.drawingLines.' + mode)}</option>`)}
+                            </select>
+                        </label>`)}
                 </fieldset>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
@@ -354,6 +354,14 @@ export class ViewerSettingsPanel {
                 apply: (el) => app.setDrawingXray(el.value),
                 sync: (el) => { el.value = app.drawingXray; },
             },
+            ...[
+                ['drawing-perfect-faces-mode', 'showDrawingPerfectFaces'],
+                ['drawing-centerplanes-mode', 'showDrawingCenterplanes'],
+            ].map(([id, option]) => ({
+                id, on: 'change',
+                apply: (el) => app.setDrawingOption(option, el.value),
+                sync: (el) => { el.value = app[option]; },
+            })),
             {
                 id: 'drawing-ghosts-toggle', on: 'change',
                 apply: (el) => app.setDrawingGhostsVisible(el.checked),
@@ -361,8 +369,6 @@ export class ViewerSettingsPanel {
             },
             ...[
                 ['color-reference-faces', 'colorReferenceFaces'],
-                ['drawing-perfect-faces-toggle', 'showDrawingPerfectFaces'],
-                ['drawing-centerplanes-toggle', 'showDrawingCenterplanes'],
                 ['highlight-reference-edges', 'highlightReferenceEdges'],
             ].map(([id, option]) => ({
                 id, on: 'change',

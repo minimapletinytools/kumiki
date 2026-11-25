@@ -164,6 +164,9 @@ def side_drawing(frame, side, back_joint, front_joint):
         Measure(end, front_joint.feature(MT.MORTISE_LEFT), placement=Beside(DimensionSide.BELOW, 2)),
         Measure(back_joint.feature(MT.MORTISE_FRONT), back_joint.feature(MT.MORTISE_BACK),
                 placement=Beside(DimensionSide.LEFT)),
+        # The mortise is centred: half its height either side of the timber's centerplane.
+        Measure(cut.feature("ptw.centerplane_front_back"), front_joint.feature(MT.MORTISE_FRONT),
+                placement=Beside(DimensionSide.RIGHT)),
     ])
     top = Viewport(label="Top face", camera=View.of_face(side, TimberFace.BACK, scale=1 / 3), measurements=[
         Measure(end, back_joint.feature(MT.PEG_HOLE_AXIS, on=side), placement=Beside(DimensionSide.ABOVE)),

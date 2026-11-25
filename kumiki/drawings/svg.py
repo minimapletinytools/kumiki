@@ -450,8 +450,9 @@ def hidden_xray_lines(root: CutCSG, timber: PerfectTimberWithin, world_triangles
 
 @dataclass(frozen=True)
 class DrawingStyles:
-    centerlines: bool = True
-    perfect_faces: bool = True
+    #: Each 'off', 'on', or 'measured' (only the lines a dimension in the view goes to); a bool is off or on.
+    centerlines: bool | str = True
+    perfect_faces: bool | str = True
     references: bool = True
     reference_faces: bool = False
 
@@ -532,16 +533,27 @@ _CENTER_DASH = '6 10'
 _PERFECT_DASH = '5 3'
 
 
-def _reference_overlays(timber, solid, styles, view):
-    for center, enabled in [(False, styles.perfect_faces), (True, styles.centerlines)]:
-        if enabled:
-            for outline in perfect_reference_outlines(timber, solid.root, center):
-                if abs(np.dot(outline.normal, view.axes[:, 2])) < 1 - 1e-3:
-                    yield ('centerplane' if center else 'perfect-face',
-                           _CENTER_COLOR if center else '#2f6fd0', outline.positions,
-                           _CENTER_DASH if center else _PERFECT_DASH, True)
-    if styles.centerlines:
-        axis = timber_reference_lines(timber, solid.root, [TimberFeature.CENTERLINE])[0]
+def _shown(mode, feature: str, measured: set[str] | None) -> bool:
+    """Return whether a reference line of `feature` is drawn under `mode` (DrawingStyles)."""
+    if mode == 'measured':
+        return measured is not None and feature in measured
+    return mode is True or mode == 'on'
+
+
+def _reference_overlays(timber, solid, styles, view, measured: set[str] | None = None):
+    """Yield the reference lines to draw; `measured` is the features this view's dimensions go to."""
+    for center, mode in [(False, styles.perfect_faces), (True, styles.centerlines)]:
+        if mode in (False, 'off'):
+            continue
+        for outline in perfect_reference_outlines(timber, solid.root, center):
+            if abs(np.dot(outline.normal, view.axes[:, 2])) < 1 - 1e-3 and _shown(mode, outline.feature, measured):
+                yield ('centerplane' if center else 'perfect-face',
+                       _CENTER_COLOR if center else '#2f6fd0', outline.positions,
+                       _CENTER_DASH if center else _PERFECT_DASH, True)
+    axis = timber_reference_lines(timber, solid.root, [TimberFeature.CENTERLINE])[0]
+    # The axis is where the two centerplanes meet: measured if either is.
+    if any(_shown(styles.centerlines, name, measured)
+           for name in ("ptw.centerplane_left_right", "ptw.centerplane_front_back")):
         yield 'centerline', _CENTER_COLOR, axis['edgePositions'], _CENTER_DASH, True
     if styles.references:
         for refline in timber_reference_lines(timber, solid.root):
@@ -593,10 +605,11 @@ def _fill_member(parent, key, triangles, faces, index, view, appearance):
 def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: dict,
                     width: float, height: float, styles: DrawingStyles = DrawingStyles(),
                     *, appearances: dict | None = None, edge_mode: str = 'noOverlay',
-                    xray_members: set[str] | None = None) -> ET.Element:
+                    xray_members: set[str] | None = None, measured: set[str] | None = None) -> ET.Element:
     """Render an orthographic viewport with camera dimensions in metres.
 
-    The xray edge mode draws dashed edges through material beneath the solid visible edges.
+    The xray edge mode draws dashed edges through material beneath the solid visible edges. `measured`
+    is what the view's dimensions go to, as "member|feature", for reference lines shown where measured.
     """
     view = _Viewport(camera, width, height)
     appearances = appearances or {}
@@ -683,7 +696,8 @@ def render_svg_view(members: dict[str, DrawingSolid], ghosts: set[str], camera: 
             continue
         if styles.reference_faces:
             _fill_reference_faces(fills, key, solid, timber, view, faces, appearance.get('opacity', 1))
-        for name, color, positions, dash, through in _reference_overlays(timber, solid, styles, view):
+        own = {entry.split('|', 1)[1] for entry in measured or () if entry.split('|', 1)[0] == key}
+        for name, color, positions, dash, through in _reference_overlays(timber, solid, styles, view, own):
             lines = ET.SubElement(overlays, 'g', {'data-member': key, 'class': name, 'stroke': color,
                                                   'stroke-width': '1.5'})
             if dash:
@@ -712,7 +726,8 @@ def render_svg_sheet(members: dict[str, DrawingSolid], sheet: dict) -> str:
         else:
             element = render_svg_view(members, set(sheet['ghosts']), pane['camera'], width * w, height * h,
                                       styles, appearances=sheet.get('appearances'), edge_mode=sheet.get('edgeMode', 'noOverlay'),
-                                      xray_members=set(pane['xrayMembers']) if 'xrayMembers' in pane else None)
+                                      xray_members=set(pane['xrayMembers']) if 'xrayMembers' in pane else None,
+                                      measured=set(pane.get('measured') or ()))
             root.append(element)
         element.attrib.update(rect)
         element.set('data-viewport', str(pane['id']))

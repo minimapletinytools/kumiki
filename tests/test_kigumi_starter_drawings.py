@@ -41,5 +41,5 @@ def test_the_starter_s_drawings_measure_what_its_dimensions_say():
                 values.setdefault(drawing["name"], []).append(round(measure["settled"]["value"]["value"] * 1000, 1))
 
     assert sorted(values["Plan"]) == [55.0, 310.0, 410.0, 590.0, 600.0]
-    assert sorted(values["Left Side ×2"]) == [40.0, 60.0, 80.0, 100.0, 460.0, 500.0]
+    assert sorted(values["Left Side ×2"]) == [20.0, 40.0, 60.0, 80.0, 100.0, 460.0, 500.0]
     assert sorted(values["Back Cross ×2"]) == [35.5, 40.0, 75.0, 80.0, 410.0]

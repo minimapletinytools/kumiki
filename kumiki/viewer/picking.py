@@ -1016,9 +1016,10 @@ def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'Perf
 
 
 class PlaneOutline(NamedTuple):
-    """A plane's outline in world space: its normal and flat segment ends."""
+    """A plane's outline in world space: its normal, flat segment ends, and the feature it is."""
     normal: List[float]
     positions: List[float]
+    feature: str = ""
 
 
 def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool) -> List[PlaneOutline]:
@@ -1044,7 +1045,7 @@ def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', ce
             continue
         positions = [v for start, end in extent.outline() for v in (*to_world(start), *to_world(end))]
         outlines.append(PlaneOutline([float(v) for v in timber.transform.local_to_global_direction(plane.normal)],
-                                     positions))
+                                     positions, feature.name))
     return outlines
 
 

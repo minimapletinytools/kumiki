@@ -140,7 +140,8 @@ class DrawingOverlays {
             geometry.setAttribute('instanceDistanceEnd', new THREE.InterleavedBufferAttribute(distances, 1, 1));
             object.renderOrder = option === 'drawingXray' ? 9 : 11;
             object.visible = false;
-            lines.push({ object, normal: new THREE.Vector3(...plane.normal), option, memberKey });
+            lines.push({ object, normal: new THREE.Vector3(...plane.normal), option, memberKey,
+                measuredAs: plane.feature ? memberKey + '|' + plane.feature : null });
         };
         for (const face of mesh.perfectFaces || []) {
             add(face, this.materials.perfect, 'showDrawingPerfectFaces');
@@ -156,18 +157,23 @@ class DrawingOverlays {
 
     /**
      * Show or hide every member's lines for one viewport, before it is drawn. `options` answers
-     * each line's display option by name. Returns whether any is shown -- and so whether the
-     * viewport needs its member id pass.
+     * each line's display option by name: 'off', 'on', or 'measured' to show only the lines whose
+     * `memberKey|feature` is in `measured`, what the viewport's dimensions go to. Returns whether any
+     * is shown -- and so whether the viewport needs its member id pass.
      */
-    showFor(bundles, camera, { inDrawing, options, xrayMembers }) {
+    showFor(bundles, camera, { inDrawing, options, xrayMembers, measured }) {
         const look = camera.getWorldDirection(this._look);
         let any = false;
+        const wanted = (line) => {
+            const mode = options[line.option];
+            return mode === 'on' || mode === true || (mode === 'measured' && Boolean(measured?.has(line.measuredAs)));
+        };
         for (const bundle of bundles) {
             for (const line of bundle.drawingLines || []) {
                 line.object.visible = inDrawing && (line.option === 'drawingXray'
                     ? Boolean(camera.isOrthographicCamera && xrayMembers?.has(line.memberKey)
                         && line.normal.dot(look) < -1 + 1e-8)
-                    : Boolean(options[line.option]) && drawnFacing(line.normal, look));
+                    : wanted(line) && drawnFacing(line.normal, look));
                 any = any || line.object.visible;
             }
         }

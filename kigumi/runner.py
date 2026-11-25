@@ -373,10 +373,11 @@ class CylinderAxisWire(TypedDict):
     radius: float
 
 
-class PlaneOutlineWire(TypedDict):
+class PlaneOutlineWire(TypedDict, total=False):
     """A perfect reference plane's outline, cropped to the cut timber, in world space, for drawing it edge-on."""
     normal: Vec3
     positions: List[float]  # segment pairs, flat
+    feature: str  # its feature's name (ptw.front, ptw.centerplane_...), absent on X-ray lines
 
 
 class ReferenceFacePlane(TypedDict):
@@ -1076,7 +1077,7 @@ def _perfect_reference_outlines(
     """Return picking.perfect_reference_outlines as wire forms."""
     from kumiki.viewer.picking import perfect_reference_outlines
 
-    return [{"normal": outline.normal, "positions": outline.positions}
+    return [{"normal": outline.normal, "positions": outline.positions, "feature": outline.feature}
             for outline in perfect_reference_outlines(timber, root, centerplanes)]
 
 
