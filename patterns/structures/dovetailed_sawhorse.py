@@ -431,17 +431,23 @@ def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[C
 TEMPLATE_PAIRS = {"A": "leg +x +y", "B": "leg +x -y"}
 
 
-def _export_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari) -> str:
-    """Write the beam and leg templates for each pair of legs to STLs in millimetres, in kigumi_exports/, and say where."""
+def _export_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari, *, kigumi: Kigumi) -> str:
+    """Write the beam and leg templates for each pair of legs to STLs in millimetres, in kigumi_exports/, and say where.
+
+    Also show them in the viewer as extra accessories, in place of any shown before.
+    """
     folder = pathlib.Path.cwd() / "kigumi_exports" / "dovetailed_sawhorse"
     folder.mkdir(parents=True, exist_ok=True)
     joint_of = {leg.timber.ticket.path: joint for leg, joint in zip(legs, joints)}
     written = []
+    kigumi.remove_all_extra_accessories()
     for pair, leg in TEMPLATE_PAIRS.items():
         joint = joint_of[leg]
         beam_template, leg_template = _templates(beam, joint.cuttings["dovetail_timber"].timber,
                                                  joint.cuttings["receiving_timber"], t)
         for part, template in (("beam_template", beam_template), ("leg_template", leg_template)):
+            kigumi.add_extra_accessory(CSGAccessory(transform=Transform.identity(), positive_csg=template),
+                                       name=f"{pair} {part.replace('_', ' ')}")
             mesh = mesh_cutcsg(template).mesh.copy()
             mesh.apply_scale(1000)
             path = folder / f"{pair} {part}.stl"
@@ -547,8 +553,9 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
     sawhorse = Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
                      source_joints=joints, name="Dovetailed sawhorse", kiwari=k,
                      tools=[Tool("export router templates",
-                                 "Write the router templates for each leg's socket in the beam and its tail to STLs, in mm",
-                                 lambda t: _export_templates(beam, legs, joints, t), kiwari=ROUTER_TEMPLATE)])
+                                 "Write the router templates for each leg's socket in the beam and its tail to STLs, in mm, and show them",
+                                 lambda t, *, kigumi: _export_templates(beam, legs, joints, t, kigumi=kigumi),
+                                 kiwari=ROUTER_TEMPLATE)])
     return with_auto_drawings(sawhorse, fixed_path="beam", extra_views=_leg_top_view)
 
 

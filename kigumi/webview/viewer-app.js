@@ -1578,6 +1578,11 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
 
+        if (message.type === 'extraAccessories') {
+            this.setExtraAccessories(Array.isArray(message.meshes) ? message.meshes : []);
+            return;
+        }
+
         if (message.type === 'toolResult') {
             this.toolRuns = { ...this.toolRuns, [message.name]: { output: message.output || '', error: message.error || null } };
             this.requestUpdate();
@@ -2201,7 +2206,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         } else if (action === 'delete') {
             // Nothing to delete is not an error: a measurement the code asks
             // for is passed over, and the key simply does nothing.
-            if (this.deleteMarkedMeasurements()) {
+            if (this.deleteMarkedMeasurements()
+                    || this.removeExtraAccessories(Array.from(this.selectionManager.selectedTimbers || []))) {
                 event.preventDefault();
             }
         } else if (action === 'escape') {
@@ -2686,6 +2692,159 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             profilingHtml;
     }
 
+    /** Build `mesh` into the scene as member `key`, replacing any member already there. */
+    _addMemberMesh(mesh, key, memberType, memberName, geometryMode) {
+        if (this.sceneManager.has(key)) {
+            this.memberMetadataByKey.delete(key);
+            this.sceneManager.disposeMember(key);
+        }
+
+        // Choose vertex/index arrays based on geometryMode. Accessories and
+        // perfect timbers (which lack the alternate-mode payload fields) fall
+        // back to the actual vertices/indices regardless of mode.
+        const { vertices: vertexSource, indices: indexSource } = GeometryMode.selectMeshBuffers(mesh, memberType, geometryMode);
+        const positions = new Float32Array(vertexSource);
+        const indexedGeometry = new THREE.BufferGeometry();
+        indexedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        indexedGeometry.setIndex(indexSource);
+
+        const geometry = indexedGeometry.toNonIndexed();
+        geometry.computeVertexNormals();
+        geometry.computeBoundingSphere();
+        indexedGeometry.dispose();
+
+        const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed);
+
+        if (memberType === 'timber' && mesh.timberToWorld && !mesh.stlPlacement?.needed) {
+            for (const material of [materialSet.solid, materialSet.reflection]) {
+                prepareTimberGrain(material, mesh.timberToWorld, key);
+                showTimberGrain(material, this.renderTimberGrain);
+            }
+        }
+        const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
+        if (mesh.referenceFacePlanes?.length) {
+            this.addReferenceFaceColors(geometry, vertexSource, indexSource, mesh.referenceFacePlanes);
+            this.applyReferenceFaceOption(solidMesh);
+        }
+        // EdgesGeometry gives a flat, non-indexed position array (every
+        // consecutive pair of vertices is one segment) -- exactly what
+        // LineSegmentsGeometry.setPositions() expects, so it's used here
+        // purely as a way to compute the sharp/boundary edge positions,
+        // then thrown away in favor of the fat-line (LineSegments2)
+        // geometry that actually gets rendered (supports real linewidth,
+        // unlike plain THREE.LineSegments/LineBasicMaterial).
+        const edgesSource = new THREE.EdgesGeometry(geometry, 25);
+        const edgeGeometry = new THREE.LineSegmentsGeometry();
+        edgeGeometry.setPositions(edgesSource.attributes.position.array);
+        edgesSource.dispose();
+        const edgeMesh = new THREE.LineSegments2(edgeGeometry, materialSet.edge);
+        edgeMesh.computeLineDistances();
+        const reflectionMesh = new THREE.Mesh(geometry, materialSet.reflection);
+        solidMesh.renderOrder = 1;
+        edgeMesh.renderOrder = 10;
+        reflectionMesh.renderOrder = 0;
+        solidMesh.castShadow = true;
+        solidMesh.receiveShadow = true;
+        edgeMesh.visible = this.edgeMode !== 'none';
+        reflectionMesh.castShadow = false;
+        reflectionMesh.receiveShadow = false;
+        reflectionMesh.visible = false;   // applyRenderMode decides, next frame
+
+        // Round accessories (pegs, dowels, ...) come with cylinderAxis: their
+        // barrel is a faceted polygon under the hood, so EdgesGeometry's fixed
+        // angle threshold above never catches the curved side (only the flat
+        // end caps). Add the two true, camera-facing tangent lines instead,
+        // parented under edgeMesh so they inherit its visibility/offset for
+        // free; updateCylinderSilhouettes() recomputes them every frame.
+        let cylinderSilhouette = null;
+        if (mesh.cylinderAxis) {
+            const axisStart = new THREE.Vector3(...mesh.cylinderAxis.axisStart);
+            const axisEnd = new THREE.Vector3(...mesh.cylinderAxis.axisEnd);
+            const radius = mesh.cylinderAxis.radius;
+            const silhouetteGeometry = new THREE.LineSegmentsGeometry();
+            const initialPositions = this._silhouetteLinePositions(axisStart, axisEnd, radius, this.camera.position)
+                || [...axisStart.toArray(), ...axisEnd.toArray(), ...axisStart.toArray(), ...axisEnd.toArray()];
+            silhouetteGeometry.setPositions(initialPositions);
+            const silhouetteLine = new THREE.LineSegments2(silhouetteGeometry, materialSet.edge);
+            silhouetteLine.computeLineDistances();
+            edgeMesh.add(silhouetteLine);
+            cylinderSilhouette = { axisStart, axisEnd, radius, line: silhouetteLine };
+        }
+
+        // Parented like the silhouette, so they follow the member's visibility and offset.
+        const drawingLines = this.drawingOverlays.linesFor(mesh, key);
+        const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
+        for (const line of drawingLines) {
+            edgeMesh.add(line.object);
+        }
+
+        this.scene.add(solidMesh);
+        this.scene.add(edgeMesh);
+        this.scene.add(reflectionMesh);
+        this.memberMetadataByKey.set(key, {
+            name: memberName,
+            type: memberType,
+            tags: KigumiTags.coerceTags(mesh.tags),
+            mesh,
+        });
+        this.sceneManager.register(key, {
+            memberType,
+            profileId: materialSet.profileId,
+            mesh: solidMesh,
+            edges: edgeMesh,
+            reflection: reflectionMesh,
+            cylinderSilhouette,
+            drawingLines,
+            idMesh,
+        });
+    }
+
+    /**
+     * Show `meshes` as the extra accessories (shown by a tool, see Kigumi.add_extra_accessory), in place
+     * of those shown before. Ones already shown are kept as they are.
+     */
+    setExtraAccessories(meshes) {
+        const geometryMode = (this.viewerOptions && this.viewerOptions.geometryMode) || 'actual';
+        const keys = new Set(meshes.map((mesh) => mesh.memberKey));
+        for (const [key, meta] of Array.from(this.memberMetadataByKey.entries())) {
+            if (meta.mesh && meta.mesh.extraAccessory && !keys.has(key)) {
+                this.selectionManager.deselectTimber(key);
+                this.memberMetadataByKey.delete(key);
+                this.sceneManager.disposeMember(key);
+            }
+        }
+        for (const mesh of meshes) {
+            if (!this.sceneManager.has(mesh.memberKey)) {
+                this._addMemberMesh(mesh, mesh.memberKey, 'accessory', mesh.memberName || mesh.memberKey, geometryMode);
+            }
+        }
+        const current = this._lastGeometryData || { meshes: [] };
+        this._lastGeometryData = { ...current, meshes: [...(current.meshes || []).filter((mesh) => !mesh.extraAccessory), ...meshes] };
+        this.memberListPanel.rebuild(this._lastGeometryData.meshes);
+        this.applyAssemblyOffsets();
+        this._syncExtraAccessoryRows();
+        this.requestUpdate();
+    }
+
+    /** Tell the layers tree which extra accessories are shown. */
+    _syncExtraAccessoryRows() {
+        const extras = [];
+        for (const [key, meta] of this.memberMetadataByKey.entries()) {
+            if (meta.mesh && meta.mesh.extraAccessory) extras.push({ key, name: meta.name });
+        }
+        this._layersView?.setExtraAccessories?.(extras);
+    }
+
+    /** Ask for the extra accessories among `keys` to be removed; return whether there were any. */
+    removeExtraAccessories(keys) {
+        const extras = keys.filter((key) => this.memberMetadataByKey.get(key)?.mesh?.extraAccessory);
+        if (extras.length === 0) {
+            return false;
+        }
+        vscode.postMessage({ type: 'removeExtraAccessories', keys: extras });
+        return true;
+    }
+
     async updateMeshScene(geometryData, refreshToken, onProgress) {
         // Cache the last geometry payload so we can re-run mesh building when the
         // user toggles geometryMode without round-tripping to Python.
@@ -2715,110 +2874,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             const memberName = mesh.memberName || mesh.name || key;
             nextKeys.add(key);
 
-            if (this.sceneManager.has(key)) {
-                this.memberMetadataByKey.delete(key);
-                this.sceneManager.disposeMember(key);
-            }
-
             const meshT0 = performance.now();
-            // Choose vertex/index arrays based on geometryMode. Accessories and
-            // perfect timbers (which lack the alternate-mode payload fields) fall
-            // back to the actual vertices/indices regardless of mode.
-            const { vertices: vertexSource, indices: indexSource } = GeometryMode.selectMeshBuffers(mesh, memberType, geometryMode);
-            const positions = new Float32Array(vertexSource);
-            const indexedGeometry = new THREE.BufferGeometry();
-            indexedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            indexedGeometry.setIndex(indexSource);
-
-            const geometry = indexedGeometry.toNonIndexed();
-            geometry.computeVertexNormals();
-            geometry.computeBoundingSphere();
-            indexedGeometry.dispose();
-
-            const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed);
-
-            if (memberType === 'timber' && mesh.timberToWorld && !mesh.stlPlacement?.needed) {
-                for (const material of [materialSet.solid, materialSet.reflection]) {
-                    prepareTimberGrain(material, mesh.timberToWorld, key);
-                    showTimberGrain(material, this.renderTimberGrain);
-                }
-            }
-            const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
-            if (mesh.referenceFacePlanes?.length) {
-                this.addReferenceFaceColors(geometry, vertexSource, indexSource, mesh.referenceFacePlanes);
-                this.applyReferenceFaceOption(solidMesh);
-            }
-            // EdgesGeometry gives a flat, non-indexed position array (every
-            // consecutive pair of vertices is one segment) -- exactly what
-            // LineSegmentsGeometry.setPositions() expects, so it's used here
-            // purely as a way to compute the sharp/boundary edge positions,
-            // then thrown away in favor of the fat-line (LineSegments2)
-            // geometry that actually gets rendered (supports real linewidth,
-            // unlike plain THREE.LineSegments/LineBasicMaterial).
-            const edgesSource = new THREE.EdgesGeometry(geometry, 25);
-            const edgeGeometry = new THREE.LineSegmentsGeometry();
-            edgeGeometry.setPositions(edgesSource.attributes.position.array);
-            edgesSource.dispose();
-            const edgeMesh = new THREE.LineSegments2(edgeGeometry, materialSet.edge);
-            edgeMesh.computeLineDistances();
-            const reflectionMesh = new THREE.Mesh(geometry, materialSet.reflection);
-            solidMesh.renderOrder = 1;
-            edgeMesh.renderOrder = 10;
-            reflectionMesh.renderOrder = 0;
-            solidMesh.castShadow = true;
-            solidMesh.receiveShadow = true;
-            edgeMesh.visible = this.edgeMode !== 'none';
-            reflectionMesh.castShadow = false;
-            reflectionMesh.receiveShadow = false;
-            reflectionMesh.visible = false;   // applyRenderMode decides, next frame
-
-            // Round accessories (pegs, dowels, ...) come with cylinderAxis: their
-            // barrel is a faceted polygon under the hood, so EdgesGeometry's fixed
-            // angle threshold above never catches the curved side (only the flat
-            // end caps). Add the two true, camera-facing tangent lines instead,
-            // parented under edgeMesh so they inherit its visibility/offset for
-            // free; updateCylinderSilhouettes() recomputes them every frame.
-            let cylinderSilhouette = null;
-            if (mesh.cylinderAxis) {
-                const axisStart = new THREE.Vector3(...mesh.cylinderAxis.axisStart);
-                const axisEnd = new THREE.Vector3(...mesh.cylinderAxis.axisEnd);
-                const radius = mesh.cylinderAxis.radius;
-                const silhouetteGeometry = new THREE.LineSegmentsGeometry();
-                const initialPositions = this._silhouetteLinePositions(axisStart, axisEnd, radius, this.camera.position)
-                    || [...axisStart.toArray(), ...axisEnd.toArray(), ...axisStart.toArray(), ...axisEnd.toArray()];
-                silhouetteGeometry.setPositions(initialPositions);
-                const silhouetteLine = new THREE.LineSegments2(silhouetteGeometry, materialSet.edge);
-                silhouetteLine.computeLineDistances();
-                edgeMesh.add(silhouetteLine);
-                cylinderSilhouette = { axisStart, axisEnd, radius, line: silhouetteLine };
-            }
-
-            // Parented like the silhouette, so they follow the member's visibility and offset.
-            const drawingLines = this.drawingOverlays.linesFor(mesh, key);
-            const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
-            for (const line of drawingLines) {
-                edgeMesh.add(line.object);
-            }
-
-            this.scene.add(solidMesh);
-            this.scene.add(edgeMesh);
-            this.scene.add(reflectionMesh);
-            this.memberMetadataByKey.set(key, {
-                name: memberName,
-                type: memberType,
-                tags: KigumiTags.coerceTags(mesh.tags),
-                mesh,
-            });
-            this.sceneManager.register(key, {
-                memberType,
-                profileId: materialSet.profileId,
-                mesh: solidMesh,
-                edges: edgeMesh,
-                reflection: reflectionMesh,
-                cylinderSilhouette,
-                drawingLines,
-                idMesh,
-            });
+            this._addMemberMesh(mesh, key, memberType, memberName, geometryMode);
             meshBuildMs += performance.now() - meshT0;
             processed += 1;
             reportProgress();
@@ -2839,6 +2896,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         this.rebuildFootprints(geometryData && geometryData.footprints);
         this.memberListPanel.rebuild(meshes);
+        this._syncExtraAccessoryRows();
         this.updateReflectionTransforms();
         // Rebuilt meshes come in at the origin; re-seat them at the current
         // scrub position so the assembly preview survives geometry refreshes.

@@ -31,6 +31,7 @@ export const MenusMixin = (Base) => class extends Base {
         const meta = this.memberMetadataByKey.get(memberKey);
         const name = (meta && meta.name) || memberKey;
         const item = { kind: 'member', member: this.selectionPanel.memberForCopy(memberKey) };
+        const extra = Boolean(meta && meta.mesh && meta.mesh.extraAccessory);
         const featureRows = features ? this._featureMenuRows() : [];
         const opened = this.contextMenu.open({
             x: clientX,
@@ -50,10 +51,14 @@ export const MenusMixin = (Base) => class extends Base {
                 { id: 'export', heading: true, label: t('viewer.contextMenu.exportNamed', { name }) },
                 { id: 'stl', label: 'stl', indent: true },
                 { id: 'step', label: 'step', indent: true },
+                ...(extra ? [{ id: 'divider-delete', divider: true },
+                    { id: 'deleteExtraAccessory', label: t('viewer.contextMenu.deleteExtraAccessory') }] : []),
             ],
             onChoose: (id, _row, event) => {
                 if (id === 'focus') {
                     this.focusMember(memberKey);
+                } else if (id === 'deleteExtraAccessory') {
+                    this.removeExtraAccessories([memberKey]);
                 } else if (id.startsWith(FEATURE_ROW)) {
                     this._takeFeatureFromMenu(id, event);
                 } else if (!this._copyFromMenu(id, item)) {

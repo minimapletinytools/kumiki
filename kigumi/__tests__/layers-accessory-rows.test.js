@@ -92,3 +92,32 @@ describe('accessory rows in the tree', () => {
         expect(panel.selectionManager.getSelectedTimbers()).not.toContain(PEG);
     });
 });
+
+describe('extra accessory rows in the tree', () => {
+    const EXTRA = 'accessory:extra#0';
+
+    function extraRow(panel) {
+        panel.extraAccessories = [{ key: EXTRA, name: 'A leg template' }];
+        return panel._buildExtraAccessoryRows()[0];
+    }
+
+    test('one is a member row named as the tool named it', () => {
+        const row = extraRow(panelWithOneJoint());
+        expect(row.dataset.memberKey).toBe(EXTRA);
+        expect(row.children.some((child) => child.textContent === 'A leg template')).toBe(true);
+        expect(buttons(row).map((button) => button.dataset.action)).toEqual(expect.arrayContaining(['lock', 'hide']));
+    });
+
+    test('a click selects it, and a right click asks for the member menu, which offers to delete it', () => {
+        const panel = panelWithOneJoint();
+        const row = extraRow(panel);
+        row.dispatch('click', { shiftKey: false });
+        expect(panel.selectionManager.getSelectedTimbers()).toContain(EXTRA);
+
+        let asked = null;
+        row.dispatchEvent = (event) => { asked = event.detail; };
+        global.CustomEvent = class { constructor(type, init) { this.type = type; this.detail = init.detail; } };
+        row.dispatch('contextmenu', { preventDefault() {}, stopPropagation() {}, clientX: 1, clientY: 2 });
+        expect(asked).toEqual({ memberKey: EXTRA, clientX: 1, clientY: 2 });
+    });
+});

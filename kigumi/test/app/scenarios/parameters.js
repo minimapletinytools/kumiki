@@ -50,5 +50,28 @@ module.exports = {
                 && output.startsWith('Wrote 4 router templates'),
             `tab "${tab}", tools "${tools}", its parameters "${toolParameters}", output "${output.split('\n')[0]}"`);
         await showTab('tree');
+
+        // What the tool exported, shown as extra accessories: a section of the tree, each one deletable,
+        // gone when the frame is rebuilt.
+        const app = `${viewDoc}.querySelector("kigumi-app")`;
+        const extras = () => inShell(`(() => {
+            const rows = [...${viewDoc}.querySelectorAll('.lp-row-extraAccessory .lp-label')].map((label) => label.textContent);
+            const drawn = [...${app}.memberMetadataByKey.values()].filter((meta) => meta.mesh?.extraAccessory).length;
+            return rows.join('|') + ' / ' + drawn;
+        })()`);
+        const shown = await waitFor(() => extras().then((text) => text.endsWith(' / 4') ? text : null), { timeoutMs: 20000 })
+            .catch(() => extras());
+        await capture('03g-extra-accessories');
+        await inShell(`${app}.removeExtraAccessories([...${app}.memberMetadataByKey.entries()]
+            .filter(([, meta]) => meta.mesh?.extraAccessory && meta.name === 'A leg template').map(([key]) => key))`);
+        const afterDelete = await waitFor(() => extras().then((text) => text.endsWith(' / 3') ? text : null), { timeoutMs: 20000 })
+            .catch(() => extras());
+        await inShell(`${app}.requestRefresh()`);
+        const afterRebuild = await waitFor(() => extras().then((text) => text === ' / 0' ? text : null), { timeoutMs: 60000 })
+            .catch(() => extras());
+        check('a tool\'s extra accessories are listed and drawn, one can be deleted, and a rebuild clears them',
+            shown === 'A beam template|A leg template|B beam template|B leg template / 4'
+                && afterDelete === 'A beam template|B beam template|B leg template / 3' && afterRebuild === ' / 0',
+            `${shown} -> ${afterDelete} -> ${afterRebuild}`);
     },
 };

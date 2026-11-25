@@ -8,6 +8,13 @@ SOURCE = '''
 from kumiki import *
 
 
+def _show(*, kigumi):
+    block = RectangularPrism(size=create_v2(mm(10), mm(10)), transform=Transform.identity(),
+                             start_distance=0, end_distance=mm(10))
+    kigumi.add_extra_accessory(CSGAccessory(transform=Transform.identity(), positive_csg=block), name="block")
+    return "shown"
+
+
 @frame
 def posts(k: Optional[Kiwari] = None) -> Frame:
     post = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(100)),
@@ -15,6 +22,8 @@ def posts(k: Optional[Kiwari] = None) -> Frame:
     frame = Frame(cut_timbers=[CutTimber(post, cuts=[])], name="posts",
                   tools=[Tool("count", "How many timbers", lambda: f"{len(frame.cut_timbers)} timbers"),
                          Tool("not text", "Returns a number", lambda: 42),
+                         Tool("show", "Shows a block", _show),
+                         Tool("clear", "Shows nothing", lambda *, kigumi: kigumi.remove_all_extra_accessories() or "cleared"),
                          Tool("times", "The timber count times a factor", lambda t: f"{len(frame.cut_timbers) * t.count('factor')}",
                               kiwari=kiwari(factor=kiwari.count(2, minimum=1)))])
 
@@ -100,7 +109,7 @@ def test_an_override_of_a_drawing_still_to_come_does_not_dangle(slot, workspace)
 
 
 def test_a_tool_runs_and_gives_its_text(slot):
-    assert runner.run_tool(slot, "count") == {"name": "count", "output": "1 timbers"}
+    assert runner.run_tool(slot, "count") == {"name": "count", "output": "1 timbers", "extraAccessories": []}
 
 
 def test_a_tool_must_give_text(slot):
@@ -122,7 +131,30 @@ def test_a_tool_s_parameters_go_to_the_viewer_as_a_kiwari_section(slot):
 
 
 def test_a_tool_runs_with_the_values_it_is_sent(slot):
-    assert runner.run_tool(slot, "times") == {"name": "times", "output": "2"}
-    assert runner.run_tool(slot, "times", {"factor": {"value": 3}}) == {"name": "times", "output": "3"}
+    assert runner.run_tool(slot, "times")["output"] == "2"
+    assert runner.run_tool(slot, "times", {"factor": {"value": 3}})["output"] == "3"
     with pytest.raises(ValueError, match="at least 1"):
         runner.run_tool(slot, "times", {"factor": {"value": 0}})
+
+
+def test_extra_accessories_a_tool_shows_stay_until_removed_or_rebuilt(slot):
+    shown = runner.run_tool(slot, "show")["extraAccessories"]
+    assert [(mesh["memberName"], mesh["memberType"], mesh["extraAccessory"]) for mesh in shown] == [("block", "accessory", True)]
+    key = shown[0]["memberKey"]
+    again = runner.run_tool(slot, "show")["extraAccessories"]
+    assert [mesh["memberKey"] for mesh in again] == [key, again[1]["memberKey"]] and again[1]["memberKey"] != key
+
+    state = runner.RunnerState(slots={"main": slot}, active_slot="main")
+    geometry = runner.build_real_geometry(state, slot)
+    assert {mesh["memberKey"] for mesh in geometry["meshes"] if mesh.get("extraAccessory")} == {key, again[1]["memberKey"]}
+    assert geometry["removedKeys"] == []
+
+    assert runner.remove_extra_accessories(slot, [key])["extraAccessories"] == [again[1]]
+    assert key not in slot.mesh_cache
+    assert runner.run_tool(slot, "clear")["extraAccessories"] == []
+    assert not any(cached.startswith(runner.EXTRA_ACCESSORY_KEY_PREFIX) for cached in slot.mesh_cache)
+
+
+def test_a_rebuilt_frame_has_no_extra_accessories(slot):
+    runner.run_tool(slot, "show")
+    assert runner.load_slot_state(str(slot.file_path)).extra_accessories == []

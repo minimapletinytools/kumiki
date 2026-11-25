@@ -406,6 +406,10 @@ class FrameViewSession {
                 this.runTool(String(message.name || ''), message.kiwari || null);
                 return;
             }
+            if (message.type === 'removeExtraAccessories') {
+                this.removeExtraAccessories(Array.isArray(message.keys) ? message.keys.map(String) : []);
+                return;
+            }
             if (message.type === 'setRefreshOptions') {
                 // Merge viewer-supplied refresh options (e.g. geometryMode) into the
                 // session's stored options so subsequent get_geometry calls include
@@ -1353,6 +1357,9 @@ class FrameViewSession {
             this.log(`[tools] Running "${name}"`);
             const result = await this.runnerSession.slotRequest('run_tool', this.slotName, kiwari ? { name, kiwari } : { name });
             reply = { type: 'toolResult', name, output: (result && result.output) || '' };
+            if (result && Array.isArray(result.extraAccessories)) {
+                await this._postExtraAccessories(result.extraAccessories);
+            }
         } catch (error) {
             const message = error.message || String(error);
             this.log(`[tools] "${name}" failed: ${message}`, 'error');
@@ -1360,6 +1367,26 @@ class FrameViewSession {
         }
         if (this.panel && !this.isDisposed) {
             await this.panel.postMessage(reply).catch(() => {});
+        }
+    }
+
+    /** Remove the extra accessories with member keys `keys`, and send the viewer those left. */
+    async removeExtraAccessories(keys) {
+        if (!this.runnerSession || keys.length === 0) {
+            return;
+        }
+        try {
+            const result = await this.runnerSession.slotRequest('remove_extra_accessories', this.slotName, { keys });
+            await this._postExtraAccessories((result && result.extraAccessories) || []);
+        } catch (error) {
+            this.log(`[tools] Removing extra accessories failed: ${error.message || error}`, 'error');
+        }
+    }
+
+    /** Send the viewer the meshes of every extra accessory now shown. */
+    async _postExtraAccessories(meshes) {
+        if (this.panel && !this.isDisposed) {
+            await this.panel.postMessage({ type: 'extraAccessories', meshes }).catch(() => {});
         }
     }
 

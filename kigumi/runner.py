@@ -390,6 +390,7 @@ class MemberMeshWire(TypedDict, total=False):
     memberName: str
     memberType: str  # "timber" | "accessory"
     memberKey: str
+    extraAccessory: bool  # shown by a tool (Kigumi.add_extra_accessory), not part of the frame
     timberKey: str
     kumikiEphemeralId: int
     tags: List[TagWire]
@@ -830,6 +831,10 @@ class SlotState:
     pending_drawings: List[DrawingWire] = field(default_factory=list)
     # The job running the frame's finishing routines, once started, and the frame from before it.
     finishing_job: Optional["Job"] = None
+    # What tools have shown (Kigumi.add_extra_accessory), as (memberKey, name, accessory, mesh). Lost on
+    # reload with the rest of the slot.
+    extra_accessories: List[Tuple[str, str, Any, "MemberMeshWire"]] = field(default_factory=list)
+    extra_accessory_serial: int = 0
     finishing_base: Any = None
     # Which import of the project's modules (kumiki, in a dev checkout) this was built
     # with. See _project_generation.
@@ -1482,6 +1487,11 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
             seen_keys.add(accessory_key)
         except Exception as exc:
             log_warning(f"skipping geometry for accessory {type(accessory).__name__}: {exc}")
+
+    for key, _, _, mesh_payload in getattr(ss, "extra_accessories", ()):
+        ss.mesh_cache[key] = {"mesh": mesh_payload}
+        meshes.append(mesh_payload)
+        seen_keys.add(key)
 
     removed_keys: List[str] = []
     for cached_key in list(ss.mesh_cache.keys()):
@@ -3973,7 +3983,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "run_finishing", "list_tools", "run_tool",
+            "run_finishing", "list_tools", "run_tool", "remove_extra_accessories",
             "shutdown",
         ],
         "frame": {
@@ -5128,18 +5138,72 @@ def _serialize_tools(frame: Any) -> List[ToolWire]:
     return tools
 
 
-def run_tool(ss: SlotState, name: str, values: Optional[Mapping[str, Any]] = None) -> Dict[str, str]:
-    """Run the frame's tool `name`, with `values` for its parameters if it takes any, and return the text it gives."""
+EXTRA_ACCESSORY_KEY_PREFIX = "accessory:extra#"
+
+
+def run_tool(ss: SlotState, name: str, values: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """Run the frame's tool `name`, with `values` for its parameters if it takes any.
+
+    Return the text it gives and, as `extraAccessories`, the meshes of every extra accessory now shown.
+    """
     tools = list(getattr(ss.frame, "tools", []))
     tool = next((tool for tool in tools if tool.name == name), None)
     if tool is None:
         raise ValueError(f"No tool named {name!r}. Available: {[tool.name for tool in tools]}")
+    kigumi = None
+    try:
+        from kumiki.finishing import Kigumi
+        kigumi = Kigumi([(shown, accessory) for _, shown, accessory, _ in ss.extra_accessories])
+    except ImportError:
+        pass  # an older kumiki: its tools take no kigumi
     with contextlib.redirect_stdout(sys.stderr):
         # kumiki 0.9.0's Tool has no call, and no parameters.
-        output = tool.call(values) if hasattr(tool, "call") else tool.run()
+        if not hasattr(tool, "call"):
+            output = tool.run()
+        elif kigumi is not None:
+            output = tool.call(values, kigumi=kigumi)
+        else:
+            output = tool.call(values)
     if not isinstance(output, str):
         raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
-    return {"name": name, "output": output}
+    if kigumi is not None:
+        _set_extra_accessories(ss, kigumi.extra_accessories)
+    return {"name": name, "output": output, "extraAccessories": _extra_accessory_meshes(ss)}
+
+
+def _set_extra_accessories(ss: SlotState, wanted: Sequence[Tuple[str, Any]]) -> None:
+    """Make `wanted` (name, accessory) the slot's extra accessories, meshing only those not already shown."""
+    shown = {(id(accessory), name): (key, mesh) for key, name, accessory, mesh in ss.extra_accessories}
+    kept: List[Tuple[str, str, Any, MemberMeshWire]] = []
+    for name, accessory in wanted:
+        existing = shown.pop((id(accessory), name), None)
+        if existing is not None:
+            kept.append((existing[0], name, accessory, existing[1]))
+            continue
+        key = f"{EXTRA_ACCESSORY_KEY_PREFIX}{ss.extra_accessory_serial}"
+        ss.extra_accessory_serial += 1
+        mesh = _accessory_to_triangle_mesh_payload(accessory, accessory.get_csg_local(), key, name)
+        mesh["extraAccessory"] = True
+        kept.append((key, name, accessory, mesh))
+    for key, _ in shown.values():
+        ss.mesh_cache.pop(key, None)
+    for key, _, _, mesh in kept:
+        ss.mesh_cache[key] = {"mesh": mesh}
+    ss.extra_accessories = kept
+
+
+def _extra_accessory_meshes(ss: SlotState) -> List[MemberMeshWire]:
+    """Return the meshes of the slot's extra accessories, in order."""
+    return [mesh for _, _, _, mesh in ss.extra_accessories]
+
+
+def remove_extra_accessories(ss: SlotState, keys: Sequence[str]) -> Dict[str, Any]:
+    """Remove the extra accessories with member keys `keys`; return the meshes of those left."""
+    gone = set(keys)
+    for key in gone:
+        ss.mesh_cache.pop(key, None)
+    ss.extra_accessories = [entry for entry in ss.extra_accessories if entry[0] not in gone]
+    return {"extraAccessories": _extra_accessory_meshes(ss)}
 
 
 class JobContext:
@@ -5444,6 +5508,13 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         ss = _resolve_slot(state, payload)
         name = _require_str(payload, "name", "run_tool requires payload.name")
         return state, make_success_response(request_id, command, run_tool(ss, name, _opt_mapping(payload, "kiwari"))), False
+
+    if command == "remove_extra_accessories":
+        ss = _resolve_slot(state, payload)
+        keys = payload.get("keys")
+        if not isinstance(keys, list) or not all(isinstance(key, str) for key in keys):
+            raise ValueError("remove_extra_accessories requires payload.keys, a list of member keys")
+        return state, make_success_response(request_id, command, remove_extra_accessories(ss, keys)), False
 
     if command == "cancel_job":
         job_id = _require_str(payload, "jobId", "cancel_job requires payload.jobId")

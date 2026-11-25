@@ -39,7 +39,7 @@ class LayersPanel {
         this.hierarchy = null;
         this.collapsed = false;
         // Default: top-level sections open, individual nodes closed
-        this.expandedNodes = new Set(['section:timbers', 'section:joints']);
+        this.expandedNodes = new Set(['section:timbers', 'section:joints', 'section:extraAccessories']);
         // Per-timber CSG payloads, fetched lazily when a row is expanded.
         this.csgTreesByKey = new Map();
         this.requestedCsgTrees = new Set();
@@ -62,6 +62,8 @@ class LayersPanel {
         /** Whether a drawing is open: the 3D measurements section hides then. */
         this.inDrawing = false;
         this.measurementsHidden = false;
+        /** What tools have shown (Kigumi.add_extra_accessory), as {key, name}. */
+        this.extraAccessories = [];
         this.activeSceneId = null;
         this.drawingsEnabled = false;
         this.viewport = null;
@@ -245,6 +247,10 @@ class LayersPanel {
             this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
             this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
         }
+        if (this.extraAccessories.length > 0) {
+            this._renderSection(this._treeEl, 'extraAccessories', t('viewer.layers.section.extraAccessories'),
+                () => this._buildExtraAccessoryRows());
+        }
         // Last, and only in the 3D view. These measurements are about the
         // model rather than about any drawing of it, so inside a drawing
         // they are neither shown nor drawable -- which is why this is the
@@ -399,7 +405,7 @@ class LayersPanel {
         row.dataset.nodeId = nodeId;
         if (memberKey) row.dataset.memberKey = memberKey;
 
-        if (memberKey && (rowType === 'timber' || rowType === 'jointMember')) {
+        if (memberKey && (rowType === 'timber' || rowType === 'jointMember' || rowType === 'extraAccessory')) {
             row.addEventListener('contextmenu', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -750,6 +756,26 @@ class LayersPanel {
             event.stopPropagation();
             this._emit('kigumi-layer-contextmenu', { item, clientX: event.clientX, clientY: event.clientY });
         });
+    }
+
+    /** Show `extras` ({key, name}) in the extra accessories section. */
+    setExtraAccessories(extras) {
+        this.extraAccessories = extras;
+        this._render();
+    }
+
+    _buildExtraAccessoryRows() {
+        return this.extraAccessories
+            .filter((extra) => this._matchesFilter(extra.name))
+            .map((extra) => this._makeRow({
+                nodeId: 'extra:' + extra.key,
+                rowType: 'extraAccessory',
+                depth: 0,
+                label: extra.name,
+                hasChildren: false,
+                memberKey: extra.key,
+                selectNode: { type: 'accessory', key: extra.key },
+            }));
     }
 
     _buildTimberRows(onlyKeys = null) {
@@ -1292,6 +1318,15 @@ class KigumiLayersView extends LayersViewBase {
         }
     }
 
+    /** The extra accessories to list, as {key, name}. */
+    setExtraAccessories(extras) {
+        this._extraAccessories = extras;
+        this._ensureMounted();
+        if (this._panel) {
+            this._panel.setExtraAccessories(extras);
+        }
+    }
+
     /** Whether the drawings section is offered at all (the beta setting). */
     setDrawingsEnabled(enabled) {
         this._drawingsEnabled = Boolean(enabled);
@@ -1325,6 +1360,9 @@ class KigumiLayersView extends LayersViewBase {
         this._panel.mount(this);
         this._panel.setHierarchy(this._hierarchy);
         // Whatever arrived before there was a panel to give it to.
+        if (this._extraAccessories) {
+            this._panel.setExtraAccessories(this._extraAccessories);
+        }
         if (this._drawings) {
             this._panel.setDrawings(
                 this._drawings.drawings, this._drawings.activeSceneId,

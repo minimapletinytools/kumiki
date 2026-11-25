@@ -26,6 +26,7 @@ const TO_EXTENSION = Object.freeze([
     'openKigumiOutput',
     'openLogLocation',
     'openOutputChannel',
+    'removeExtraAccessories',
     'requestCSGByPath',
     'requestCSGTree',
     'requestDebugDrawing',

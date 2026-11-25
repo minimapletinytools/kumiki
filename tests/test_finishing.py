@@ -2,8 +2,8 @@
 
 import pytest
 
-from kumiki import (CutTimber, Finishing, FinishingCancelled, Drawing, Frame, Tool, create_timber, create_v2,
-                    create_v3, kiwari, mm)
+from kumiki import (CutTimber, Finishing, FinishingCancelled, Drawing, Frame, Kigumi, Peg, PegShape, Tool, Transform,
+                    create_timber, create_v2, create_v3, kiwari, mm)
 from kumiki.frame_decorators import overlay_frames
 
 
@@ -70,6 +70,32 @@ def test_shown_together_frames_keep_their_routines_and_tools():
 
 def test_a_tool_without_parameters_is_run_with_nothing():
     assert Tool("count", "Counts", lambda: "1").call() == "1"
+
+
+def test_a_tool_taking_kigumi_by_keyword_is_given_one():
+    def show(t, *, kigumi):
+        kigumi.add_extra_accessory(Peg(transform=Transform.identity(), size=mm(10), shape=PegShape.ROUND,
+                                       forward_length=mm(50), stickout_length=mm(5)), name="peg")
+        return t.text("name")
+
+    tool = Tool("show", "Shows a peg", show, kiwari=kiwari(name=kiwari.text("jig")))
+    kigumi = Kigumi()
+    assert tool.call(kigumi=kigumi) == "jig"
+    assert [name for name, _ in kigumi.extra_accessories] == ["peg"]
+    assert tool.call() == "jig"
+
+
+def test_only_a_keyword_only_kigumi_is_passed():
+    assert Tool("count", "Counts", lambda kigumi=None: str(kigumi)).call(kigumi=Kigumi()) == "None"
+
+
+def test_kigumi_names_an_unnamed_accessory_by_its_type_and_forgets_them_all():
+    peg = Peg(transform=Transform.identity(), size=mm(10), shape=PegShape.ROUND, forward_length=mm(50),
+              stickout_length=mm(5))
+    kigumi = Kigumi([("old", peg)])
+    kigumi.remove_all_extra_accessories()
+    kigumi.add_extra_accessory(peg)
+    assert kigumi.extra_accessories == [("Peg", peg)]
 
 
 def test_a_tool_with_parameters_is_given_them_over_its_defaults():
