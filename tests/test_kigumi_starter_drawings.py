@@ -1,8 +1,12 @@
 """The starter frame's hand-placed drawings, as the viewer gets them: every dimension resolves, placed."""
 
+import contextlib
 import importlib.util
+import io
 import sys
 from pathlib import Path
+
+from tests.module_isolation import restore_modules
 
 ROOT = Path(__file__).resolve().parent.parent
 STARTER = ROOT / "patterns" / "structures" / "my_cute_frame.py"
@@ -18,10 +22,17 @@ def _runner():
 
 
 def test_the_starter_s_drawings_measure_what_its_dimensions_say():
-    runner = _runner()
-    slot = runner.load_slot_state(str(STARTER))
+    # Loading purges kumiki where it is installed from this checkout (as on CI); put it back after.
+    saved_modules = dict(sys.modules)
+    try:
+        runner = _runner()
+        with contextlib.redirect_stdout(io.StringIO()):
+            slot = runner.load_slot_state(str(STARTER))
+        drawings = runner.collect_drawings(slot.frame, STARTER)
+    finally:
+        restore_modules(saved_modules)
     values = {}
-    for drawing in runner.collect_drawings(slot.frame, STARTER):
+    for drawing in drawings:
         for viewport in drawing["viewports"]:
             for measure in viewport.get("measurements", []):
                 assert not measure.get("unresolved"), (drawing["name"], measure)
