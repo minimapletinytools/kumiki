@@ -77,20 +77,6 @@ unplaced measurements go through the auto-placer. Explained again on 2026-11-25;
 *Recommend: yes, keeping `MeasurementPlacement(offset, along)` as the stored form.*
 - Sub-question: lanes only, or also explicit paper millimetres?
 
-**C. How manual edits combine with generated drawings.**
-Proposal: one entry point where the generated drawing is the starting point and code adds, removes or
-pins measurements, using the existing generated → coded → file-override tiers (`MeasurementSource`).
-*Recommend: layer on top; a fully hand-built `Drawing` stays possible.*
-- Sub-question: the name. `with_drawings(frame, fn, fixed_path=...)` alongside `with_auto_drawings`, or
-  a callback argument on `with_auto_drawings`?
-
-**D. Where a view's name comes from, and renames.**
-Proposal: the name is the view's label, unique within a drawing (raise on a duplicate).
-- Renaming a view in code orphans its saved overrides. Accept that, or add an optional explicit `id`
-  separate from the label? *Recommend: label by default, optional `id` for when the label must change.*
-- Existing drawings files are keyed by position. Migrate on load and rewrite on save, or keep reading
-  both forever? *Recommend: read both, write names.*
-
 **E. What a view is (API part).**
 Agreed direction (2026-11-25): a view is a direction and a scale, built with helpers
 (`View.of_face(post, TimberFace.FRONT, scale=1/5)`, `View.world("front")`, ...); the label is only text.
@@ -113,12 +99,6 @@ and `cut_timber.corner(a, b, c)`, on the cut timber since the faces can come fro
 to face covers most cases (a face seen edge-on draws as a line); these matter for faces seen at an angle
 (sloped shoulders, dovetail flanks). *Recommend: include, build late.* Explained on 2026-11-25; awaiting
 confirmation.
-
-**H. `describe` details.**
-- Frame: what `describe_frame` returns today. Timber: faces, joints on it, feature names. Joint: members,
-  each feature with its constant name and type.
-- Keep `describe_frame` as an alias? *Recommend: yes, for a while.*
-- How a timber or joint is named in the call: ticket path?
 
 ## 4. Sketch of the target
 
