@@ -352,14 +352,14 @@ def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: fl
     return [(float(x), float(y)) for x, y in points]
 
 
-def _templates(beam: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG]:
+def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG]:
     """Return the router templates for one dovetail's socket in the beam and for its tail, in world space.
 
     Both trace the dovetail's wide face, seen square to it, over the stretch where the socket is in the
     beam. The beam template lies on the neck's plane, its opening the wide face moved out by the beam
     offset, with the uncut beam taken out of its underside so it sits on the beam. The leg template lies
-    on the wide face, on the side away from the leg, as the wide face moved in by the leg offset. Each
-    has clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
+    on the wide face, on the side away from the leg, as the wide face moved in by the leg offset, its wide
+    end square to `leg`'s length so it can be squared off the leg's edge. Each has clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
     `CLAMP_FLOOR` under its slot.
     """
     body = adopt_csg(beam.transform, None, CutTimber(beam, cuts=[]).render_timber_with_cuts_csg_local())
@@ -381,9 +381,18 @@ def _templates(beam: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG
     wide_frame = PlaneFrame.with_axes(frame.origin - frame.normal * depth, frame.u, frame.v, frame.normal)
     # Where the socket starts and stops along the dovetail, from the corners of the part in the beam.
     axis = np.array([float(value) for value in dovetail.transform.orientation.matrix[:, 2]])
-    reach = mesh_cutcsg(Intersection(dovetail, body)).mesh.vertices @ axis - frame.origin @ axis
+    in_beam = mesh_cutcsg(Intersection(dovetail, body)).mesh.vertices - frame.origin
+    reach = in_beam @ axis
     along = np.array([axis @ frame.u, axis @ frame.v])
     outline = _clip_between(wide_outline, along, float(reach.min()), float(reach.max()))
+    # The leg's: the same at its narrow top end, and at its wide bottom end square to the leg.
+    leg_up = np.array([float(value) for value in leg.get_length_direction_global()])
+    up_in_face = np.array([leg_up @ frame.u, leg_up @ frame.v])
+    up_in_face /= np.linalg.norm(up_in_face)
+    leg_outline = (_clip_between(wide_outline, along, -np.inf, float(reach.max())) if along @ up_in_face > 0
+                   else _clip_between(wide_outline, along, float(reach.min()), np.inf))
+    lowest = float((in_beam @ np.array([frame.u, frame.v]).T @ up_in_face).min())
+    leg_outline = _clip_between(leg_outline, up_in_face, lowest, np.inf)
     beam_offset, leg_offset = t.length("beam_bushing_offset"), t.length("leg_bushing_offset")
     top = t.length("top_depth")
     socket_template = router_template((frame, [outline]), body, beam_offset, top, t.length("base_support_width"),
@@ -400,8 +409,8 @@ def _templates(beam: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG
                        top - depth_of_slot, top + mm(1))
         for toward in ((-1.0, 0.0, 1.0), (1.0, 0.0, -1.0))], label=CutCSGLabel("socket_template"))
     tail_thickness = max(top, depth_of_slot + CLAMP_FLOOR)
-    tail = tail_template((wide_frame, [outline]), leg_offset, tail_thickness)
-    tail_outline = np.array(_offset_convex(outline, -float(leg_offset)))
+    tail = tail_template((wide_frame, [leg_outline]), leg_offset, tail_thickness)
+    tail_outline = np.array(_offset_convex(leg_outline, -float(leg_offset)))
     up = np.array([frame.u[2], frame.v[2]]) / np.linalg.norm([frame.u[2], frame.v[2]])
     # The top end: the edge facing most up, the slot from its middle along its inward normal.
     starts, ends = tail_outline, np.roll(tail_outline, -1, axis=0)
@@ -429,7 +438,9 @@ def _export_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], 
     joint_of = {leg.timber.ticket.path: joint for leg, joint in zip(legs, joints)}
     written = []
     for pair, leg in TEMPLATE_PAIRS.items():
-        beam_template, leg_template = _templates(beam, joint_of[leg].cuttings["receiving_timber"], t)
+        joint = joint_of[leg]
+        beam_template, leg_template = _templates(beam, joint.cuttings["dovetail_timber"].timber,
+                                                 joint.cuttings["receiving_timber"], t)
         for part, template in (("beam_template", beam_template), ("leg_template", leg_template)):
             mesh = mesh_cutcsg(template).mesh.copy()
             mesh.apply_scale(1000)
