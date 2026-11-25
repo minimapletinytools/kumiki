@@ -20,6 +20,7 @@ from kumiki.construction import arrangement_error
 from typing import NamedTuple, Union
 
 from kumiki.timber import *
+from kumiki.joints.workshop.feature_names import MortiseAndTenonFeatures as MT
 from kumiki.measuring import (
     Line,
     locate_centerline,
@@ -57,10 +58,10 @@ _TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 #: a dovetail tenon is named the way the mortise and tenon joint names its cheeks:
 #: right and left for the width faces, front and back for the height ones.
 _TENON_FACE_NAME_BY_TIMBER_FACE = {
-    TimberFace.RIGHT: "tenon_right",
-    TimberFace.LEFT: "tenon_left",
-    TimberFace.FRONT: "tenon_front",
-    TimberFace.BACK: "tenon_back",
+    TimberFace.RIGHT: MT.TENON_RIGHT,
+    TimberFace.LEFT: MT.TENON_LEFT,
+    TimberFace.FRONT: MT.TENON_FRONT,
+    TimberFace.BACK: MT.TENON_BACK,
 }
 
 
@@ -606,7 +607,7 @@ def dovetail_tenon_geometry(
     # with the shoulder plane a second time (see _drop_duplicate_derived). The profile
     # edge on the shoulder plane is left unnamed as well -- the tenon leaves the timber
     # there and the shoulder names that plane, so nothing is left to pick.
-    tenon_tip_name = "tenon_top" if arrangement.butt_timber_end == TimberEnd.TOP else "tenon_bot"
+    tenon_tip_name = MT.TENON_TOP if arrangement.butt_timber_end == TimberEnd.TOP else MT.TENON_BOTTOM
     tenon_feature_overrides = [
         FeatureOverride(side_key(0), tenon_tip_name, _TENON_FACE),
         FeatureOverride(side_key(3), _tenon_face_name(tenon_timber, -top_face_dir), _TENON_FACE),
@@ -631,7 +632,7 @@ def dovetail_tenon_geometry(
         offset=shoulder_offset,
         label=CutCSGLabel("shoulder"),
         feature_overrides=[
-            shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.SHOULDER_PLANE),
+            shoulder_override(HALF_SPACE_PLANE, name=MT.SHOULDER, group=FeatureGroup.SHOULDER_PLANE),
         ],
     )
 

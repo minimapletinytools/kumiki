@@ -455,7 +455,7 @@ class TestAMeasurementMadeOnASheet:
     """The same chain in a drawing, where a face is a line seen edge-on."""
 
     DRAWING = "tenon"
-    VIEWPORT = "0.0.0"
+    VIEWPORT = "Front"
 
     def _look(self, viewer):
         for drawing in runner.collect_drawings(viewer.frame, None, viewer.pending):

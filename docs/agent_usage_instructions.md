@@ -218,20 +218,22 @@ Older files name their one frame `example` or `build_frame` instead of marking i
 A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])`. 
 
 ```python
-from kumiki.csg.feature_paths import find_feature
-
 post = frame.cut_timber_of(post_timber)
-shoulder = find_feature(post, ["tenon_joint"], "shoulder")   # CSG labels down to the node, then the feature name
-bottom = find_feature(post, [], "rptw.bottom")                # a timber's own faces: rptw.* (ptw.* inside rough stock)
+shoulder = tenon_joint.feature(MortiseAndTenonFeatures.SHOULDER)   # a feature the joint names
+bottom = post.face(TimberFace.BOTTOM)                               # a timber's own face
 shop = Drawing(
-    name="post (generated)",
+    name="post",
     timbers=[post.timber],
-    viewports=shop_drawing_viewports(),   # the piece's four long faces and a preview; elevation_viewports() for a whole frame
-    measurements={SHOP_DRAWING_IDS["front"]: [Measure(bottom, shoulder)]},
+    viewports=shop_drawing_viewports(),   # views named "Front", "Right", "Back", "Left", "Preview"; elevation_viewports() for a whole frame
+    measurements={"Front": [Measure(bottom, shoulder, placement=Beside(DimensionSide.BELOW, lane=1))]},
 )
 ```
 
+A dimension's `placement` is `Auto()` (the default, placed clear of the work), `Beside(side, lane)` (a side of the work, lane 1 nearest), or `Offset(distance)`. `post.edge(a, b)` is the line where two faces meet. A view of your own is `Viewport(label="Detail", camera=View.of_face(post.timber, TimberFace.FRONT, scale=1/5))`. The `describe` tool with a timber lists the feature names there are to measure.
+
 Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet, so you prefer building your own drawings or modifying the auto generated one.
+
+To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
 
 ### Deferring drawing generation and other slow work.
 

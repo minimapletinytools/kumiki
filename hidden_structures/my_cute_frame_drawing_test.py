@@ -24,6 +24,7 @@ Run directly to print what each drawing picked; load in Kigumi to see the drawin
 """
 
 import importlib.util as importlib_util
+from dataclasses import replace
 from pathlib import Path as FilePath
 from typing import Optional
 
@@ -47,7 +48,8 @@ def _rough(timber: Timber) -> Timber:
 
 
 def _load_cute_frame():
-    """my_cute_frame's frame, every timber of it rough on its two non-reference faces.
+    """my_cute_frame's frame function, every timber of it rough on its two non-reference faces, and
+    without the drawings it draws by hand (these drawings are generated).
 
     my_cute_frame.py is the starter project's frame and stays as it is, so the rough stock goes in
     here, where its timbers are made.
@@ -58,7 +60,8 @@ def _load_cute_frame():
     module = importlib_util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.create_axis_aligned_timber = lambda *args, **kwargs: _rough(create_axis_aligned_timber(*args, **kwargs))
-    return module.my_cute_frame
+    build = module.my_cute_frame
+    return lambda *args, **kwargs: replace(build(*args, **kwargs), drawings=[])
 
 
 FIXED_TIMBER = "Left Side"

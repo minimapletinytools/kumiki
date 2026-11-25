@@ -578,6 +578,7 @@
   "agent.tool.say.camera": "Moving the camera in {target}",
   "agent.tool.say.check_frame": "Building {target} to check it",
   "agent.tool.say.describe_frame": "Looking over {target}",
+  "agent.tool.say.describe": "Looking over {target}",
   "agent.tool.say.describe_panel": "Looking at {target}",
   "agent.tool.say.drawings": "Looking at the drawings of {target}",
   "agent.tool.say.read_view_log": "Reading {target}'s log",

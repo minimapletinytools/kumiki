@@ -3,6 +3,13 @@ const {
 } = require('../webview/measurements.js');
 
 describe('dimensionLayout', () => {
+    test('a vertical label reads bottom to top whichever way its anchors run', () => {
+        const up = dimensionLayout({ x: 0, y: 100 }, { x: 0, y: 0 }, { offset: 20 });
+        const down = dimensionLayout({ x: 0, y: 0 }, { x: 0, y: 100 }, { offset: 20 });
+        expect(up.label.angle).toBeCloseTo(-90);
+        expect(down.label.angle).toBeCloseTo(-90);
+    });
+
     const from = { x: 100, y: 100 };
     const to = { x: 200, y: 100 };
 

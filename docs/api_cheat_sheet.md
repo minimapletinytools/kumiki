@@ -195,15 +195,24 @@ def post_drawing(finishing: Finishing) -> None:
     finishing.add_drawing(piece_drawing(SymmetricTimberGroup(frame.cut_timber_of(post), ())))
 frame = frame.with_finishing(post_drawing)
 
+# or the generated drawings, changed: a dimension added to the post's Front view, below the work
+from kumiki.drawings.auto_drawings import with_drawings
+def edit(drawings):
+    post_cut = drawings.piece("post").cut_timbers[0]
+    drawings.piece("post").view("Front").measure(post_cut.face(TimberFace.BOTTOM),
+                                                 joint.feature(MortiseAndTenonFeatures.SHOULDER),
+                                                 placement=Beside(DimensionSide.BELOW, lane=1))
+frame = with_drawings(frame, edit, fixed_path="beam")
+
 return frame
 ```
 
 To add measurements by manually, make a `Drawing` whose `measurements` are `Measure(feature_a, feature_b)`s between features found with `find_feature`, and add it from a finishing routine (`frame.with_finishing`, `Finishing.add_drawing`). Use the `kumiki_source` tool to see the following files:
 
-- `kumiki/drawings/auto_drawings.py`: `with_auto_drawings`, and `plan_drawing` / `piece_drawing` to start from a generated drawing
-- `kumiki/drawings/drawing.py`: `Drawing`, `shop_drawing_viewports()`, `SHOP_DRAWING_IDS`, `elevation_viewports()`
-- `kumiki/drawings/measure.py`: `Measure`
-- `kumiki/csg/feature_paths.py`: `find_feature`, which names the features to measure between
+- `kumiki/drawings/auto_drawings.py`: `with_auto_drawings`, `with_drawings`, and `plan_drawing` / `piece_drawing` to start from a generated drawing
+- `kumiki/drawings/drawing.py`: `Drawing`, `Viewport` (named by its label or `id`), `View`, `shop_drawing_viewports()`, `elevation_viewports()`
+- `kumiki/drawings/measure.py`: `Measure`, and its placements `Auto`, `Beside`, `Offset`
+- `Joint.feature`, `CutTimber.feature` / `face` / `edge` / `corner` (kumiki/timber.py), and the names in `kumiki/joints/workshop/feature_names.py`, name the features to measure between; the `describe` tool lists them for a timber
 - `kumiki/finishing.py`: `Finishing`
 - an example: `patterns/structures/dovetailed_sawhorse.py`; and "Generating drawings" in `agent_usage_instructions.md`
 

@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 from ..identity import DrawingId, ViewportId
 if TYPE_CHECKING:
     from ..timber import PerfectTimberWithin
-from ..rule import Numeric
+    from ..timber_features import TimberFace
+from ..rule import Numeric, V3, create_v3
 
 # Measuring lived here; its names are still importable from this module.
 from .measure import (  # noqa: F401
@@ -46,11 +47,71 @@ from .measure import (  # noqa: F401
     FROM_VIEWPORT,
     MeasurementPlaneSpec,
     MeasurementPlacement,
+    Placement,
+    Auto,
+    Offset,
+    Beside,
+    DimensionSide,
     Measure,
     MeasurementSource,
     does_override,
     does_override_identities,
 )
+
+
+@dataclass(frozen=True)
+class View:
+    """What a drawing viewport shows: which way it looks, which way is up, its scale and its centre.
+
+    Build one with `View.of_face` or `View.world`. Vectors are in world space.
+    """
+
+    look: V3
+    up: V3
+    #: Sheet length per world length (1/5 draws at 1:5). None fits the drawing's timbers in the viewport.
+    scale: Optional[float] = None
+    #: The world point at the viewport's middle. None is the middle of the drawing's timbers.
+    centre: Optional[V3] = None
+
+    def __post_init__(self):
+        if self.scale is not None and not self.scale > 0:
+            raise ValueError(f"A view's scale is positive, got {self.scale}")
+
+    @property
+    def axes(self) -> ViewAxes:
+        """Return the camera frame: `up` squared to `look`, and right across the sheet."""
+        from .kigumi_drawing_view_helpers import frame_from_look_and_up
+        frame = frame_from_look_and_up([float(v) for v in self.look], [float(v) for v in self.up])
+        return ViewAxes(look=create_v3(*frame.look), right=create_v3(*frame.right), up=create_v3(*frame.up))
+
+    @staticmethod
+    def of_face(timber: 'PerfectTimberWithin', face: 'TimberFace', scale: Optional[float] = None,
+                centre: Optional[V3] = None) -> 'View':
+        """Return a view square onto `timber`'s `face`, from outside it.
+
+        A long face is seen as a shop drawing sees it, the timber's length across the sheet; an end
+        face with the timber's front face up.
+        """
+        from ..timber_features import TimberFace
+        from .kigumi_drawing_view_helpers import camera_looking_at_face
+        normal = [float(v) for v in timber.get_face_direction_global(face)]
+        if face in (TimberFace.TOP, TimberFace.BOTTOM):
+            up = [float(v) for v in timber.get_face_direction_global(TimberFace.FRONT)]
+            return View(look=create_v3(*[-v for v in normal]), up=create_v3(*up), scale=scale, centre=centre)
+        frame = camera_looking_at_face(normal, [float(v) for v in timber.get_length_direction_global()])
+        return View(look=create_v3(*frame.look), up=create_v3(*frame.up), scale=scale, centre=centre)
+
+    @staticmethod
+    def world(side: str, scale: Optional[float] = None, centre: Optional[V3] = None) -> 'View':
+        """Return a world elevation: "front" looks along +y, "back" -y, "right" -x, "left" +x, with z
+        up, and "top" looks down -z, "bottom" up +z, with +y up the sheet."""
+        looks = {"front": ((0, 1, 0), (0, 0, 1)), "back": ((0, -1, 0), (0, 0, 1)),
+                 "right": ((-1, 0, 0), (0, 0, 1)), "left": ((1, 0, 0), (0, 0, 1)),
+                 "top": ((0, 0, -1), (0, 1, 0)), "bottom": ((0, 0, 1), (0, 1, 0))}
+        if side not in looks:
+            raise ValueError(f"A world view is one of {', '.join(looks)}, not {side!r}")
+        look, up = looks[side]
+        return View(look=create_v3(*look), up=create_v3(*up), scale=scale, centre=centre)
 
 
 # TODO move these into a viewport.py file or prefix with Viewport to make it more clear
@@ -147,8 +208,8 @@ class Viewport:
     """One view on a sheet, and the views inside it.
 
     A leaf (no `subdivision`) gets a camera; a container's children fill its cell. `rect` and `z`
-    place a floating root viewport and are ignored inside a subdivision. A viewport doesn't know its
-    id or position; Drawing does. Compared by identity.
+    place a floating root viewport and are ignored inside a subdivision. It is named by its `id`, else
+    its label (viewport_names); it doesn't know its position, Drawing does. Compared by identity.
     """
 
     label: Optional[str] = None
@@ -163,9 +224,12 @@ class Viewport:
     #: Which is in front where two floating viewports overlap. Higher is nearer
     #: the reader.
     z: int = 0
-    #: A leaf's camera, in world space. None lets the viewer choose one from the label
-    #: ("Front", "Top", "Preview", ...).
-    camera: Optional[ViewAxes] = None
+    #: A leaf's camera: a `View` (direction, scale, centre) or bare `ViewAxes`, in world space. None
+    #: lets the viewer choose one from the label ("Front", "Top", "Preview", ...).
+    camera: Optional[Union[ViewAxes, View]] = None
+    #: What measurements and the drawings file call this viewport. None uses the label. Set it to keep
+    #: a viewport's saved edits when its label changes.
+    id: Optional[str] = None
 
     def __post_init__(self):
         object.__setattr__(self, 'measurements', tuple(self.measurements))
@@ -200,6 +264,37 @@ class Viewport:
     def taking(self, size: Size) -> Portion:
         """Return Portion(self, size): `plan.taking(Share(2))`."""
         return Portion(viewport=self, size=size)
+
+
+def viewport_names(roots: Sequence[Viewport]) -> Dict[str, str]:
+    """Return each viewport's name by its position id ("0.1.0").
+
+    A viewport's name is its `id`, else a leaf's label, else its position. A label two leaves share
+    names neither, and they keep their positions. Raises ValueError if two viewports have one `id`.
+    """
+    positions: List[Tuple[str, Viewport]] = []
+
+    def descend(viewport: Viewport, path: Tuple[int, ...]) -> None:
+        positions.append((".".join(str(step) for step in path), viewport))
+        for index, child in enumerate(viewport.children):
+            descend(child, path + (index,))
+
+    for index, root in enumerate(roots):
+        descend(root, (index,))
+    ids = [viewport.id for _, viewport in positions if viewport.id]
+    for one in set(ids):
+        if ids.count(one) > 1:
+            raise ValueError(f"Two viewports have the id {one!r}; a viewport's id names it, so it must be unique")
+    labels = [viewport.label for _, viewport in positions if not viewport.id and viewport.is_leaf and viewport.label]
+    names = {}
+    for position, viewport in positions:
+        if viewport.id:
+            names[position] = viewport.id
+        elif viewport.is_leaf and viewport.label and labels.count(viewport.label) == 1 and viewport.label not in ids:
+            names[position] = viewport.label
+        else:
+            names[position] = position
+    return names
 
 
 def rows(*children: Union[Viewport, 'Subdivision', Portion], gap: Numeric = 0) -> Subdivision:
@@ -297,6 +392,7 @@ class Drawing:
     #: layout.resolve_drawing needs one.
     page: Optional[Page] = None
 
+    #: Measurements by viewport: its name (`Viewport.id`, else its label) or, for now, its position ("0.0.0").
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -314,6 +410,7 @@ class Drawing:
         viewports = (default_viewports_for(len(self.timbers))
                      if self.viewports is None else tuple(self.viewports))
         object.__setattr__(self, 'viewports', viewports)
+        object.__setattr__(self, '_names', viewport_names(viewports))
         self._check_placement()
         self._check_each_viewport_appears_once()
 
@@ -334,14 +431,23 @@ class Drawing:
         for index, root in enumerate(self.roots):
             yield from descend(root, (index,))
 
+    def viewport_name(self, key: Union[str, ViewportId]) -> str:
+        """Return the name of the viewport `key` names, by its name or its position; `key` if it names none."""
+        key = str(key)
+        names: Dict[str, str] = getattr(self, '_names')
+        if key in names.values():
+            return key
+        return names.get(key, key)
+
     def measurements_by_viewport(self) -> Dict[str, Tuple[Measure, ...]]:
-        """Return the drawing's measurements, keyed by viewport id."""
+        """Return the drawing's measurements, keyed by viewport name."""
         collected: Dict[str, Tuple[Measure, ...]] = {}
         for viewport_id, viewport in self.walk():
             if viewport.measurements:
-                collected[str(viewport_id)] = tuple(viewport.measurements)
+                key = self.viewport_name(viewport_id)
+                collected[key] = collected.get(key, ()) + tuple(viewport.measurements)
         for viewport_id, measures in self.measurements.items():
-            key = str(viewport_id)
+            key = self.viewport_name(viewport_id)
             collected[key] = collected.get(key, ()) + tuple(measures)
         return collected
 
@@ -356,11 +462,11 @@ class Drawing:
                 return found
         raise KeyError(f"{viewport!r} is not a viewport of drawing {self.drawing_id}")
 
-    def viewport_at(self, viewport_id: ViewportId) -> Optional['Viewport']:
-        """Return the viewport with id `viewport_id`, or None."""
-        wanted = str(viewport_id)
+    def viewport_at(self, viewport_id: Union[str, ViewportId]) -> Optional['Viewport']:
+        """Return the viewport `viewport_id` names, by its name or its position, or None."""
+        wanted = self.viewport_name(viewport_id)
         for found, viewport in self.walk():
-            if str(found) == wanted:
+            if self.viewport_name(found) == wanted:
                 return viewport
         return None
 

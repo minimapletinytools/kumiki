@@ -39,6 +39,7 @@ from kumiki.csg.cutcsg import (
     HALF_SPACE_PLANE,
     shoulder_override,
 )
+from kumiki.joints.workshop.feature_names import MortiseAndTenonFeatures as MT
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -198,18 +199,18 @@ def _flared_mortise(side_angle: Numeric, spread: int, size: V2, shoulder_global:
 
     def plane(normal: V3, point: V3, name: str, opposite: str | None = None) -> HalfSpace:
         normal_global = shoulder_global.local_to_global_direction(normal)
-        props = FeatureProperties() if name == "mortise_entry" else hole
+        props = FeatureProperties() if name == MT.MORTISE_ENTRY else hole
         if opposite:
             props = measured_against(props, opposite)
         return HalfSpace(normal=normal_global, offset=safe_dot_product(normal_global, shoulder_global.local_to_global(point)),
                          feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, props)])
 
-    cut: CutCSG = plane(along, start * along, "mortise_entry")
+    cut: CutCSG = plane(along, start * along, MT.MORTISE_ENTRY)
     if depth is not None:
-        cut = Intersection(cut, plane(-along, depth * along, "mortise_bottom"))
+        cut = Intersection(cut, plane(-along, depth * along, MT.MORTISE_BOTTOM))
     for index, (axis, positive, negative) in enumerate((
-        (create_v3(1, 0, 0), "mortise_right", "mortise_left"),
-        (create_v3(0, 1, 0), "mortise_front", "mortise_back"),
+        (create_v3(1, 0, 0), MT.MORTISE_RIGHT, MT.MORTISE_LEFT),
+        (create_v3(0, 1, 0), MT.MORTISE_FRONT, MT.MORTISE_BACK),
     )):
         for sign, name, opposite in ((1, positive, negative), (-1, negative, positive)):
             normal = -sign * axis
@@ -238,11 +239,11 @@ _TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 def _mortise_walls(wall: FeatureProperties) -> List[FeatureOverride]:
     """The mortise hole's walls, each measured against the opposite one, and its bottom."""
     return [
-        FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right", measured_against(wall, "mortise_left")),
-        FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left", measured_against(wall, "mortise_right")),
-        FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front", measured_against(wall, "mortise_back")),
-        FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back", measured_against(wall, "mortise_front")),
-        FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom", wall),
+        FeatureOverride(prism_face_key(PrismFace.RIGHT), MT.MORTISE_RIGHT, measured_against(wall, MT.MORTISE_LEFT)),
+        FeatureOverride(prism_face_key(PrismFace.LEFT), MT.MORTISE_LEFT, measured_against(wall, MT.MORTISE_RIGHT)),
+        FeatureOverride(prism_face_key(PrismFace.FRONT), MT.MORTISE_FRONT, measured_against(wall, MT.MORTISE_BACK)),
+        FeatureOverride(prism_face_key(PrismFace.BACK), MT.MORTISE_BACK, measured_against(wall, MT.MORTISE_FRONT)),
+        FeatureOverride(prism_face_key(PrismFace.TOP), MT.MORTISE_BOTTOM, wall),
     ]
 
 
@@ -545,7 +546,7 @@ def cut_mortise_and_tenon_joint(
         # Bore Y lies along the receiver, the axis stretched by the oblique entrance.
         spread_index = 1 if spread_index == joint_angle_axis_index else 0
 
-    tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
+    tenon_tip_name = MT.TENON_TOP if tenon_end == TimberEnd.TOP else MT.TENON_BOTTOM
 
     wedge_layouts: dict[str, _TenonWedgeLayout] = {}
     if wedge_parameters is not None:
@@ -590,16 +591,16 @@ def cut_mortise_and_tenon_joint(
             end_distance=tenon_length,
             extra_features=(
                 *(datum for layout in wedge_layouts.values() for datum in layout.kerf_datums),
-                MidplaneFeature("tenon_centerplane_left_right", between=("tenon_right", "tenon_left")),
-                MidplaneFeature("tenon_centerplane_front_back", between=("tenon_front", "tenon_back")),
+                MidplaneFeature(MT.TENON_CENTERPLANE_LEFT_RIGHT, between=(MT.TENON_RIGHT, MT.TENON_LEFT)),
+                MidplaneFeature(MT.TENON_CENTERPLANE_FRONT_BACK, between=(MT.TENON_FRONT, MT.TENON_BACK)),
             ),
             feature_overrides=[
                 # Cheek to cheek is the tenon's thickness; tip to shoulder its length, and the tip
                 # is measured from nothing else.
-                FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right", measured_against(_TENON_FACE, "tenon_left")),
-                FeatureOverride(prism_face_key(PrismFace.LEFT), "tenon_left", measured_against(_TENON_FACE, "tenon_right")),
-                FeatureOverride(prism_face_key(PrismFace.FRONT), "tenon_front", measured_against(_TENON_FACE, "tenon_back")),
-                FeatureOverride(prism_face_key(PrismFace.BACK), "tenon_back", measured_against(_TENON_FACE, "tenon_front")),
+                FeatureOverride(prism_face_key(PrismFace.RIGHT), MT.TENON_RIGHT, measured_against(_TENON_FACE, MT.TENON_LEFT)),
+                FeatureOverride(prism_face_key(PrismFace.LEFT), MT.TENON_LEFT, measured_against(_TENON_FACE, MT.TENON_RIGHT)),
+                FeatureOverride(prism_face_key(PrismFace.FRONT), MT.TENON_FRONT, measured_against(_TENON_FACE, MT.TENON_BACK)),
+                FeatureOverride(prism_face_key(PrismFace.BACK), MT.TENON_BACK, measured_against(_TENON_FACE, MT.TENON_FRONT)),
                 FeatureOverride(prism_face_key(PrismFace.TOP), tenon_tip_name,
                                 measured_against(_TENON_FACE, "shoulder", datum=Datum.AVOID)),
             ],
@@ -609,7 +610,7 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.SHOULDER_PLANE)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name=MT.SHOULDER, group=FeatureGroup.SHOULDER_PLANE)],
         label=CutCSGLabel("shoulder"),
     )
 
@@ -753,7 +754,7 @@ def cut_mortise_and_tenon_joint(
                     # not by a tangent to its wall -- and the barrel declines to
                     # locate, being curved, so without this the hole has nothing
                     # measurable on it at all.
-                    extra_features=[CylinderAxisFeature("peg_hole_axis")],
+                    extra_features=[CylinderAxisFeature(MT.PEG_HOLE_AXIS)],
                     label=CutCSGLabel(label),
                 )
             return RectangularPrism(

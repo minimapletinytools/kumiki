@@ -946,31 +946,72 @@ FROM_VIEWPORT = FromViewport()
 MeasurementPlaneSpec = Union[MeasurementPlane, FromViewport]
 
 
-@dataclass(frozen=True)
-class MeasurementPlacement:
-    """Where a dimension is drawn: `offset` from the features, `along` them, and `flip` for an angle's supplement."""
+class Placement:
+    """Where a dimension line is drawn. One of `Auto`, `Offset` or `Beside`.
 
-    #: How far the dimension line sits from the features, in world units, square to the run.
-    #: None uses the viewport's default (in pixels).
+    Each kind is turned into an `Offset` before the drawing is shown (auto_drawings.with_placed_dimensions).
+    """
+
+
+@dataclass(frozen=True)
+class Auto(Placement):
+    """Let the drawing place the dimension, clear of the work and of the others."""
+
+
+@dataclass(frozen=True)
+class Offset(Placement):
+    """A dimension line `offset` from the features, square to the run, and slid `along` them.
+
+    `offset` is in world units. Positive is to the right of the run from the measure's `anchor_a` to its
+    `anchor_b`, as it is seen on screen. None uses the viewport's default (in pixels).
+    """
+
     offset: Optional[float] = None
     #: How far the anchors are slid along slide_axis from their default, in world units. Only for a
     #: distance between two lines; None is the default.
     along: Optional[float] = None
-    #: An angle measured the other way round its second feature: the supplement of the one it
-    #: opens by default (angle_rays). Only an angle has one.
-    flip: bool = False
 
     @classmethod
-    def from_wire(cls, value) -> Optional['MeasurementPlacement']:
-        """Return a placement from {"offset", "along", "flip"}, each optional."""
+    def from_wire(cls, value) -> Optional['Offset']:
+        """Return an offset from {"offset", "along"}, each optional."""
         if value is None or isinstance(value, cls):
             return value
         if isinstance(value, Mapping):
             offset, along = value.get("offset"), value.get("along")
             return cls(offset=None if offset is None else float(offset),
-                       along=None if along is None else float(along),
-                       flip=bool(value.get("flip", False)))
+                       along=None if along is None else float(along))
         raise TypeError(f"Expected a placement or a mapping, got {type(value).__name__}")
+
+
+#: The name the stored form had before the other kinds; an `Offset`.
+MeasurementPlacement = Offset
+
+
+class DimensionSide(Enum):
+    """Which side of the work a dimension goes on, as the view shows it."""
+
+    LEFT = "left"
+    RIGHT = "right"
+    ABOVE = "above"
+    BELOW = "below"
+
+
+@dataclass(frozen=True)
+class Beside(Placement):
+    """A dimension line beside the work on `side`, in row `lane` counted out from the work's outline.
+
+    Lane 1 is nearest the work; each lane is a fixed distance further out on the sheet. Only for a
+    distance in a drawing view whose run lies along that side.
+    """
+
+    side: DimensionSide
+    lane: int = 1
+
+    def __post_init__(self):
+        if isinstance(self.side, str):
+            object.__setattr__(self, "side", DimensionSide(self.side))
+        if self.lane < 1:
+            raise ValueError(f"Lanes count from 1, got {self.lane}")
 
 
 @dataclass(frozen=True)
@@ -989,7 +1030,7 @@ class Measure:
     measure_id: Optional[MeasurementId] = None
     #: Where the dimension sits. Deliberately not part of identity: moving a
     #: dimension line is not measuring something else.
-    placement: Optional[MeasurementPlacement] = None
+    placement: Placement = field(default_factory=Auto)
 
     #: The plane it is taken and drawn on; FROM_VIEWPORT by default. Not part of identity.
     plane: MeasurementPlaneSpec = FROM_VIEWPORT
@@ -997,15 +1038,23 @@ class Measure:
     #: Dimension text. None shows the value alone. Include {value} to insert the formatted measurement.
     label: Optional[str] = None
 
+    #: For an angle, measure the other way round its second feature: the supplement of the one it opens
+    #: by default (angle_rays). Part of what is measured, so not part of the placement.
+    flip: bool = False
+
+    def __post_init__(self):
+        if self.placement is None:
+            object.__setattr__(self, "placement", Auto())
+
     def format_label(self, value: str) -> str:
         """Return the dimension text with the caller’s formatted length or angle."""
         return value if self.label is None else self.label.replace("{value}", value)
 
     def wire_anchors(
         self, frame: 'Frame',
-    ) -> Optional[Tuple[FeaturePath, FeaturePath, Optional[MeasurementPlacement]]]:
+    ) -> Optional[Tuple[FeaturePath, FeaturePath, Optional[Offset]]]:
         """Return both anchors as wire paths in sorted order, with the placement to match (offset negated if
-        swapped), or None if either isn't in `frame`.
+        swapped), or None if either isn't in `frame`. A placement not yet an `Offset` comes back as None.
 
         NOTE Some day we may support asymmetric measurements.
         """
@@ -1014,9 +1063,9 @@ class Measure:
         first, second = to_feature_path(self.anchor_a, frame), to_feature_path(self.anchor_b, frame)
         if first is None or second is None:
             return None
+        placement = self.placement if isinstance(self.placement, Offset) else None
         if first.sort_key <= second.sort_key:
-            return first, second, self.placement
-        placement = self.placement
+            return first, second, placement
         if placement is not None and placement.offset is not None:
             placement = replace(placement, offset=-placement.offset)
         return second, first, placement

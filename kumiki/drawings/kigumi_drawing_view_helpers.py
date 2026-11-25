@@ -2,7 +2,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, NamedTuple, Sequence, Tuple
+from typing import Optional, TYPE_CHECKING, Dict, List, NamedTuple, Sequence, Tuple
 
 from ..viewer.rule_at_home import FloatList3
 from kumiki.user_warnings import warn_user
@@ -72,15 +72,41 @@ def frame_from_look_and_up(look: FloatList3, up_hint: FloatList3) -> CameraFrame
 # --- what a view is fitted to -----------------------------------------------------------------
 
 def cut_extent(cut_timber: 'CutTimber', stock_length: float) -> Tuple[float, float]:
-    """Return where the finished piece starts and ends along the timber's length (not its stock)."""
+    """Return where the finished piece starts and ends along the timber's length (not its stock),
+    including anything a joint carries past its ends, such as a tenon."""
     try:
         prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
         start = float(prism.start_distance) if prism.start_distance is not None else 0.0
         end = float(prism.end_distance) if prism.end_distance is not None else stock_length
-        return start, end
     except Exception as exc:
         warn_user(f"could not measure cut extent: {exc}")
         return 0.0, stock_length
+    reach = _reach_along_length(cut_timber, stock_length)
+    return (min(start, reach[0]), max(end, reach[1])) if reach is not None else (start, end)
+
+
+def _reach_along_length(cut_timber: 'CutTimber', stock_length: float) -> Optional[Tuple[float, float]]:
+    """Return how far the cut piece reaches along its length, on lines through a 3x3 grid across its
+    section, or None if it can't be told."""
+    from ..csg.edges_on_csg import crop_line_to_segments_on_csg
+    from ..geometry import Line
+    from ..rule import create_v3
+
+    timber = cut_timber.timber
+    root = cut_timber.render_timber_with_cuts_csg_local()
+    half_width, half_height = float(timber.size[0]) / 2, float(timber.size[1]) / 2
+    low, high = float("inf"), float("-inf")
+    for x in (-0.45, 0.0, 0.45):
+        for y in (-0.45, 0.0, 0.45):
+            line = Line(direction=create_v3(0, 0, 1), point=create_v3(x * half_width, y * half_height, stock_length / 2))
+            try:
+                pieces = crop_line_to_segments_on_csg(line, root, seed_reach=4 * stock_length)
+            except Exception:
+                return None
+            for piece in pieces or ():
+                for end in (piece.start, piece.end):
+                    low, high = min(low, float(end[2, 0])), max(high, float(end[2, 0]))
+    return (low, high) if low <= high else None
 
 
 def _floats(vec) -> FloatList3:

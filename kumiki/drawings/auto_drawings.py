@@ -30,8 +30,10 @@ from ..timber import CutTimber, Frame, PerfectTimberWithin
 from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
-from .drawing import ELEVATION_IDS, Drawing, Page, Viewport, columns, covering_page, elevation_viewports, rows
-from .measure import FromViewport, Measure, MeasurementOperation, MeasurementPlacement, ViewAxes
+from .drawing import ELEVATION_IDS, Drawing, Page, View, Viewport, columns, covering_page, elevation_viewports, rows
+from .measure import (Auto, Beside, DimensionSide, FromViewport, Measure, MeasurementKind, MeasurementOperation, Offset,
+                      Placement, ViewAxes)
+from ..user_warnings import warn_user
 from .measure_solving import DrawingSolve
 from .visibility import visible_by_view
 from .xray import xray_sides
@@ -253,6 +255,115 @@ def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[Extr
     return frame.with_finishing(generate)
 
 
+class ViewEdit:
+    """One view of a drawing being edited in `with_drawings`: add or remove its dimensions."""
+
+    def __init__(self, measures: List[Measure], frame: Frame):
+        self._measures = measures
+        self._frame = frame
+
+    def measure(self, a: FeatureHandle, b: FeatureHandle, *, kind: Optional[MeasurementKind] = None,
+                placement: Optional[Placement] = None, label: Optional[str] = None, flip: bool = False) -> Measure:
+        """Add a dimension between `a` and `b` and return it. Placed automatically unless `placement` says."""
+        measure = Measure(a, b, kind=kind, placement=placement or Auto(), label=label, flip=flip)
+        self._measures.append(measure)
+        return measure
+
+    def remove(self, a: FeatureHandle, b: FeatureHandle) -> int:
+        """Remove every dimension between `a` and `b`, either way round; return how many there were."""
+        wanted = Measure(a, b).pair_identity(self._frame)
+        kept = [measure for measure in self._measures if measure.pair_identity(self._frame) != wanted]
+        removed = len(self._measures) - len(kept)
+        self._measures[:] = kept
+        return removed
+
+
+class DrawingEdit:
+    """A drawing being edited in `with_drawings`: its views by name, and the timbers it draws."""
+
+    def __init__(self, drawing: Drawing, frame: Frame):
+        self.drawing = drawing
+        self._frame = frame
+        self._measures: Dict[str, List[Measure]] = {name: list(measures)
+                                                    for name, measures in drawing.measurements_by_viewport().items()}
+
+    @property
+    def cut_timbers(self) -> List[CutTimber]:
+        """Return the cut timbers it draws, the frame's own."""
+        return [cut for cut in (self._frame.cut_timber_of(timber) for timber in self.drawing.timbers) if cut is not None]
+
+    def view(self, name: str) -> ViewEdit:
+        """Return the view `name` ("Front", or a viewport's id); raises KeyError, naming them, if there is none."""
+        found = self.drawing.viewport_at(name)
+        if found is None or not found.is_leaf:
+            names = [str(placed) for placed, viewport in self.drawing.leaves()]
+            raise KeyError(f"Drawing {self.drawing.name!r} has no view {name!r}; it has "
+                           + ", ".join(self.drawing.viewport_name(one) for one in names))
+        return ViewEdit(self._measures.setdefault(self.drawing.viewport_name(name), []), self._frame)
+
+    def built(self) -> Drawing:
+        """Return the drawing with the edits made."""
+        return replace(self.drawing, viewports=[_without_measurements(root) for root in self.drawing.roots],
+                       measurements={ViewportId(name): measures for name, measures in self._measures.items()})
+
+
+class DrawingEdits:
+    """What a `with_drawings` routine is handed: the generated drawings to change, and a way to add more."""
+
+    def __init__(self, plan: DrawingEdit, pieces: List[Tuple[SymmetricTimberGroup, DrawingEdit]], frame: Frame):
+        #: The plan: every timber in world elevations.
+        self.plan = plan
+        self._pieces = pieces
+        self._frame = frame
+        self._added: List[Drawing] = []
+
+    def piece(self, path: str) -> DrawingEdit:
+        """Return the shop drawing of the piece the timber at `path` is (or matches); raises KeyError if none is."""
+        for group, edit in self._pieces:
+            if path in [cut.timber.ticket.path for cut in (group.representative, *(m.cut for m in group.matches))]:
+                return edit
+        raise KeyError(f"No piece drawing has a timber at {path!r}; the pieces are "
+                       + ", ".join(group.representative.timber.ticket.path for group, _ in self._pieces))
+
+    def add(self, drawing: Drawing) -> None:
+        """Add a drawing of your own."""
+        self._added.append(drawing)
+
+    def all(self) -> List[Drawing]:
+        """Return every drawing, edited, then those added."""
+        return [self.plan.built(), *(edit.built() for _, edit in self._pieces), *self._added]
+
+
+def with_drawings(frame: Frame, edit: Callable[[DrawingEdits], None], fixed_path: str,
+                  extra_views: Optional[ExtraViews] = None,
+                  dimensioned: Optional[Callable[[CutTimber], bool]] = None) -> Frame:
+    """Return `frame` with the generated plan and piece drawings (as with_auto_drawings), changed by `edit`.
+
+    `edit(drawings)` runs once they are generated, in the frame's finishing work: it can add and remove
+    dimensions in any view (`drawings.piece("post").view("Front").measure(a, b)`) and add drawings of its
+    own. Every dimension not given a placement is then placed clear of the work.
+    """
+    cut_timbers = list(frame.cut_timbers)
+    members = [cut for cut in cut_timbers if dimensioned(cut)] if dimensioned else None
+
+    def generate(finishing: Finishing) -> None:
+        groups = match_timbers(cut_timbers)
+        finishing.progress(0, 2 + len(groups), "plan")
+        plan = DrawingEdit(plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members), frame)
+        pieces = []
+        for done, group in enumerate(groups, start=1):
+            finishing.progress(done, 2 + len(groups), group.representative.timber.ticket.path)
+            drawing = piece_drawing(group, extra_views(group.representative) if extra_views else {})
+            pieces.append((group, DrawingEdit(drawing, frame)))
+        finishing.progress(1 + len(groups), 2 + len(groups), "edits")
+        edits = DrawingEdits(plan, pieces, frame)
+        edit(edits)
+        for drawing in edits.all():
+            finishing.add_drawing(with_placed_dimensions(drawing, frame))
+
+    return frame.with_finishing(generate)
+
+
 #: The sheet the viewer draws code drawings on (A3 landscape), in metres.
 SHEET = Page(0.420, 0.297)
 
@@ -260,8 +371,8 @@ SHEET = Page(0.420, 0.297)
 TEXT_MM = 4.8
 CHAR_MM = 2.8
 #: The first lane's distance from the features, and lane to lane, in sheet millimetres.
-BASE_MM = 5.0
-PITCH_MM = 7.0
+BASE_MM = 9.0
+PITCH_MM = 8.0
 LANES = 8
 #: The material grid's cell, in sheet millimetres.
 CELL_MM = 0.5
@@ -338,6 +449,25 @@ class MaterialGrid:
         inside = (l1 >= -1e-6) & (l2 >= -1e-6) & (1 - l1 - l2 >= -1e-6)
         self.cells[lo[1]:hi[1] + 1, lo[0]:hi[0] + 1] |= inside
 
+    def material(self) -> np.ndarray:
+        """Return the centres of the cells with material on them, in sheet mm, (n, 2)."""
+        if not hasattr(self, "_material"):
+            rows, cols = np.nonzero(self.cells)
+            self._material = self.origin + (np.stack([cols, rows], axis=1) + 0.5) * CELL_MM
+        return self._material
+
+    def beyond(self, a: np.ndarray, b: np.ndarray, toward: np.ndarray, gap: float) -> float:
+        """Return how far to move the line from `a` to `b` along unit `toward` (sheet) so it lies `gap` mm
+        past the work's outline in that direction, over the stretch between the two ends."""
+        run = b - a
+        run = run / max(float(np.linalg.norm(run)), 1e-9)
+        low, high = sorted((float(a @ run), float(b @ run)))
+        points = self.material()
+        along = points @ run
+        near = points[(along >= low - CELL_MM) & (along <= high + CELL_MM)]
+        edge = max([float(a @ toward), float(b @ toward)] + ([float((near @ toward).max())] if len(near) else []))
+        return max(edge + gap - float(a @ toward), edge + gap - float(b @ toward))
+
     def fraction(self, points: np.ndarray) -> float:
         """Return the fraction of sheet `points` that sit on material."""
         cells = np.floor((np.atleast_2d(points) - self.origin) / CELL_MM).astype(int)
@@ -389,8 +519,8 @@ def text_up(run: np.ndarray) -> np.ndarray:
     """Return which way a label stands on the sheet: the viewer reads it along `run`, within 90
     degrees of upright, set on the line's upper side."""
     angle = np.degrees(np.arctan2(run[1], run[0]))
-    # As the viewer turns it (measurements.js dimensionLayout).
-    while angle > 90:
+    # As the viewer turns it (measurements.js dimensionLayout): a vertical one reads bottom to top.
+    while angle > 90 - 1e-6:
         angle -= 180
     while angle < -90:
         angle += 180
@@ -446,10 +576,15 @@ class Placed:
     cost: float
 
 
-def _candidates(dim: Dim, view: SheetView) -> List[Tuple[Optional[float], float, np.ndarray, np.ndarray]]:
-    """Return the (along, offset, a, b) to try."""
+def _lane_gap(lane: int) -> float:
+    """Return how far lane `lane` (from 1) sits past the work's outline, in sheet mm."""
+    return BASE_MM + (lane - 1) * PITCH_MM
+
+
+def _candidates(dim: Dim, view: SheetView, grid: MaterialGrid) -> List[Tuple[Optional[float], float, np.ndarray, np.ndarray]]:
+    """Return the (along, offset, a, b) to try: each lane past the work's outline, on either side."""
     out = []
-    lanes = [BASE_MM + lane * PITCH_MM for lane in range(LANES)]
+    ends = [(None, dim.a, dim.b)]
     if dim.slide is not None and dim.stretch is not None:
         slide_sheet = view.direction_to_sheet(dim.slide)
         facing = float(slide_sheet @ dim.away)
@@ -457,10 +592,27 @@ def _candidates(dim: Dim, view: SheetView) -> List[Tuple[Optional[float], float,
             # The ends slid to the end of the stretch on this side.
             along = (dim.stretch[1] if facing * side > 0 else dim.stretch[0]) - dim.t0
             shift = slide_sheet * along * view.mm_per_world
-            out += [(along, side * lane, dim.a + shift, dim.b + shift) for lane in lanes]
-    for side in (1.0, -1.0):
-        out += [(None, side * lane, dim.a, dim.b) for lane in lanes]
+            ends.append((along, dim.a + shift, dim.b + shift))
+    for along, a, b in ends:
+        for side in (1.0, -1.0):
+            out += [(along, side * grid.beyond(a, b, side * dim.away, _lane_gap(lane)), a, b)
+                    for lane in range(1, LANES + 1)]
     return out
+
+
+#: Each side as a sheet direction (y down).
+_SIDE_DIRECTIONS = {DimensionSide.LEFT: (-1.0, 0.0), DimensionSide.RIGHT: (1.0, 0.0),
+                    DimensionSide.ABOVE: (0.0, -1.0), DimensionSide.BELOW: (0.0, 1.0)}
+
+
+def _beside(dim: Dim, beside: Beside, grid: MaterialGrid) -> Optional[float]:
+    """Return the offset (sheet mm, along `dim.away`) putting `dim` in `beside`'s lane, or None if its line
+    can't lie on that side (the dimension runs across it)."""
+    toward = np.array(_SIDE_DIRECTIONS[beside.side])
+    facing = float(dim.away @ toward)
+    if abs(facing) < 0.5:
+        return None
+    return float(np.sign(facing)) * grid.beyond(dim.a, dim.b, toward, _lane_gap(beside.lane)) / abs(facing)
 
 
 def _try(dim: Dim, along, offset, a, b, grid: MaterialGrid, placed: List[Placed], rect) -> Placed:
@@ -490,18 +642,34 @@ def _try(dim: Dim, along, offset, a, b, grid: MaterialGrid, placed: List[Placed]
     return Placed(dim, along, offset, a, b, (la, lb), label, cost)
 
 
-def place(dims: Sequence[Dim], view: SheetView, meshes: Sequence[Mesh]) -> Dict[int, MeasurementPlacement]:
+def place(dims: Sequence[Dim], view: SheetView, meshes: Sequence[Mesh], beside: Mapping[int, Beside] = {},
+          grid: Optional[MaterialGrid] = None) -> Dict[int, Offset]:
     """Return a placement for each of `dims`, by its index, with the offset as the viewer reads it
-    for the ends in the order given (positive along `Dim.away`)."""
+    for the ends in the order given (positive along `Dim.away`).
+
+    A dim whose index is in `beside` goes in that lane, if it can lie on that side; the rest are placed
+    clear of the work and of each other.
+    """
     if not dims:
         return {}
-    grid = MaterialGrid(view, meshes)
+    grid = grid or MaterialGrid(view, meshes)
     rect = view.rect_mm()
     placed: List[Placed] = []
-    for dim in sorted(dims, key=lambda d: d.span):
+    free = []
+    for dim in dims:
+        wanted = beside.get(dim.index)
+        offset = _beside(dim, wanted, grid) if wanted is not None else None
+        if wanted is not None and offset is None:
+            warn_user(f"A dimension ({dim.text}) can't go {wanted.side.value} of the work: it runs across "
+                      "that side, so it is placed automatically.")
+        if offset is None:
+            free.append(dim)
+        else:
+            placed.append(_try(dim, None, offset, dim.a, dim.b, grid, placed, rect))
+    for dim in sorted(free, key=lambda d: d.span):
         placed.append(min((_try(dim, along, offset, a, b, grid, placed, rect)
-                           for along, offset, a, b in _candidates(dim, view)), key=lambda p: p.cost))
-    return {one.dim.index: MeasurementPlacement(offset=one.offset / view.mm_per_world, along=one.along)
+                           for along, offset, a, b in _candidates(dim, view, grid)), key=lambda p: p.cost))
+    return {one.dim.index: Offset(offset=one.offset / view.mm_per_world, along=one.along)
             for one in placed}
 
 
@@ -529,9 +697,17 @@ def sheet_views(drawing: Drawing, cuts: Sequence['CutTimber'], page: Page = SHEE
         x, y, w, h = (float(v) for v in placed.rect)
         rect = (x, y, w, h)
         label = (placed.label or "").lower()
-        if placed.viewport.camera is not None:
-            right = floats(placed.viewport.camera.right)
-            up = floats(placed.viewport.camera.up)
+        camera = placed.viewport.camera
+        target, extent = centre, None
+        if isinstance(camera, View):
+            if camera.centre is not None:
+                target = floats(camera.centre)
+            if camera.scale is not None:
+                extent = rect[3] * float(page.height) / (2 * float(camera.scale))
+            camera = camera.axes
+        if camera is not None:
+            right = floats(camera.right)
+            up = floats(camera.up)
             right, up = (list(np.array(v) / np.linalg.norm(v)) for v in (right, up))
         elif len(cuts) == 1 and label in _LONG_FACES:
             timber = cuts[0].timber
@@ -545,8 +721,9 @@ def sheet_views(drawing: Drawing, cuts: Sequence['CutTimber'], page: Page = SHEE
         else:
             continue
         aspect = rect[2] * page_mm[0] / (rect[3] * page_mm[1])
-        views[str(placed.id)] = SheetView(np.array(right, float), np.array(up, float), np.array(centre, float),
-                                          view_extent(half, right, up, aspect), rect, page_mm)
+        views[str(placed.id)] = SheetView(np.array(right, float), np.array(up, float), np.array(target, float),
+                                          extent if extent is not None else view_extent(half, right, up, aspect),
+                                          rect, page_mm)
     return views
 
 
@@ -606,28 +783,52 @@ def _dim(index: int, measure: Measure, view: SheetView, frame: 'Frame') -> Optio
     return (dim, swapped) if dim.span > 0.3 else None
 
 
+def _without_measurements(viewport: Viewport) -> Viewport:
+    """Return `viewport` and everything inside it with no measurements of their own."""
+    subdivision = viewport.subdivision
+    if subdivision is not None:
+        subdivision = replace(subdivision, portions=[replace(portion, viewport=_without_measurements(portion.viewport))
+                                                     for portion in subdivision.portions])
+    return replace(viewport, measurements=(), subdivision=subdivision)
+
+
+def needs_placing(drawing: Drawing) -> bool:
+    """Return whether any of `drawing`'s measurements has a placement still to be worked out."""
+    return any(not isinstance(measure.placement, Offset)
+               for measures in drawing.measurements_by_viewport().values() for measure in measures)
+
+
 def with_placed_dimensions(drawing: Drawing, frame: 'Frame', page: Page = SHEET) -> Drawing:
-    """Return `drawing` with a placement on each of its lengths (in `Drawing.measurements`) that has none,
-    in the orthographic views the viewer frames on `page`."""
+    """Return `drawing` with each length's `Auto` or `Beside` placement worked out as an `Offset`, in the
+    orthographic views the viewer frames on `page`. Its measurements all end up in `Drawing.measurements`.
+
+    A placement that can't be worked out (an angle, a 3D measurement, a view with no camera) stays as it is.
+    """
+    by_viewport = drawing.measurements_by_viewport()
+    if not needs_placing(drawing):
+        return drawing
     cuts = [cut for cut in (frame.cut_timber_of(timber) for timber in drawing.timbers) if cut is not None]
     views = sheet_views(drawing, cuts, page)
     meshes = [mesh for mesh in (_world_mesh(cut) for cut in cuts) if mesh is not None]
     measurements = {}
-    for viewport_id, measures in drawing.measurements.items():
+    for viewport_id, measures in by_viewport.items():
         measures = list(measures)
         view = views.get(str(viewport_id))
         if view is None:
-            measurements[viewport_id] = measures
+            measurements[ViewportId(viewport_id)] = measures
             continue
         found = {}
         for index, measure in enumerate(measures):
-            one = _dim(index, measure, view, frame) if measure.placement is None else None
+            one = None if isinstance(measure.placement, Offset) else _dim(index, measure, view, frame)
             if one is not None:
                 found[index] = one
-        for index, placement in place([dim for dim, _ in found.values()], view, meshes).items():
+        beside = {index: measures[index].placement for index in found
+                  if isinstance(measures[index].placement, Beside)}
+        for index, placement in place([dim for dim, _ in found.values()], view, meshes, beside).items():
             if found[index][1] and placement.offset is not None:
                 # The measure's own order runs the other way: wire_anchors negates it back.
                 placement = replace(placement, offset=-placement.offset)
             measures[index] = replace(measures[index], placement=placement)
-        measurements[viewport_id] = measures
-    return replace(drawing, measurements=measurements)
+        measurements[ViewportId(viewport_id)] = measures
+    return replace(drawing, viewports=[_without_measurements(root) for root in drawing.roots],
+                   measurements=measurements)

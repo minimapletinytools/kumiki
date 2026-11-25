@@ -17,6 +17,7 @@ import inspect
 import json
 import math
 import os
+import re
 import select
 import sys
 import threading
@@ -82,8 +83,8 @@ class MeasureKindWire(TypedDict):
 
 class PlacementWire(TypedDict, total=False):
     offset: float
-    along: float  # MeasurementPlacement.along
-    flip: bool  # MeasurementPlacement.flip
+    along: float  # Offset.along
+    flip: bool  # Measure.flip
 
 
 class ExtentsWire(TypedDict):
@@ -712,7 +713,7 @@ if TYPE_CHECKING:
     # Annotations only: import kumiki inside functions at runtime, since a reload purges it.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
     from kumiki.drawings.drawing import Viewport, ViewportId
-    from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
+    from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement, Offset,
                                            MeasurementPlane, MeasurementSpace, VectorLike, ViewAxes)
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
@@ -1681,12 +1682,13 @@ def _placed_by_role(
     viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: PageWire,
 ) -> Dict[str, 'PlacedViewport']:
     """Return a drawing's viewports laid out on `page`, keyed by role via `ids`."""
-    from kumiki.drawings.drawing import Page
+    from kumiki.drawings.drawing import Page, viewport_names
     from kumiki.drawings.layout import resolve_viewports
 
     placed = {str(view.id): view
               for view in resolve_viewports(viewports, Page(page["width"], page["height"]))}
-    return {role: placed[str(viewport_id)] for role, viewport_id in ids.items()}
+    names = viewport_names(viewports)
+    return {role: placed[names.get(str(viewport_id), str(viewport_id))] for role, viewport_id in ids.items()}
 
 
 def _viewport_spec(
@@ -1895,8 +1897,18 @@ def _custom_camera_viewport(
     """Return a locked orthographic viewport looking along its own camera at what is drawn."""
     from kumiki.drawings.kigumi_drawing_view_helpers import view_extent
 
+    from kumiki.drawings.measure import ViewAxes
+
     camera = placed.viewport.camera
-    right, up, look = (_normalize(_vector3_to_floats(axis)) for axis in (camera.right, camera.up, camera.look))
+    assert camera is not None, "only a viewport with a camera of its own is placed here"
+    # A View carries its own scale and centre; bare ViewAxes fit what is drawn.
+    if isinstance(camera, ViewAxes):
+        axes, scale, at = camera, None, None
+    else:
+        axes, scale, at = camera.axes, camera.scale, camera.centre
+    right, up, look = (_normalize(_vector3_to_floats(axis)) for axis in (axes.right, axes.up, axes.look))
+    extent = (placed.rect[3] * page["height"] / (2 * float(scale)) if scale is not None
+              else view_extent(half_size, right, up, _viewport_aspect(list(placed.rect), page)))
     return _viewport_spec(
         placed,
         locked=True,
@@ -1905,8 +1917,8 @@ def _custom_camera_viewport(
             "right": right,
             "up": up,
             "look": look,
-            "target": centre,
-            "extent": view_extent(half_size, right, up, _viewport_aspect(list(placed.rect), page)),
+            "target": _vector3_to_floats(at) if at is not None else centre,
+            "extent": extent,
         },
     )
 
@@ -2207,11 +2219,14 @@ def _plane_for_pick(
         in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
-def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
-    wire = cast(PlacementWire, {"offset": placement.offset})
-    if placement.along is not None:
+def _placement_wire(placement: Optional['Offset'], flip: bool) -> Optional[PlacementWire]:
+    """Return a measure's placement as the viewer reads it, or None when it has none of its own."""
+    if placement is None and not flip:
+        return None
+    wire = cast(PlacementWire, {"offset": placement.offset if placement is not None else None})
+    if placement is not None and placement.along is not None:
         wire["along"] = placement.along
-    if placement.flip:
+    if flip:
         wire["flip"] = True
     return wire
 
@@ -2219,7 +2234,9 @@ def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
 def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
-        log_warning("a measurement's feature is not in this frame, so it is left out.")
+        names = " / ".join(getattr(getattr(end, "feature", None), "name", "?") for end in (measure.anchor_a, measure.anchor_b))
+        log_warning(f"the measurement {names} names a feature not on the frame's timbers (from a joint rebuilt "
+                    "before it reached the frame?), so it is skipped.")
         return None
     first, second, placement = anchors
     plane = getattr(measure, "plane", None)
@@ -2229,7 +2246,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         "measureId": str(measure.measure_id) if measure.measure_id else None,
         # Not identity; sent so a file override starts from what the code asked for.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
-        "placement": _placement_wire(placement) if placement is not None else None,
+        "placement": _placement_wire(placement, bool(getattr(measure, "flip", False))),
         # Likewise not identity. Absent on the wire means "take the viewport's
         # plane", which is what an orthographic viewport's measurements may
         # always mean -- FromViewport.as_wire() is how the python side says it.
@@ -2300,6 +2317,31 @@ def _file_measurements_by_viewport(entry: Optional[DrawingWire]) -> Dict[str, Li
     return by_viewport
 
 
+_PLACED_DRAWINGS: Dict[int, Tuple[Any, Any]] = {}
+
+
+def _with_placed_dimensions(declared: Any, frame: 'Frame') -> Any:
+    """Return a code drawing with its Auto and Beside placements worked out, once per drawing object."""
+    try:
+        from kumiki.drawings.auto_drawings import needs_placing, with_placed_dimensions
+    except ImportError:
+        return declared  # an older kumiki: every placement is already its own
+    if not needs_placing(declared):
+        return declared
+    cached = _PLACED_DRAWINGS.get(id(declared))
+    if cached is not None and cached[0] is declared:
+        return cached[1]
+    try:
+        placed = with_placed_dimensions(declared, frame)
+    except Exception as exc:
+        log_warning(f"could not place the dimensions of drawing {declared.name!r}: {exc}")
+        placed = declared
+    if len(_PLACED_DRAWINGS) > 64:
+        _PLACED_DRAWINGS.clear()
+    _PLACED_DRAWINGS[id(declared)] = (declared, placed)
+    return placed
+
+
 def _measurements_by_viewport(
     declared: Any,
     override: Optional[DrawingWire],
@@ -2310,6 +2352,12 @@ def _measurements_by_viewport(
     # and one keyed by id both reach the merge the same way.
     code_by_viewport = declared.measurements_by_viewport() if declared is not None else {}
     file_by_viewport = _file_measurements_by_viewport(override)
+    if declared is not None and hasattr(declared, "viewport_name"):
+        # A file saved before viewports had names keys them by position ("0.0.0").
+        by_name: Dict[str, List[MeasureWire]] = {}
+        for key, measures in file_by_viewport.items():
+            by_name.setdefault(declared.viewport_name(key), []).extend(measures or [])
+        file_by_viewport = by_name
     merged: Dict[str, List[MeasureWire]] = {}
     for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
         merged[viewport] = merge_measurements(
@@ -2616,6 +2664,7 @@ def collect_drawings(
         # The layout is always the code's. A file entry that wants a layout of
         # its own is a drawing of its own, which is what keeps adding one
         # dimension from taking a drawing's page and viewports with it.
+        declared = _with_placed_dimensions(declared, frame)
         scene = _drawing_from_code(frame, declared)
         override = overrides.get(str(declared.drawing_id))
         if override is not None:
@@ -3983,7 +4032,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "run_finishing", "list_tools", "run_tool", "remove_extra_accessories",
+            "run_finishing", "list_tools", "run_tool", "remove_extra_accessories", "describe_timber",
             "shutdown",
         ],
         "frame": {
@@ -5138,6 +5187,68 @@ def _serialize_tools(frame: Any) -> List[ToolWire]:
     return tools
 
 
+#: A feature name a primitive gives itself by number ("arris.3"), left out of a description.
+_NUMBERED_FEATURE = re.compile(r"^(arris|corner|cap|side|edge)\.\d+$")
+
+
+def _feature_constants() -> Dict[str, str]:
+    """Return the constant each joint feature name has (kumiki.joints.workshop.feature_names), by name."""
+    try:
+        from kumiki.joints.workshop import feature_names
+    except ImportError:
+        return {}
+    constants: Dict[str, str] = {}
+    for holder in vars(feature_names).values():
+        if isinstance(holder, type) and holder.__module__ == feature_names.__name__:
+            for attribute, value in vars(holder).items():
+                if attribute.isupper() and isinstance(value, str):
+                    constants.setdefault(value, f"{holder.__name__}.{attribute}")
+    return constants
+
+
+def describe_timber(frame: Any, path: str) -> Dict[str, Any]:
+    """Return what can be measured on the timber at `path`: its own faces, and each joint on it with
+    the other timbers it joins and the features it names (with their constants, if they have one)."""
+    from kumiki.csg.cutcsg import walk_csg_with_parity
+    from kumiki.timber_features import TimberFace
+
+    cuts = {cut.timber.ticket.path: cut for cut in frame.cut_timbers}
+    cut = cuts.get(path)
+    if cut is None:
+        raise ValueError(f"No timber at {path!r}. The timbers are: {', '.join(sorted(cuts))}")
+    faces = {}
+    for face in TimberFace:
+        try:
+            faces[face.name.lower()] = cut.face(face).feature.name
+        except (KeyError, AttributeError):
+            pass
+    constants = _feature_constants()
+
+    def named(csg: Any, timber_path: str) -> List[Dict[str, Any]]:
+        counts: Dict[Tuple[str, str], int] = {}
+        for owner, _ in walk_csg_with_parity(csg):
+            for feature in owner.get_declared_features():
+                if not _NUMBERED_FEATURE.match(feature.name):
+                    key = (feature.name, feature.feature_type().name)
+                    counts[key] = counts.get(key, 0) + 1
+        return [{"name": name, "type": kind, "on": timber_path, **({"count": count} if count > 1 else {}),
+                 **({"constant": constants[name]} if name in constants else {})}
+                for (name, kind), count in counts.items()]
+
+    joints = []
+    for joint in list(getattr(frame, "source_joints", ()) or ()):
+        timbers = [cutting.timber.ticket.path for cutting in joint.cuttings.values()]
+        if path not in timbers:
+            continue
+        features = [feature for cutting in joint.cuttings.values() if cutting.negative_csg is not None
+                    for feature in named(cutting.negative_csg, cutting.timber.ticket.path)]
+        joints.append({"type": getattr(joint.ticket, "joint_type", None), "name": _joint_display_name(joint),
+                       "timbers": timbers, "features": features})
+    return {"timber": path, "faces": faces, "joints": joints,
+            "howTo": "In Python: cut_timber.face(TimberFace.FRONT), cut_timber.feature(name), joint.feature(constant "
+                     "or name, index) for one of several, cut_timber.edge(a, b), cut_timber.corner(edge, face)."}
+
+
 EXTRA_ACCESSORY_KEY_PREFIX = "accessory:extra#"
 
 
@@ -5508,6 +5619,11 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         ss = _resolve_slot(state, payload)
         name = _require_str(payload, "name", "run_tool requires payload.name")
         return state, make_success_response(request_id, command, run_tool(ss, name, _opt_mapping(payload, "kiwari"))), False
+
+    if command == "describe_timber":
+        ss = _resolve_slot(state, payload)
+        path = _require_str(payload, "timber", "describe_timber requires payload.timber")
+        return state, make_success_response(request_id, command, describe_timber(ss.frame, path)), False
 
     if command == "remove_extra_accessories":
         ss = _resolve_slot(state, payload)
