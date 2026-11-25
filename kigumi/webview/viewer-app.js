@@ -959,7 +959,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this._showHighlightsFor(viewport.id, viewport.camera.getWorldDirection(this._viewportLook));
             const anyDrawingLines = this.drawingOverlays.showFor(
                 this.sceneManager.bundles(), viewport.camera, { inDrawing: this.isInDrawing, options: this,
-                    xrayMembers: this.xrayMembers(viewport) });
+                    xrayMembers: this.xrayMembers(viewport), measured: this.measuredFeatures(viewport) });
             const rect = viewport.pixelRect(pageRect, size.y);
             if (anyDrawingLines && this.memberIds) {
                 // Who is in front where, for the dotted lines to clip themselves by.
@@ -1257,7 +1257,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         if (typeof ui.drawingXray === 'string') this.setDrawingXray(ui.drawingXray);
         if (typeof colorFaces === 'boolean') this.setDrawingOption('colorReferenceFaces', colorFaces);
         for (const key of ['showDrawingCenterplanes', 'showDrawingPerfectFaces']) {
-            if (typeof ui[key] === 'boolean') this.setDrawingOption(key, ui[key]);
+            // Saved before they had three settings, as true or false.
+            if (typeof ui[key] === 'boolean') this.setDrawingOption(key, ui[key] ? 'measured' : 'off');
+            else if (typeof ui[key] === 'string') this.setDrawingOption(key, ui[key]);
         }
         if (typeof ui.showDrawingGhosts === 'boolean') this.setDrawingGhostsVisible(ui.showDrawingGhosts);
         if (typeof ui.showFeatureParent === 'boolean') this.setShowFeatureParent(ui.showFeatureParent);

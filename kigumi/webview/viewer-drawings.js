@@ -11,6 +11,9 @@ import { composeDrawingPng, drawingFileName, previewImage, standaloneSvg } from 
 // The exported page's longer side, in pixels; less where the GPU can't draw that large.
 const EXPORT_LONG_SIDE_PX = 3000;
 
+/** The drawing options that take 'off', 'measured' or 'on' rather than on or off. */
+const LINE_OPTIONS = ['showDrawingPerfectFaces', 'showDrawingCenterplanes'];
+
 export const DrawingsMixin = (Base) => class extends Base {
     /** The members this scene is about, or null when it is about all of them. */
     get activeSceneMembers() {
@@ -205,6 +208,21 @@ export const DrawingsMixin = (Base) => class extends Base {
         return true;
     }
 
+    /** Return the features this viewport's dimensions go to, as `memberKey|feature` (both of a derived one's). */
+    measuredFeatures(viewport) {
+        const measured = new Set();
+        for (const measure of viewport?.spec.measurements || []) {
+            if (KigumiMeasurements.isDeleted(measure)) continue;
+            for (const end of [measure.a, measure.b]) {
+                if (!end || !end.timber) continue;
+                for (const part of [end, end.a, end.b]) {
+                    if (part && part.feature) measured.add(end.timber + '|' + part.feature);
+                }
+            }
+        }
+        return measured;
+    }
+
     /** Return members whose authored X-ray strokes this drawing viewport can show. */
     xrayMembers(viewport) {
         if (!this.isInDrawing || !viewport?.camera.isOrthographicCamera || this.drawingXray === 'off'
@@ -232,7 +250,9 @@ export const DrawingsMixin = (Base) => class extends Base {
     }
 
     setDrawingOption(option, enabled) {
-        if (this.displayOptions.set(option, Boolean(enabled))) {
+        // The reference lines take 'off', 'measured' or 'on'; the rest are on or off.
+        const value = LINE_OPTIONS.includes(option) ? enabled : Boolean(enabled);
+        if (this.displayOptions.set(option, value)) {
             if (option === 'colorReferenceFaces') {
                 for (const bundle of this.sceneManager.bundles()) {
                     this.applyReferenceFaceOption(bundle.mesh);
@@ -318,7 +338,8 @@ export const DrawingsMixin = (Base) => class extends Base {
             const page = this.pageScreenRect(size.x, size.y);
             const views = [];
             this.renderViewports((viewport, rect) => {
-                const spec = { id: viewport.id, rect: viewport.spec.rect, xrayMembers: [...this.xrayMembers(viewport)] };
+                const spec = { id: viewport.id, rect: viewport.spec.rect, xrayMembers: [...this.xrayMembers(viewport)],
+                    measured: [...this.measuredFeatures(viewport)] };
                 const camera = viewport.camera;
                 if (camera.isOrthographicCamera) {
                     const axis = (x, y) => new THREE.Vector3(x, y, 0).transformDirection(camera.matrixWorld).toArray();

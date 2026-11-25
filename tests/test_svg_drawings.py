@@ -182,3 +182,19 @@ def test_directional_xray_through_own_stock_clips_at_another_member():
             coords = list(map(float, path.get('d').replace('M', '').replace('L', '').split()))
             assert max(coords[0], coords[2]) <= 50.00001
             assert coords[1] == pytest.approx(40)
+
+
+def test_centerlines_where_measured_draw_only_those_a_dimension_goes_to():
+    timber = Timber(length=4, size=create_v2(2, 2), transform=Transform.identity(), ticket=TimberTicket('beam'))
+    members = {'beam': DrawingSolid(CutTimber(timber).render_timber_with_cuts_csg_local(), timber.transform, timber)}
+    camera = dict(center=[0, 0, 0], right=(0, 0, 1), up=(0, 1, 0), width=10, height=10)
+
+    def drawn(measured):
+        view = render_svg_view(members, set(), camera, 100, 100, DrawingStyles(centerlines='measured'),
+                               measured=measured)
+        return len(view.findall(".//{*}g[@class='centerplane']")), len(view.findall(".//{*}g[@class='centerline']"))
+
+    assert drawn(set()) == (0, 0)
+    # Looking along x, the front-back centerplane is the one seen edge-on; measuring it draws it and the axis.
+    assert drawn({'beam|ptw.centerplane_front_back'}) == (1, 1)
+    assert drawn({'other|ptw.centerplane_front_back'}) == (0, 0), "another member's is not this one's"

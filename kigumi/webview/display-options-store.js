@@ -18,6 +18,16 @@ function oneOf(allowed, fallback) {
     return (value) => (allowed.includes(value) ? value : fallback);
 }
 
+/**
+ * Whether a drawing draws a kind of reference line: 'off', 'measured' (only where a dimension in the
+ * view goes to it) or 'on'. An older saved true or false reads as 'measured' or 'off'.
+ */
+const LINE_MODES = ['off', 'measured', 'on'];
+function lineMode(value) {
+    if (value === false) return 'off';
+    return LINE_MODES.includes(value) ? value : 'measured';
+}
+
 function oneOfOrReject(allowed) {
     return (value) => (allowed.includes(value) ? value : REJECT);
 }
@@ -56,8 +66,8 @@ function optionSpecs(themeIds) {
         // its centerplanes, dotted, and the reference features, lit.
         colorReferenceFaces: { value: false, normalize: bool },
         drawingXray: { value: 'selection', normalize: oneOf(['off', 'selection', 'on'], 'selection') },
-        showDrawingPerfectFaces: { value: true, normalize: bool },
-        showDrawingCenterplanes: { value: true, normalize: bool },
+        showDrawingPerfectFaces: { value: 'measured', normalize: lineMode },
+        showDrawingCenterplanes: { value: 'measured', normalize: lineMode },
         highlightReferenceEdges: { value: true, normalize: bool },
         // A scale ruler at the bottom right of the 3D view and drawings (scale-ruler.js).
         showScaleRuler: { value: false, normalize: bool },

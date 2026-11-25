@@ -57,6 +57,9 @@ module.exports = {
             return drawings.length && Array.from(app.sceneManager.bundles()).length ? drawings[drawings.length - 1].id : null;
         })()`), { timeoutMs: 90000 }).catch(() => null);
         let entered = null;
+        // Every reference line drawn, not just the measured ones: this is about drawing them at all.
+        await inShell(`(() => { const app = ${viewerApp};
+            app.setDrawingOption('showDrawingPerfectFaces', 'on'); app.setDrawingOption('showDrawingCenterplanes', 'on'); })()`);
         const drawn = drawingId && await (async () => {
             entered = await inShell(`(() => { try { ${viewerApp}.enterDrawing(${JSON.stringify(drawingId)}); return 'ok'; }
                 catch (error) { return String(error && error.stack || error); } })()`);
