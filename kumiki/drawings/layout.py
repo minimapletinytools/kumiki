@@ -2,18 +2,19 @@
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .drawing import (Length, Page, Portion, Rect, Share, Size, SplitDirection,
-                      Subdivision, Viewport)
+                      Subdivision, Viewport, viewport_names)
 from ..identity import ViewportId
 from ..rule import Numeric
 
 
 @dataclass(frozen=True)
 class PlacedViewport:
-    """A leaf viewport with its id and its rect on the page."""
+    """A leaf viewport with its name (`id`) and its rect on the page."""
 
+    #: Its name: `Viewport.id`, else its label, else its position (drawing.viewport_names).
     id: ViewportId
     viewport: Viewport
     rect: Rect
@@ -115,6 +116,8 @@ def resolve_viewports(viewports: Sequence[Viewport], page: Page) -> Tuple[Placed
                 f"Drawing checks this; resolving a bare list does not."
             )
         _place(root, root.rect, (index,), root.z, page, placed)
+    names = viewport_names(viewports)
+    placed = [replace(view, id=ViewportId(names.get(str(view.id), str(view.id)))) for view in placed]
     # Sorted on z alone, with Python's stable sort keeping written order within
     # a z. Sorting on the id as well would order "0.10" before "0.2".
     return tuple(sorted(placed, key=lambda view: view.z))

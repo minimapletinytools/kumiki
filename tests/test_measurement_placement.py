@@ -31,7 +31,8 @@ def _placed(beam, *placements):
     drawing = Drawing(name="beam", timbers=[cut.timber], viewports=shop_drawing_viewports(),
                       measurements={FRONT: [Measure(*ends, placement=placement) for placement in placements]})
     placed = with_placed_dimensions(drawing, frame)
-    return placed.measurements[FRONT], sheet_views(placed, [cut])[str(FRONT)]
+    front = placed.viewport_name(FRONT)
+    return list(placed.measurements_by_viewport()[front]), sheet_views(placed, [cut])[front]
 
 
 def _offset(measure):

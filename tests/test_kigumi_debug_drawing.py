@@ -67,13 +67,11 @@ def _orthographic_viewports(drawing):
     return [v for v in drawing["viewports"] if v["projection"] == "orthographic"]
 
 
-# A viewport is identified by WHERE IT IS -- see kumiki/drawings/layout.py -- so these
-# are the two layouts written out, and TestViewportIds below is what catches
-# either changing under the rest of these tests. Looking a viewport up by its
-# label would be the one thing layout.py says nothing may do.
-QUADRANTS = {"front": "0.0.0", "top": "0.0.1", "right": "0.1.0", "preview": "0.1.1"}
-LONG_FACES = {"front": "0.0.0", "right": "0.0.1", "back": "0.0.2",
-              "left": "0.0.3", "preview": "0.1"}
+# A viewport is named by its id, else its label (drawing.viewport_names), so these are the
+# two layouts' names, and TestViewportIds below is what catches either changing under the
+# rest of these tests.
+QUADRANTS = {"front": "Front", "top": "Top", "right": "Right", "preview": "Preview"}
+LONG_FACES = {"front": "Front", "right": "Right", "back": "Back", "left": "Left", "preview": "Preview"}
 
 
 def _by_id(drawing):
@@ -81,42 +79,32 @@ def _by_id(drawing):
 
 
 def _at(drawing, ids, label):
-    """The viewport the layout puts `label` at. Positional, via the tables above."""
+    """The viewport the layout calls `label`, via the tables above."""
     return _by_id(drawing)[ids[label]]
 
 
 class TestViewportIds:
-    """The layouts, written out.
+    """The layouts, written out: each viewport is named by its label, which is its id on the wire.
 
-    A viewport is identified by its position -- the index of its floating pane,
-    then of each child stepped through to reach it. So the tables above are the
-    layout, and if either layout is rearranged these fail first and plainly,
-    instead of every camera test failing with a KeyError and no clue why.
-
-    The label is asserted alongside the id on purpose: it is what says WHICH
-    view is at that position, and it is the one thing nothing in the viewer may
-    look a viewport up by.
+    If either layout is renamed these fail first and plainly, instead of every camera test failing
+    with a KeyError and no clue why.
     """
 
     def test_the_quadrant_layout_is_two_rows_of_two(self):
         by_id = _by_id(_drawing(_post(create_v3(mm(0), mm(0), mm(0)))))
 
         assert {vid: v["name"] for vid, v in by_id.items()} == {
-            "0.0.0": "Front", "0.0.1": "Top", "0.1.0": "Right", "0.1.1": "Preview"}
+            "Front": "Front", "Top": "Top", "Right": "Right", "Preview": "Preview"}
 
     def test_the_long_face_layout_is_four_rows_beside_a_preview(self):
         by_id = _by_id(_selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"]))
 
         assert {vid: v["name"] for vid, v in by_id.items()} == {
-            "0.0.0": "Front", "0.0.1": "Right", "0.0.2": "Back",
-            "0.0.3": "Left", "0.1": "Preview"}
+            "Front": "Front", "Right": "Right", "Back": "Back", "Left": "Left", "Preview": "Preview"}
 
-    def test_a_label_is_not_an_id(self):
-        # The whole rule in one assertion: what a view is called and what it is
-        # are different strings, and only one of them is looked up by.
+    def test_a_view_is_named_by_its_label(self):
         for viewport in _drawing(_post(create_v3(mm(0), mm(0), mm(0))))["viewports"]:
-            assert viewport["name"] and viewport["id"]
-            assert viewport["name"] != viewport["id"]
+            assert viewport["name"] and viewport["id"] == viewport["name"]
 
 
 class TestDefaultDebugDrawing:

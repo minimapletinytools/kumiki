@@ -51,11 +51,11 @@ class TestTheLayoutsThatShip:
         ))
 
         assert _rects(tree) == {
-            "0.0.0": (0.0, 0.0, 0.5, 0.25),
-            "0.0.1": (0.0, 0.25, 0.5, 0.25),
-            "0.0.2": (0.0, 0.5, 0.5, 0.25),
-            "0.0.3": (0.0, 0.75, 0.5, 0.25),
-            "0.1": (0.5, 0.0, 0.5, 1.0),
+            "Front": (0.0, 0.0, 0.5, 0.25),
+            "Right": (0.0, 0.25, 0.5, 0.25),
+            "Back": (0.0, 0.5, 0.5, 0.25),
+            "Left": (0.0, 0.75, 0.5, 0.25),
+            "Preview": (0.5, 0.0, 0.5, 1.0),
         }
 
     def test_the_quadrants_are_two_rows_of_two(self):
@@ -66,10 +66,10 @@ class TestTheLayoutsThatShip:
         ))
 
         assert _rects(tree) == {
-            "0.0.0": (0.0, 0.0, 0.5, 0.5),
-            "0.0.1": (0.5, 0.0, 0.5, 0.5),
-            "0.1.0": (0.0, 0.5, 0.5, 0.5),
-            "0.1.1": (0.5, 0.5, 0.5, 0.5),
+            "Front": (0.0, 0.0, 0.5, 0.5),
+            "Top": (0.5, 0.0, 0.5, 0.5),
+            "Right": (0.0, 0.5, 0.5, 0.5),
+            "Preview": (0.5, 0.5, 0.5, 0.5),
         }
 
 
@@ -122,12 +122,13 @@ class TestEveryDrawingHasViewports:
 
 
 class TestAViewportDoesNotKnowWhereItIs:
-    def test_a_viewport_carries_no_id_and_no_rect_of_its_own(self):
+    def test_a_viewport_carries_no_position_and_no_rect_of_its_own(self):
         inside = _view("Front")
 
-        Drawing(name="d", page=A3, viewports=[covering_page(rows(inside))])
+        drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(inside))])
 
-        assert not hasattr(inside, "id")
+        assert inside.id is None, "named by its label unless it is given an id"
+        assert drawing.viewport_name("0.0") == "Front"
         assert inside.rect is None, "only a floating viewport is placed by a rect"
 
     def test_the_drawing_answers_where_one_is(self):
@@ -152,8 +153,8 @@ class TestAViewportDoesNotKnowWhereItIs:
 
         assert [str(i) for i, _ in drawing.walk()] == ["0", "0.0", "0.0.0", "0.0.1", "0.1"]
         assert [str(i) for i, _ in drawing.leaves()] == ["0.0.0", "0.0.1", "0.1"]
-        # What renders is what the wire gets: containers draw nothing themselves.
-        assert [str(p.id) for p in resolve_drawing(drawing)] == ["0.0.0", "0.0.1", "0.1"]
+        # What renders is what the wire gets, by name: containers draw nothing themselves.
+        assert [str(p.id) for p in resolve_drawing(drawing)] == ["a", "b", "c"]
 
 
 class TestViewportsAreComparedByObject:
@@ -352,7 +353,7 @@ class TestWhereAMeasurementIsWritten:
         drawing = Drawing(name="d", page=A3, viewports=[
             covering_page(columns(rows(front, _view("Right")), _view("Preview")))])
 
-        assert list(drawing.measurements_by_viewport()) == ["0.0.0"]
+        assert list(drawing.measurements_by_viewport()) == ["Front"]
         assert str(drawing.get_viewport_id(front)) == "0.0.0"
 
     def test_by_id_when_the_layout_is_not_the_drawings(self):
@@ -361,14 +362,15 @@ class TestWhereAMeasurementIsWritten:
         drawing = Drawing(name="d", timbers=[_timber("posts/fl")],
                           measurements={ViewportId("0.0.1"): [self._measure()]})
 
-        assert list(drawing.measurements_by_viewport()) == ["0.0.1"]
+        # By position, for now: it lands on the view at that position, by its name.
+        assert list(drawing.measurements_by_viewport()) == ["Right"]
 
     def test_a_viewport_with_both_gets_both(self):
         front = Viewport(label="Front", measurements=[self._measure("tenon_top")])
         drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(front))],
                           measurements={ViewportId("0.0"): [self._measure("tenon_left")]})
 
-        assert len(drawing.measurements_by_viewport()["0.0"]) == 2
+        assert len(drawing.measurements_by_viewport()["Front"]) == 2
 
     def test_moving_a_viewport_takes_its_measurements_with_it(self):
         # The reason to write it there. Under an id, inserting a row above
@@ -377,8 +379,8 @@ class TestWhereAMeasurementIsWritten:
         before = Drawing(name="d", page=A3, viewports=[covering_page(rows(front))])
         after = Drawing(name="d", page=A3, viewports=[covering_page(rows(_view("New"), front))])
 
-        assert list(before.measurements_by_viewport()) == ["0.0"]
-        assert list(after.measurements_by_viewport()) == ["0.1"]
+        assert list(before.measurements_by_viewport()) == ["Front"]
+        assert list(after.measurements_by_viewport()) == ["Front"]
 
 
 class TestTheSheetDoesNotChangeTheLayout:
@@ -409,3 +411,21 @@ class TestAViewportsCamera:
         from kumiki.drawings.measure import ViewAxes
         with pytest.raises(ValueError, match="leaf"):
             Viewport(camera=ViewAxes(), subdivision=rows(Viewport(), Viewport()))
+
+
+class TestAViewportsName:
+    def test_an_id_names_it_in_place_of_its_label(self):
+        front = Viewport(label="Front elevation", id="front")
+        drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(front, _view("Right")))])
+
+        assert [str(p.id) for p in resolve_drawing(drawing)] == ["front", "Right"]
+        assert drawing.viewport_at("front") is front and drawing.viewport_at("0.0") is front
+
+    def test_a_label_two_views_share_names_neither(self):
+        drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(_view("Detail"), _view("Detail")))])
+
+        assert [str(p.id) for p in resolve_drawing(drawing)] == ["0.0", "0.1"]
+
+    def test_two_views_cannot_share_an_id(self):
+        with pytest.raises(ValueError, match="unique"):
+            Drawing(name="d", page=A3, viewports=[covering_page(rows(Viewport(id="a"), Viewport(id="a")))])

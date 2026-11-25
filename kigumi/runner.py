@@ -1681,12 +1681,13 @@ def _placed_by_role(
     viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: PageWire,
 ) -> Dict[str, 'PlacedViewport']:
     """Return a drawing's viewports laid out on `page`, keyed by role via `ids`."""
-    from kumiki.drawings.drawing import Page
+    from kumiki.drawings.drawing import Page, viewport_names
     from kumiki.drawings.layout import resolve_viewports
 
     placed = {str(view.id): view
               for view in resolve_viewports(viewports, Page(page["width"], page["height"]))}
-    return {role: placed[str(viewport_id)] for role, viewport_id in ids.items()}
+    names = viewport_names(viewports)
+    return {role: placed[names.get(str(viewport_id), str(viewport_id))] for role, viewport_id in ids.items()}
 
 
 def _viewport_spec(
@@ -2340,6 +2341,12 @@ def _measurements_by_viewport(
     # and one keyed by id both reach the merge the same way.
     code_by_viewport = declared.measurements_by_viewport() if declared is not None else {}
     file_by_viewport = _file_measurements_by_viewport(override)
+    if declared is not None and hasattr(declared, "viewport_name"):
+        # A file saved before viewports had names keys them by position ("0.0.0").
+        by_name: Dict[str, List[MeasureWire]] = {}
+        for key, measures in file_by_viewport.items():
+            by_name.setdefault(declared.viewport_name(key), []).extend(measures or [])
+        file_by_viewport = by_name
     merged: Dict[str, List[MeasureWire]] = {}
     for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
         merged[viewport] = merge_measurements(

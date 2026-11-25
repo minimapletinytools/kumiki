@@ -126,7 +126,7 @@ def test_front_shop_dimension_keeps_xray_after_its_face_becomes_an_arris(loaded)
     revealed = [(view['id'], m) for view in drawing['viewports'] for m in view.get('measurements', [])
                 if m['a'].get('xray') or m['b'].get('xray')]
     (view_id, measure), = revealed
-    assert view_id == '0.0.0'
+    assert view_id == 'Front'
     assert measure['a']['feature'].startswith('arris.')
     assert measure['b']['feature'] == 'peg_hole_axis'
     assert measure['settled']['value']['value'] == pytest.approx(.0435)

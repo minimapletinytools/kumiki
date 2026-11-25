@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 from ..identity import DrawingId, ViewportId
 if TYPE_CHECKING:
@@ -152,8 +152,8 @@ class Viewport:
     """One view on a sheet, and the views inside it.
 
     A leaf (no `subdivision`) gets a camera; a container's children fill its cell. `rect` and `z`
-    place a floating root viewport and are ignored inside a subdivision. A viewport doesn't know its
-    id or position; Drawing does. Compared by identity.
+    place a floating root viewport and are ignored inside a subdivision. It is named by its `id`, else
+    its label (viewport_names); it doesn't know its position, Drawing does. Compared by identity.
     """
 
     label: Optional[str] = None
@@ -171,6 +171,9 @@ class Viewport:
     #: A leaf's camera, in world space. None lets the viewer choose one from the label
     #: ("Front", "Top", "Preview", ...).
     camera: Optional[ViewAxes] = None
+    #: What measurements and the drawings file call this viewport. None uses the label. Set it to keep
+    #: a viewport's saved edits when its label changes.
+    id: Optional[str] = None
 
     def __post_init__(self):
         object.__setattr__(self, 'measurements', tuple(self.measurements))
@@ -205,6 +208,37 @@ class Viewport:
     def taking(self, size: Size) -> Portion:
         """Return Portion(self, size): `plan.taking(Share(2))`."""
         return Portion(viewport=self, size=size)
+
+
+def viewport_names(roots: Sequence[Viewport]) -> Dict[str, str]:
+    """Return each viewport's name by its position id ("0.1.0").
+
+    A viewport's name is its `id`, else a leaf's label, else its position. A label two leaves share
+    names neither, and they keep their positions. Raises ValueError if two viewports have one `id`.
+    """
+    positions: List[Tuple[str, Viewport]] = []
+
+    def descend(viewport: Viewport, path: Tuple[int, ...]) -> None:
+        positions.append((".".join(str(step) for step in path), viewport))
+        for index, child in enumerate(viewport.children):
+            descend(child, path + (index,))
+
+    for index, root in enumerate(roots):
+        descend(root, (index,))
+    ids = [viewport.id for _, viewport in positions if viewport.id]
+    for one in set(ids):
+        if ids.count(one) > 1:
+            raise ValueError(f"Two viewports have the id {one!r}; a viewport's id names it, so it must be unique")
+    labels = [viewport.label for _, viewport in positions if not viewport.id and viewport.is_leaf and viewport.label]
+    names = {}
+    for position, viewport in positions:
+        if viewport.id:
+            names[position] = viewport.id
+        elif viewport.is_leaf and viewport.label and labels.count(viewport.label) == 1 and viewport.label not in ids:
+            names[position] = viewport.label
+        else:
+            names[position] = position
+    return names
 
 
 def rows(*children: Union[Viewport, 'Subdivision', Portion], gap: Numeric = 0) -> Subdivision:
@@ -302,6 +336,7 @@ class Drawing:
     #: layout.resolve_drawing needs one.
     page: Optional[Page] = None
 
+    #: Measurements by viewport: its name (`Viewport.id`, else its label) or, for now, its position ("0.0.0").
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -319,6 +354,7 @@ class Drawing:
         viewports = (default_viewports_for(len(self.timbers))
                      if self.viewports is None else tuple(self.viewports))
         object.__setattr__(self, 'viewports', viewports)
+        object.__setattr__(self, '_names', viewport_names(viewports))
         self._check_placement()
         self._check_each_viewport_appears_once()
 
@@ -339,14 +375,23 @@ class Drawing:
         for index, root in enumerate(self.roots):
             yield from descend(root, (index,))
 
+    def viewport_name(self, key: Union[str, ViewportId]) -> str:
+        """Return the name of the viewport `key` names, by its name or its position; `key` if it names none."""
+        key = str(key)
+        names: Dict[str, str] = getattr(self, '_names')
+        if key in names.values():
+            return key
+        return names.get(key, key)
+
     def measurements_by_viewport(self) -> Dict[str, Tuple[Measure, ...]]:
-        """Return the drawing's measurements, keyed by viewport id."""
+        """Return the drawing's measurements, keyed by viewport name."""
         collected: Dict[str, Tuple[Measure, ...]] = {}
         for viewport_id, viewport in self.walk():
             if viewport.measurements:
-                collected[str(viewport_id)] = tuple(viewport.measurements)
+                key = self.viewport_name(viewport_id)
+                collected[key] = collected.get(key, ()) + tuple(viewport.measurements)
         for viewport_id, measures in self.measurements.items():
-            key = str(viewport_id)
+            key = self.viewport_name(viewport_id)
             collected[key] = collected.get(key, ()) + tuple(measures)
         return collected
 
@@ -361,11 +406,11 @@ class Drawing:
                 return found
         raise KeyError(f"{viewport!r} is not a viewport of drawing {self.drawing_id}")
 
-    def viewport_at(self, viewport_id: ViewportId) -> Optional['Viewport']:
-        """Return the viewport with id `viewport_id`, or None."""
-        wanted = str(viewport_id)
+    def viewport_at(self, viewport_id: Union[str, ViewportId]) -> Optional['Viewport']:
+        """Return the viewport `viewport_id` names, by its name or its position, or None."""
+        wanted = self.viewport_name(viewport_id)
         for found, viewport in self.walk():
-            if str(found) == wanted:
+            if self.viewport_name(found) == wanted:
                 return viewport
         return None
 

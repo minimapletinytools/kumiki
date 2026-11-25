@@ -431,10 +431,9 @@ class TestMergeMeasurements:
         assert _feature_names(merged) == [("a", "b"), ("c", "d"), ("e", "f")]
 
 
-# A viewport's id is its position in the layout -- see kumiki/drawings/layout.py -- so a
-# drawing keys its measurements by one of these, not by what the view is called.
-# These are the long-face layout one timber gets.
-FRONT, RIGHT = ViewportId("0.0.0"), ViewportId("0.0.1")
+# A viewport is named by its label (drawing.viewport_names); these are the long-face layout one
+# timber gets. Positions ("0.0.0") are still accepted when writing measurements.
+FRONT, RIGHT = ViewportId("Front"), ViewportId("Right")
 
 
 class TestMeasurementsThroughADrawing:
@@ -508,6 +507,21 @@ class TestMeasurementsThroughADrawing:
             runner.ORIGIN_CODE, runner.ORIGIN_FILE,
         ]
         assert len(drawing["viewports"]) > 1, "the code's layout survived"
+
+    def test_a_file_saved_before_viewports_had_names_still_lands_on_its_view(self, example):
+        # Saved by position ("0.0.0" is Front in the long-face layout); read onto the view of that name.
+        frame = _posts_with(lambda face, timber: [Drawing(
+            name="post", timbers=[timber("posts/fl")],
+            measurements={FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))]},
+        )])
+        _write_file(example, [_override("sheet", "post", [
+            {"id": "0.0.0", "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
+        ])])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert [m["origin"] for m in self._front(drawing)] == [runner.ORIGIN_CODE, runner.ORIGIN_FILE]
+        assert "unplaceableMeasurements" not in drawing or not drawing["unplaceableMeasurements"]
 
     def test_a_measurement_for_a_viewport_that_is_gone_is_not_shown(self, example):
         # An override naming a viewport the code's layout does not produce.
@@ -1083,7 +1097,7 @@ class TestDerivedFeaturePath:
         assert read.identity() == ("posts/fl#0", ("cut",), "x", "FACE")
 
 
-VIEWPORT = "0.0.0"  # the first pane a default layout produces; ids are tree paths
+VIEWPORT = "Front"  # the first pane a default layout produces, by its name
 
 
 class TestChangingAndRemovingAMeasurement:
