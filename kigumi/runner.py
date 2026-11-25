@@ -1896,8 +1896,18 @@ def _custom_camera_viewport(
     """Return a locked orthographic viewport looking along its own camera at what is drawn."""
     from kumiki.drawings.kigumi_drawing_view_helpers import view_extent
 
+    from kumiki.drawings.measure import ViewAxes
+
     camera = placed.viewport.camera
-    right, up, look = (_normalize(_vector3_to_floats(axis)) for axis in (camera.right, camera.up, camera.look))
+    assert camera is not None, "only a viewport with a camera of its own is placed here"
+    # A View carries its own scale and centre; bare ViewAxes fit what is drawn.
+    if isinstance(camera, ViewAxes):
+        axes, scale, at = camera, None, None
+    else:
+        axes, scale, at = camera.axes, camera.scale, camera.centre
+    right, up, look = (_normalize(_vector3_to_floats(axis)) for axis in (axes.right, axes.up, axes.look))
+    extent = (placed.rect[3] * page["height"] / (2 * float(scale)) if scale is not None
+              else view_extent(half_size, right, up, _viewport_aspect(list(placed.rect), page)))
     return _viewport_spec(
         placed,
         locked=True,
@@ -1906,8 +1916,8 @@ def _custom_camera_viewport(
             "right": right,
             "up": up,
             "look": look,
-            "target": centre,
-            "extent": view_extent(half_size, right, up, _viewport_aspect(list(placed.rect), page)),
+            "target": _vector3_to_floats(at) if at is not None else centre,
+            "extent": extent,
         },
     )
 

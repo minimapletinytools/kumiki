@@ -487,3 +487,18 @@ class TestSelectionPreview:
         preview = next(v for v in drawing["viewports"] if v["projection"] == "perspective")
         # The post is 1000mm of stock cut at 900, so its box centres on 450mm.
         assert preview["camera"]["target"][2] == pytest.approx(0.45, abs=1e-6)
+
+
+def test_a_view_with_a_scale_and_centre_reaches_the_viewer_camera():
+    from kumiki.drawings.drawing import View, Viewport, columns, covering_page
+    from kumiki.timber_features import TimberFace
+
+    beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+    view = View.of_face(beam, TimberFace.FRONT, scale=1 / 10, centre=create_v3(mm(300), 0, 0))
+    layout = [covering_page(columns(Viewport(label="Detail", camera=view), Viewport(label="Preview")))]
+    drawing = runner.create_drawing_from_selection(_frame(beam), ["beam#0"], layout)
+    camera = _by_id(drawing)["Detail"]["camera"]
+
+    assert camera["target"] == pytest.approx([0.3, 0, 0])
+    # Half the sheet's height (A3 landscape) at 1:10.
+    assert camera["extent"] == pytest.approx(0.297 / 2 * 10)

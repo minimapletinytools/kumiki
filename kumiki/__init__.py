@@ -36,7 +36,7 @@ from .identity import (
     ViewportId,
 )
 from .drawings.layout import PlacedViewport, resolve_drawing, resolve_viewports
-from .drawings.drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Share,
+from .drawings.drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Share, View,
                       SHOP_DRAWING_IDS, SplitDirection, Subdivision, Viewport,
                       columns, covering_page, default_viewports_for,
                       elevation_viewports, rows, shop_drawing_viewports,

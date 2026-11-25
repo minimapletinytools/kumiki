@@ -83,3 +83,24 @@ def test_a_side_the_dimension_runs_across_is_warned_about_and_placed_automatical
 def test_lanes_count_from_one():
     with pytest.raises(ValueError, match="count from 1"):
         Beside(DimensionSide.ABOVE, 0)
+
+
+def test_a_view_at_a_scale_draws_at_that_scale_about_its_centre(beam):
+    from kumiki import TimberFace, View, Viewport, columns, covering_page
+
+    frame, cut = beam
+    view = View.of_face(cut.timber, TimberFace.FRONT, scale=1 / 5, centre=create_v3(mm(100), 0, 0))
+    drawing = Drawing(name="beam", timbers=[cut.timber], viewports=[covering_page(columns(
+        Viewport(label="Detail", camera=view)))])
+    sheet = sheet_views(drawing, [cut])["Detail"]
+    assert sheet.mm_per_world == pytest.approx(1000 / 5)
+    assert list(sheet.target) == pytest.approx([0.1, 0, 0])
+    assert list(sheet.axes.look) == pytest.approx([-float(v) for v in cut.timber.get_face_direction_global(TimberFace.FRONT)])
+
+
+def test_world_views_look_the_way_the_elevations_do():
+    from kumiki import View
+
+    assert [list(map(float, View.world(side).axes.right)) for side in ("front", "top")] == [[1, 0, 0], [1, 0, 0]]
+    with pytest.raises(ValueError, match="one of"):
+        View.world("north")

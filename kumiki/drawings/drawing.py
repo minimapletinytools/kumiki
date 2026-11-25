@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Dict, Iterator, List, Mapping, Optional, Seque
 from ..identity import DrawingId, ViewportId
 if TYPE_CHECKING:
     from ..timber import PerfectTimberWithin
-from ..rule import Numeric
+    from ..timber_features import TimberFace
+from ..rule import Numeric, V3, create_v3
 
 # Measuring lived here; its names are still importable from this module.
 from .measure import (  # noqa: F401
@@ -56,6 +57,61 @@ from .measure import (  # noqa: F401
     does_override,
     does_override_identities,
 )
+
+
+@dataclass(frozen=True)
+class View:
+    """What a drawing viewport shows: which way it looks, which way is up, its scale and its centre.
+
+    Build one with `View.of_face` or `View.world`. Vectors are in world space.
+    """
+
+    look: V3
+    up: V3
+    #: Sheet length per world length (1/5 draws at 1:5). None fits the drawing's timbers in the viewport.
+    scale: Optional[float] = None
+    #: The world point at the viewport's middle. None is the middle of the drawing's timbers.
+    centre: Optional[V3] = None
+
+    def __post_init__(self):
+        if self.scale is not None and not self.scale > 0:
+            raise ValueError(f"A view's scale is positive, got {self.scale}")
+
+    @property
+    def axes(self) -> ViewAxes:
+        """Return the camera frame: `up` squared to `look`, and right across the sheet."""
+        from .kigumi_drawing_view_helpers import frame_from_look_and_up
+        frame = frame_from_look_and_up([float(v) for v in self.look], [float(v) for v in self.up])
+        return ViewAxes(look=create_v3(*frame.look), right=create_v3(*frame.right), up=create_v3(*frame.up))
+
+    @staticmethod
+    def of_face(timber: 'PerfectTimberWithin', face: 'TimberFace', scale: Optional[float] = None,
+                centre: Optional[V3] = None) -> 'View':
+        """Return a view square onto `timber`'s `face`, from outside it.
+
+        A long face is seen as a shop drawing sees it, the timber's length across the sheet; an end
+        face with the timber's front face up.
+        """
+        from ..timber_features import TimberFace
+        from .kigumi_drawing_view_helpers import camera_looking_at_face
+        normal = [float(v) for v in timber.get_face_direction_global(face)]
+        if face in (TimberFace.TOP, TimberFace.BOTTOM):
+            up = [float(v) for v in timber.get_face_direction_global(TimberFace.FRONT)]
+            return View(look=create_v3(*[-v for v in normal]), up=create_v3(*up), scale=scale, centre=centre)
+        frame = camera_looking_at_face(normal, [float(v) for v in timber.get_length_direction_global()])
+        return View(look=create_v3(*frame.look), up=create_v3(*frame.up), scale=scale, centre=centre)
+
+    @staticmethod
+    def world(side: str, scale: Optional[float] = None, centre: Optional[V3] = None) -> 'View':
+        """Return a world elevation: "front" looks along +y, "back" -y, "right" -x, "left" +x, with z
+        up, and "top" looks down -z, "bottom" up +z, with +y up the sheet."""
+        looks = {"front": ((0, 1, 0), (0, 0, 1)), "back": ((0, -1, 0), (0, 0, 1)),
+                 "right": ((-1, 0, 0), (0, 0, 1)), "left": ((1, 0, 0), (0, 0, 1)),
+                 "top": ((0, 0, -1), (0, 1, 0)), "bottom": ((0, 0, 1), (0, 1, 0))}
+        if side not in looks:
+            raise ValueError(f"A world view is one of {', '.join(looks)}, not {side!r}")
+        look, up = looks[side]
+        return View(look=create_v3(*look), up=create_v3(*up), scale=scale, centre=centre)
 
 
 # TODO move these into a viewport.py file or prefix with Viewport to make it more clear
@@ -168,9 +224,9 @@ class Viewport:
     #: Which is in front where two floating viewports overlap. Higher is nearer
     #: the reader.
     z: int = 0
-    #: A leaf's camera, in world space. None lets the viewer choose one from the label
-    #: ("Front", "Top", "Preview", ...).
-    camera: Optional[ViewAxes] = None
+    #: A leaf's camera: a `View` (direction, scale, centre) or bare `ViewAxes`, in world space. None
+    #: lets the viewer choose one from the label ("Front", "Top", "Preview", ...).
+    camera: Optional[Union[ViewAxes, View]] = None
     #: What measurements and the drawings file call this viewport. None uses the label. Set it to keep
     #: a viewport's saved edits when its label changes.
     id: Optional[str] = None

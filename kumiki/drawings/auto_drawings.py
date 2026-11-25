@@ -30,7 +30,7 @@ from ..timber import CutTimber, Frame, PerfectTimberWithin
 from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
-from .drawing import ELEVATION_IDS, Drawing, Page, Viewport, columns, covering_page, elevation_viewports, rows
+from .drawing import ELEVATION_IDS, Drawing, Page, View, Viewport, columns, covering_page, elevation_viewports, rows
 from .measure import (Auto, Beside, DimensionSide, FromViewport, Measure, MeasurementOperation, Offset, Placement,
                       ViewAxes)
 from ..user_warnings import warn_user
@@ -588,9 +588,17 @@ def sheet_views(drawing: Drawing, cuts: Sequence['CutTimber'], page: Page = SHEE
         x, y, w, h = (float(v) for v in placed.rect)
         rect = (x, y, w, h)
         label = (placed.label or "").lower()
-        if placed.viewport.camera is not None:
-            right = floats(placed.viewport.camera.right)
-            up = floats(placed.viewport.camera.up)
+        camera = placed.viewport.camera
+        target, extent = centre, None
+        if isinstance(camera, View):
+            if camera.centre is not None:
+                target = floats(camera.centre)
+            if camera.scale is not None:
+                extent = rect[3] * float(page.height) / (2 * float(camera.scale))
+            camera = camera.axes
+        if camera is not None:
+            right = floats(camera.right)
+            up = floats(camera.up)
             right, up = (list(np.array(v) / np.linalg.norm(v)) for v in (right, up))
         elif len(cuts) == 1 and label in _LONG_FACES:
             timber = cuts[0].timber
@@ -604,8 +612,9 @@ def sheet_views(drawing: Drawing, cuts: Sequence['CutTimber'], page: Page = SHEE
         else:
             continue
         aspect = rect[2] * page_mm[0] / (rect[3] * page_mm[1])
-        views[str(placed.id)] = SheetView(np.array(right, float), np.array(up, float), np.array(centre, float),
-                                          view_extent(half, right, up, aspect), rect, page_mm)
+        views[str(placed.id)] = SheetView(np.array(right, float), np.array(up, float), np.array(target, float),
+                                          extent if extent is not None else view_extent(half, right, up, aspect),
+                                          rect, page_mm)
     return views
 
 
