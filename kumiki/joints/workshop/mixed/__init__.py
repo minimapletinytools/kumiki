@@ -2,6 +2,7 @@
 Kumiki - Mixed joint construction functions
 """
 
+from ..feature_names import MortiseAndTenonFeatures
 from .mortise_and_tenon_joints import (
     WedgeParameters,
     WedgeOrientation,
@@ -20,6 +21,7 @@ from .mortise_and_tenon_joints import (
 )
 
 __all__ = [
+    "MortiseAndTenonFeatures",
     "WedgeParameters",
     "WedgeOrientation",
     "TuskParameters",

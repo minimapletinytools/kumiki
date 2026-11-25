@@ -2222,7 +2222,9 @@ def _placement_wire(placement: Optional['Offset'], flip: bool) -> Optional[Place
 def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
-        log_warning("a measurement's feature is not in this frame, so it is left out.")
+        names = " / ".join(getattr(getattr(end, "feature", None), "name", "?") for end in (measure.anchor_a, measure.anchor_b))
+        log_warning(f"the measurement {names} names a feature not on the frame's timbers (from a joint rebuilt "
+                    "before it reached the frame?), so it is skipped.")
         return None
     first, second, placement = anchors
     plane = getattr(measure, "plane", None)

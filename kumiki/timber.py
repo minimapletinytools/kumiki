@@ -26,7 +26,7 @@ from .assembly import (
 # Aliased: cutcsg (wildcard-imported above) also exports a AxisAlignedBoundingBox.
 from .assembly import AxisAlignedBoundingBox as AssemblyBoundingBox
 from enum import Enum
-from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
+from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from typing_extensions import deprecated
@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from .identity import (JointPath, ResolvedJointPath, ResolvedTimberPath,
                            TimberPath)
     from .kiwari import Kiwari
+    from .csg.feature_paths import FeatureHandle
 
 # TODO DELETE ME
 # Aliases for backwards compatibility
@@ -2024,6 +2025,60 @@ class CutTimber:
         """The rough timber with every cut subtracted. Built once, at construction."""
         return self._rendered_csg_local_precomputed
 
+    def feature(self, name: str, index: Optional[int] = None) -> 'FeatureHandle':
+        """Return a handle to the declared feature `name` anywhere on this timber.
+
+        `index` picks one of several features with that name, in the order of the timber's CSG tree.
+        Raises KeyError, naming the closest names, if there is none, and ValueError if there are several
+        and no `index`.
+        """
+        from .csg.feature_paths import FeatureHandle
+        root = self.render_timber_with_cuts_csg_local()
+        found = [(owner, feature) for owner, _ in walk_csg_with_parity(root)
+                 for feature in owner.get_declared_features() if feature.name == name]
+        owner, feature = _pick_named(found, name, index, f"timber {self.timber.ticket.path!r}",
+                                     lambda: [feature.name for owner, _ in walk_csg_with_parity(root)
+                                              for feature in owner.get_declared_features()])
+        return FeatureHandle(timber=self.timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
+
+    def face(self, face: TimberFace) -> 'FeatureHandle':
+        """Return a handle to one of this timber's own faces: `rptw.*`, or `ptw.*` inside rough stock."""
+        name = face.name.lower()
+        try:
+            return self.feature(RPTW_FACE_PREFIX + name)
+        except KeyError:
+            return self.feature(PTW_FACE_PREFIX + name)
+
+    def edge(self, a: Union['FeatureHandle', str], b: Union['FeatureHandle', str]) -> 'FeatureHandle':
+        """Return a handle to the edge where faces `a` and `b` (handles, or names on this timber) meet.
+
+        Raises ValueError if they don't meet in a line (not both faces, parallel, or one isn't there).
+        """
+        from .csg.feature_paths import FeatureHandle
+        first, second = (self.feature(one) if isinstance(one, str) else one for one in (a, b))
+        derived = DerivedEdgeFeature.derive(first.hit, second.hit, any_groups=True)
+        if derived is None:
+            raise ValueError(f"{first.feature.name} and {second.feature.name} don't meet in an edge")
+        owner = shared_ancestor(self.render_timber_with_cuts_csg_local(), first.hit.owner, second.hit.owner)
+        return FeatureHandle(timber=self.timber, hit=OwnedFeatureHit(feature=derived, owner=owner or first.hit.owner))
+
+    def corner(self, edge: Union['FeatureHandle', str], face: Union['FeatureHandle', str]) -> 'FeatureHandle':
+        """Return a handle to the point where a declared `edge` (an arris such as `rptw.front_left`) crosses
+        `face` (handles, or names on this timber).
+
+        Raises ValueError if there is no such point, or if `edge` is a derived edge: a point is saved as
+        the declared edge and face it lies on.
+        """
+        from .csg.feature_paths import FeatureHandle
+        line, plane = (self.feature(one) if isinstance(one, str) else one for one in (edge, face))
+        if isinstance(line.feature, DerivedEdgeFeature):
+            raise ValueError(f"{line.feature.name} is a derived edge; a corner needs a declared one, such as an arris")
+        derived = DerivedPointFeature.derive(line.hit, plane.hit)
+        if derived is None:
+            raise ValueError(f"{line.feature.name} doesn't cross {plane.feature.name} at a point")
+        owner = shared_ancestor(self.render_timber_with_cuts_csg_local(), line.hit.owner, plane.hit.owner)
+        return FeatureHandle(timber=self.timber, hit=OwnedFeatureHit(feature=derived, owner=owner or line.hit.owner))
+
     def render_perfect_timber_within_with_cuts_csg_local(self) -> CutCSG:
         """The perfect timber within with every cut subtracted. Built once, at construction.
 
@@ -2650,6 +2705,28 @@ def warn_joints_whose_timber_extended_rough_prisms_dont_touch(joints: Iterable['
                           FrameWarning, stacklevel=3)
 
         
+def _pick_named(found: List[Any], name: str, index: Optional[int], where: str,
+                names: Callable[[], List[str]]) -> Any:
+    """Return the one of `found` (each a feature named `name` in `where`) that `index` picks.
+
+    Raises KeyError with the closest of `names()` if there is none, and ValueError if `index` is needed
+    or out of range.
+    """
+    import difflib
+    if not found:
+        close = difflib.get_close_matches(name, sorted(set(names())), n=5, cutoff=0.4)
+        raise KeyError(f"No feature named {name!r} on {where}"
+                       + (f"; did you mean {', '.join(repr(one) for one in close)}?" if close else ""))
+    if index is None:
+        if len(found) > 1:
+            raise ValueError(f"{len(found)} features are named {name!r} on {where}: pass an index from 0 to "
+                             f"{len(found) - 1}")
+        return found[0]
+    if not 0 <= index < len(found):
+        raise ValueError(f"{len(found)} features are named {name!r} on {where}, so index {index} is out of range")
+    return found[index]
+
+
 @dataclass(frozen=True)
 class Joint:
     cuttings: Dict[str, Cutting]
@@ -2663,6 +2740,28 @@ class Joint:
             cutting.get_negative_csg_local() is not None
             for cutting in self.cuttings.values()
         ), f"Joint '{self.ticket.path}' has no cutting that removes anything"
+
+    def feature(self, name: str, index: Optional[int] = None) -> 'FeatureHandle':
+        """Return a handle to this joint's declared feature `name`, on whichever timber it cuts.
+
+        `index` picks one of several features with that name (pegs), in the order of the joint's
+        cuttings. Raises KeyError, naming the closest names, if there is none, and ValueError if there
+        are several and no `index`. The handle is checked when a drawing resolves it: one from a joint
+        whose cuts were rebuilt before reaching the frame is warned about and skipped then.
+        """
+        from .csg.feature_paths import FeatureHandle
+
+        def declared():
+            for cutting in self.cuttings.values():
+                if cutting.negative_csg is not None:
+                    for owner, _ in walk_csg_with_parity(cutting.negative_csg):
+                        for feature in owner.get_declared_features():
+                            yield cutting.timber, owner, feature
+
+        found = [(timber, owner, feature) for timber, owner, feature in declared() if feature.name == name]
+        timber, owner, feature = _pick_named(found, name, index, f"joint {self.ticket.path!r}",
+                                             lambda: [feature.name for _, _, feature in declared()])
+        return FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
 
     def is_decorative(self) -> bool:
         return len(self.cuttings) == 1
