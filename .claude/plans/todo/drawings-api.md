@@ -55,7 +55,15 @@ Nothing in `patterns/` or `hidden_structures/` writes one this way. The problems
    cuts by name, raises if missing or ambiguous, and takes an index for repeats. A handle from the joint
    passed to the frame resolves on the final cut timber (checked: all 252 features on the cute frame's
    joints). One taken before a step that rebuilds the joint's cuts (`FauxTimber.restore_joint`) does
-   not, so `joint.feature` checks and raises.
+   not. `joint.feature` always returns a handle; it is checked when the drawing resolves it against the
+   cut timber, and one that doesn't resolve is warned about and its measurement skipped (today it is
+   dropped silently).
+10. **A view is a direction and a scale** (2026-11-25), plus an up direction (default: the timber's
+    length or world Z) and a centre (default: fit the drawing's timbers), built with helpers
+    (`View.of_face(...)`, `View.world(...)`); the label is only text.
+11. **Derived edges and corners get one-call constructors** (2026-11-25): `cut_timber.edge(a, b)`,
+    `cut_timber.corner(a, b, c)`. Measuring them already works (the viewer, the drawings file,
+    `DerivedEdgeFeature.derive` + `shared_ancestor`); this only adds the convenience.
 6. **Layering on generated drawings** (2026-11-25): supported as one pattern, e.g.
    `with_drawings(frame, fn, fixed_path=...)`; the exact shape is open to whatever builds cleanly.
 7. **View names** (2026-11-25): the label by default, an optional separate `id`; old position-keyed
@@ -77,12 +85,6 @@ unplaced measurements go through the auto-placer. Explained again on 2026-11-25;
 *Recommend: yes, keeping `MeasurementPlacement(offset, along)` as the stored form.*
 - Sub-question: lanes only, or also explicit paper millimetres?
 
-**E. What a view is (API part).**
-Agreed direction (2026-11-25): a view is a direction and a scale, built with helpers
-(`View.of_face(post, TimberFace.FRONT, scale=1/5)`, `View.world("front")`, ...); the label is only text.
-Open: a view also needs an up direction (default: the timber's length or world Z) and a centre (default:
-fit the drawing's timbers; set it to frame a detail). Asked whether a view carries those two.
-
 **E2. Viewport layout model (for the UI work).**
 The UI notes want one grid (split rows/columns, at least one cell) plus ordered floating views. Today
 every root floats and the grid is a subdivision inside a page-covering root.
@@ -91,14 +93,6 @@ every root floats and the grid is a subdivision inside a page-covering root.
   details), which timbers, X-ray mode. Which of these are in the first cut?
 - `"Front"` meaning two things (timber face vs world): make the camera explicit
   (`look=TimberFace.FRONT` vs `look=World.FRONT`) and keep the label as text only?
-
-**F. Derived features.**
-Edges and corners that exist only where declared faces meet (`shoulder×rptw.top`); dimensions usually
-run to edges and the auto-dimensioner uses them, but code cannot name one today. `cut_timber.edge(a, b)`
-and `cut_timber.corner(a, b, c)`, on the cut timber since the faces can come from different joints. Face
-to face covers most cases (a face seen edge-on draws as a line); these matter for faces seen at an angle
-(sloped shoulders, dovetail flanks). *Recommend: include, build late.* Explained on 2026-11-25; awaiting
-confirmation.
 
 ## 4. Sketch of the target
 
