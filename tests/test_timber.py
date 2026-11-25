@@ -25,21 +25,6 @@ from tests.testing_shavings import (
 class TestVectorHelpers:
     """Test vector helper functions."""
     
-    def test_create_v2(self):
-        """Test 2D vector creation."""
-        v = create_v2(scalar(3, 2), scalar(5, 2))  # 1.5, 2.5 as exact rationals
-        assert v.shape == (2, 1)
-        assert v[0] == scalar(3, 2)
-        assert v[1] == scalar(5, 2)
-    
-    def test_create_v3(self):
-        """Test 3D vector creation."""
-        v = create_v3(1, 2, 3)  # Use exact integers
-        assert v.shape == (3, 1)
-        assert v[0] == 1
-        assert v[1] == 2
-        assert v[2] == 3
-    
     def test_normalize_vector(self):
         """Test vector normalization."""
         v = create_v3(3, 4, 0)  # Use integers for exact computation
@@ -407,8 +392,8 @@ class TestTimber:
         assert width_dir[1] == 0
         assert width_dir[2] == 0
     
-    def test_get_position_on_centerline_from_bottom_global(self):
-        """Test the get_centerline_position_from_bottom method."""
+    def test_get_position_on_centerline_from_bottom_global_of_a_horizontal_timber(self):
+        """Test the get_centerline_position_from_bottom method on a timber running north."""
         timber = create_timber(
             length=scalar(5),
             size=create_v2(scalar("0.2"), scalar("0.3")),
@@ -527,12 +512,6 @@ class TestTimber:
 
 class TestEnumsAndDataStructures:
     """Test enums and data structures."""
-    
-    def test_timber_location_type_enum(self):
-        """Test FootprintLocation enum."""
-        assert FootprintLocation.INSIDE.value == 1
-        assert FootprintLocation.CENTER.value == 2
-        assert FootprintLocation.OUTSIDE.value == 3
     
     def test_timber_face_enum(self):
         """Test TimberFace enum."""

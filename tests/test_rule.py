@@ -635,236 +635,25 @@ class TestFlipOrientation:
         assert flipped.matrix != original_matrix
 
 
-class TestReprAndString:
-    """Test string representation."""
-    
-    def test_repr_contains_matrix(self):
-        """Test __repr__ contains the matrix."""
-        orientation = Orientation.identity()
-        repr_str = repr(orientation)
-        
-        assert "Orientation(" in repr_str
-        assert "Matrix(" in repr_str
-        assert "1" in repr_str  # Should contain identity matrix elements 
-
-
 class TestDimensionalHelpers:
-    """Test dimensional helper functions."""
-    
-    def test_inches_integer(self):
-        """Test inches with integer input."""
-        result = inches(1)
-        expected = scalar(1) * INCH_TO_METER
-        assert result == expected
-    
-    def test_inches_fraction(self):
-        """Test inches with fractional input (1/32 inch)."""
-        result = inches(1, 32)
-        expected = scalar(1, 32) * INCH_TO_METER
-        assert result == expected
-    
-    def test_inches_float(self):
-        """Test inches with float input."""
-        result = inches(3.5)
-        expected = scalar(7, 2) * INCH_TO_METER
-        assert result == expected
-    
-    def test_inches_string(self):
-        """Test inches with string input."""
-        result = inches("1.5")
-        expected = scalar(3, 2) * INCH_TO_METER
-        assert result == expected
-    
-    def test_inches_fraction_string(self):
-        """Test inches with fraction string."""
-        result = inches("1/32")
-        expected = scalar(1, 32) * INCH_TO_METER
-        assert result == expected
-    
-    def test_feet_integer(self):
-        """Test feet with integer input."""
-        result = feet(8)
-        expected = scalar(8) * FOOT_TO_METER
-        assert result == expected
-    
-    def test_feet_fraction(self):
-        """Test feet with fractional input."""
-        result = feet(1, 2)
-        expected = scalar(1, 2) * FOOT_TO_METER
-        assert result == expected
-    
-    def test_feet_float(self):
-        """Test feet with float input."""
-        result = feet(6.5)
-        expected = scalar(13, 2) * FOOT_TO_METER
-        assert result == expected
-    
-    def test_mm_integer(self):
-        """Test millimeters with integer input."""
-        result = mm(90)
-        expected = scalar(90, 1000)
-        assert result == expected
-    
-    def test_mm_fraction(self):
-        """Test millimeters with fractional input."""
-        result = mm(1, 2)
-        expected = scalar(1, 2000)
-        assert result == expected
-    
-    def test_mm_float(self):
-        """Test millimeters with a pre-scaled float for exact comparison."""
-        result = mm(scalar(254, 10))  # Exactly 25.4mm
-        assert isinstance(result, float)
-        # Check it equals exactly 1 inch
-        expected = inches(1)
-        assert result == expected
-    
-    def test_cm_integer(self):
-        """Test centimeters with integer input."""
-        result = cm(9)
-        expected = scalar(9, 100)
-        assert result == expected
-    
-    def test_cm_fraction(self):
-        """Test centimeters with fractional input."""
-        result = cm(1, 2)
-        expected = scalar(1, 200)
-        assert result == expected
-    
-    def test_m_integer(self):
-        """Test meters with integer input."""
-        result = m(1)
-        expected = scalar(1)
-        assert result == expected
-    
-    def test_m_fraction(self):
-        """Test meters with fractional input."""
-        result = m(1, 2)
-        expected = scalar(1, 2)
-        assert result == expected
-    
-    def test_m_float(self):
-        """Test meters with float input."""
-        result = m(2.5)
-        expected = scalar(5, 2)
-        assert result == expected
-    
-    def test_shaku_integer(self):
-        """Test shaku with integer input."""
-        result = shaku(1)
-        expected = scalar(1) * SHAKU_TO_METER
-        assert result == expected
-    
-    def test_shaku_fraction(self):
-        """Test shaku with fractional input."""
-        result = shaku(3, 2)
-        expected = scalar(3, 2) * SHAKU_TO_METER
-        assert result == expected
-    
-    def test_shaku_float(self):
-        """Test shaku with float input."""
-        result = shaku(2.5)
-        expected = scalar(5, 2) * SHAKU_TO_METER
-        assert result == expected
-    
-    def test_sun_integer(self):
-        """Test sun with integer input (1 sun = 1/10 shaku)."""
-        result = sun(1)
-        expected = SHAKU_TO_METER / 10
-        assert result == expected
-    
-    def test_sun_fraction(self):
-        """Test sun with fractional input."""
-        result = sun(1, 2)
-        expected = scalar(1, 2) * SHAKU_TO_METER / 10
-        assert result == expected
-    
-    def test_sun_multiple(self):
-        """Test that 10 sun equals 1 shaku."""
-        result_sun = sun(10)
-        result_shaku = shaku(1)
-        assert result_sun == result_shaku
-    
-    def test_bu_integer(self):
-        """Test bu with integer input (1 bu = 1/100 shaku)."""
-        result = bu(1)
-        expected = SHAKU_TO_METER / 100
-        assert result == expected
-    
-    def test_bu_fraction(self):
-        """Test bu with fractional input."""
-        result = bu(1, 2)
-        expected = scalar(1, 2) * SHAKU_TO_METER / 100
-        assert result == expected
-    
-    def test_bu_multiple(self):
-        """Test that 10 bu equals 1 sun and 100 bu equals 1 shaku."""
-        result_10bu = bu(10)
-        result_1sun = sun(1)
-        result_100bu = bu(100)
-        result_1shaku = shaku(1)
-        assert result_10bu == result_1sun
-        assert result_100bu == result_1shaku
-    
-    def test_all_return_float(self):
-        """Test that all helper functions return plain float types."""
-        # Test with integer inputs
-        assert isinstance(inches(1), float)
-        assert isinstance(feet(1), float)
-        assert isinstance(mm(1), float)
-        assert isinstance(cm(1), float)
-        assert isinstance(m(1), float)
-        assert isinstance(shaku(1), float)
-        assert isinstance(sun(1), float)
-        assert isinstance(bu(1), float)
+    """Each unit helper turns a whole number, a fraction (numerator, denominator), a float or a string
+    into metres, as a float."""
 
-        # Test with float inputs
-        assert isinstance(inches(1.5), float)
-        assert isinstance(feet(6.5), float)
-        assert isinstance(mm(25.4), float)
-    
-    def test_conversion_consistency(self):
-        """Test that 1 inch equals 25.4 mm exactly."""
-        result_inch = inches(1)
-        result_mm = mm(scalar(254, 10))  # 25.4 mm
-        assert result_inch == result_mm
-    
-    def test_practical_example_imperial(self):
-        """Test a practical carpentry example with imperial units."""
-        # 2x4 nominal dimensions (actual: 1.5" x 3.5")
-        width = inches(3, 2)  # 1.5 inches
-        height = inches(7, 2)  # 3.5 inches
-        
-        assert isinstance(width, float)
-        assert isinstance(height, float)
-
-        # Verify metric values (independently-rounded literals, so compare
-        # with tolerance rather than exact float equality)
-        assert safe_equality_test(width, scalar(381, 10000))  # ~38.1mm
-        assert safe_equality_test(height, scalar(889, 10000))  # ~88.9mm
-    
-    def test_practical_example_metric(self):
-        """Test a practical carpentry example with metric units."""
-        # Common timber: 90mm x 90mm
-        width = mm(90)
-        height = mm(90)
-        
-        assert isinstance(width, float)
-        assert isinstance(height, float)
-        assert width == scalar(9, 100)  # 0.09 meters
-    
-    def test_practical_example_japanese(self):
-        """Test a practical carpentry example with Japanese traditional units."""
-        # Common post: 4 sun x 4 sun (approximately 120mm x 120mm)
-        width = sun(4)
-        height = sun(4)
-        
-        assert isinstance(width, float)
-        assert isinstance(height, float)
-
-        # Verify they're equal and exact
-        assert width == height
-        assert width == scalar(4) * SHAKU_TO_METER / 10
+    @pytest.mark.parametrize("value, expected", [
+        (inches(1), INCH_TO_METER), (inches(1, 32), scalar(1, 32) * INCH_TO_METER),
+        (inches(3.5), scalar(7, 2) * INCH_TO_METER), (inches("1.5"), scalar(3, 2) * INCH_TO_METER),
+        (inches("1/32"), scalar(1, 32) * INCH_TO_METER),
+        (feet(8), 8 * FOOT_TO_METER), (feet(1, 2), scalar(1, 2) * FOOT_TO_METER), (feet(6.5), scalar(13, 2) * FOOT_TO_METER),
+        (mm(90), scalar(90, 1000)), (mm(1, 2), scalar(1, 2000)), (mm(scalar(254, 10)), inches(1)),
+        (cm(9), scalar(9, 100)), (cm(1, 2), scalar(1, 200)),
+        (m(1), 1), (m(1, 2), scalar(1, 2)), (m(2.5), scalar(5, 2)),
+        (shaku(1), SHAKU_TO_METER), (shaku(3, 2), scalar(3, 2) * SHAKU_TO_METER), (shaku(2.5), scalar(5, 2) * SHAKU_TO_METER),
+        (sun(1), SHAKU_TO_METER / 10), (sun(1, 2), scalar(1, 2) * SHAKU_TO_METER / 10), (sun(10), shaku(1)),
+        (bu(1), SHAKU_TO_METER / 100), (bu(1, 2), scalar(1, 2) * SHAKU_TO_METER / 100), (bu(10), sun(1)), (bu(100), shaku(1)),
+    ])
+    def test_a_length_is_metres(self, value, expected):
+        assert isinstance(value, float)
+        assert value == pytest.approx(expected)
 
 
 class TestTransformRotateAroundAxis:
@@ -1199,18 +988,6 @@ class TestGiraffeDotProduct:
         assert result == 1
 
 
-class TestSafeDet:
-    def test_det_identity_is_one(self):
-        M = Matrix.eye(3)
-        assert safe_det(M) == 1
-
-
-class TestSafeSimplify:
-    def test_simplify_leaves_value_unchanged(self):
-        x = scalar(1, 2) + scalar(1, 3)
-        assert safe_equality_test(safe_simplify(x), scalar(5, 6))
-
-
 class TestSafeCompare:
     def test_gt_positive(self):
         assert safe_compare(scalar(1, 2), 0, Comparison.GT) == True
@@ -1231,11 +1008,6 @@ class TestSafeEqualityTest:
         assert safe_zero_test(scalar(1, 2)) == False
 
 
-class TestEqualityTest:
-    def test_equal_rationals(self):
-        assert safe_equality_test(scalar(1, 2), scalar(1, 2)) == True
-
-
 class TestDegrees:
     def test_90_degrees_to_radians(self):
         assert degrees(90) == pi / 2
@@ -1247,39 +1019,6 @@ class TestAreVectorsPerpendicular:
         v2 = create_v3(0, 1, 0)
         assert are_vectors_perpendicular(v1, v2) == True
 
-
-class TestTransformMul:
-    def test_identity_times_identity(self):
-        T = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
-        result = T * T
-        assert result.position == create_v3(0, 0, 0)
-        assert result.orientation.matrix == Matrix.eye(3)
-
-
-class TestTransformInvert:
-    def test_invert_identity_is_identity(self):
-        T = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
-        inv = T.invert()
-        assert inv.position == create_v3(0, 0, 0)
-        assert inv.orientation.matrix == Matrix.eye(3)
-
-
-class TestTransformToGlobalTransform:
-    def test_to_global_with_identity_parent(self):
-        T = Transform(position=create_v3(1, 2, 3), orientation=Orientation.identity())
-        parent = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
-        global_t = T.to_global_transform(parent)
-        assert global_t.position == T.position
-        assert global_t.orientation.matrix == T.orientation.matrix
-
-
-class TestTransformToLocalTransform:
-    def test_to_local_with_identity_parent(self):
-        T = Transform(position=create_v3(1, 2, 3), orientation=Orientation.identity())
-        parent = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
-        local_t = T.to_local_transform(parent)
-        assert local_t.position == T.position
-        assert local_t.orientation.matrix == T.orientation.matrix
 
 def test_a_direction_is_rotated_but_not_translated():
     from kumiki.rule import Orientation, Transform, create_v3

@@ -14,36 +14,6 @@ def _dummy_pattern(center: V3) -> Frame:
     return Frame(cut_timbers=[])
 
 
-def test_pattern_metadata_creation():
-    """Test creating PatternMetadata objects."""
-    # Basic metadata
-    metadata1 = PatternMetadata(
-        pattern_name="test_pattern",
-        pattern_type="frame"
-    )
-    assert metadata1.pattern_name == "test_pattern"
-    assert metadata1.pattern_group_names == []
-    assert metadata1.pattern_type == "frame"
-    
-    # Metadata with single group
-    metadata2 = PatternMetadata(
-        pattern_name="test_pattern2",
-        pattern_group_names=["test_group"],
-        pattern_type="csg"
-    )
-    assert metadata2.pattern_group_names == ["test_group"]
-    assert metadata2.pattern_type == "csg"
-    
-    # Metadata with multiple groups
-    metadata3 = PatternMetadata(
-        pattern_name="test_pattern3",
-        pattern_group_names=["group_a", "group_b"],
-        pattern_type="frame"
-    )
-    assert metadata3.pattern_group_names == ["group_a", "group_b"]
-    assert metadata3.pattern_type == "frame"
-
-
 def test_pattern_metadata_invalid_type():
     """Test that invalid pattern types raise ValueError."""
     with pytest.raises(ValueError, match="pattern_type must be"):

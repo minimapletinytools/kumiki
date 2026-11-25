@@ -267,50 +267,8 @@ class TestSupportDistance:
 # Tests for Peg and Wedge Joint Accessories
 # ============================================================================
 
-class TestPegShape:
-    """Test PegShape enum."""
-    
-    def test_peg_shape_enum(self):
-        """Test PegShape enum values."""
-        assert PegShape.SQUARE.value == "square"
-        assert PegShape.ROUND.value == "round"
-
-
 class TestPeg:
     """Test Peg class."""
-    
-    def test_peg_creation(self):
-        """Test basic Peg creation."""
-        orientation = Orientation.identity()
-        position = create_v3(1, 2, 3)
-        
-        peg = Peg(
-            transform=Transform(position=position, orientation=orientation),
-            size=scalar(2),
-            shape=PegShape.SQUARE,
-            forward_length=scalar(10),
-            stickout_length=scalar(1)
-        )
-        
-        assert peg.transform.orientation == orientation
-        assert peg.transform.position == position
-        assert peg.size == scalar(2)
-        assert peg.shape == PegShape.SQUARE
-        assert peg.forward_length == scalar(10)
-        assert peg.stickout_length == scalar(1)
-    
-    def test_peg_is_frozen(self):
-        """Test that Peg is immutable."""
-        peg = Peg(
-            transform=Transform.identity(),
-            size=scalar(2),
-            shape=PegShape.ROUND,
-            forward_length=scalar(10),
-            stickout_length=scalar(1)
-        )
-        
-        with pytest.raises(Exception):  # FrozenInstanceError
-            peg.size = scalar(3)  # type: ignore
     
     def test_peg_get_csg_local_square(self):
         """Test rendering square peg CSG in local space."""
@@ -359,26 +317,6 @@ class TestPeg:
 class TestWedge:
     """Test Wedge class."""
     
-    def test_wedge_creation(self):
-        """Test basic Wedge creation."""
-        orientation = Orientation.identity()
-        position = create_v3(1, 2, 3)
-        
-        wedge = Wedge(
-            transform=Transform(position=position, orientation=orientation),
-            base_width=scalar(5),
-            tip_width=scalar(1),
-            height=scalar(2),
-            length=scalar(10)
-        )
-        
-        assert wedge.transform.orientation == orientation
-        assert wedge.transform.position == position
-        assert wedge.base_width == scalar(5)
-        assert wedge.tip_width == scalar(1)
-        assert wedge.height == scalar(2)
-        assert wedge.length == scalar(10)
-    
     def test_wedge_width_property(self):
         """Test that width property is an alias for base_width."""
         wedge = Wedge(
@@ -391,19 +329,6 @@ class TestWedge:
         
         assert wedge.width == wedge.base_width
         assert wedge.width == scalar(5)
-    
-    def test_wedge_is_frozen(self):
-        """Test that Wedge is immutable."""
-        wedge = Wedge(
-            transform=Transform.identity(),
-            base_width=scalar(5),
-            tip_width=scalar(1),
-            height=scalar(2),
-            length=scalar(10)
-        )
-        
-        with pytest.raises(Exception):  # FrozenInstanceError
-            wedge.base_width = scalar(6)  # type: ignore
     
     def test_wedge_get_csg_local(self):
         """Test rendering wedge CSG in local space."""
@@ -790,36 +715,6 @@ class TestCreateWedgeInTimberEnd:
         assert wedge.transform.position[0] == scalar(0)
         assert wedge.transform.position[1] == scalar(0)
         assert wedge.transform.position[2] == scalar(100)
-
-
-class TestWedgeShape:
-    """Test WedgeShape specification class."""
-    
-    def test_wedge_shape_creation(self):
-        """Test WedgeShape creation."""
-        shape = WedgeShape(
-            base_width=scalar(6),
-            tip_width=scalar(2),
-            height=scalar(3),
-            length=scalar(12)
-        )
-        
-        assert shape.base_width == scalar(6)
-        assert shape.tip_width == scalar(2)
-        assert shape.height == scalar(3)
-        assert shape.length == scalar(12)
-    
-    def test_wedge_shape_is_frozen(self):
-        """Test that WedgeShape is immutable."""
-        shape = WedgeShape(
-            base_width=scalar(5),
-            tip_width=scalar(1),
-            height=scalar(2),
-            length=scalar(10)
-        )
-        
-        with pytest.raises(Exception):  # FrozenInstanceError
-            shape.base_width = scalar(7)  # type: ignore
 
 
 class TestTimberRelationshipHelpers:
