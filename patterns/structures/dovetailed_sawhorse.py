@@ -247,9 +247,9 @@ ROUTER_TEMPLATE = kiwari(
     clamp_depth=kiwari.length(inches(3, 8), minimum=0, about="How deep each clamp slot is, into the template's router side"),
     clamp_clearance=kiwari.length(inches(1, 4), minimum=0, about="How far the socket template's clamp slots stop short of its opening"),
     tail_clamp_length=kiwari.length(inches(1), minimum=0, about="How far the tail template's clamp slot runs in from its top end"),
-    leg_template_wide_runout=kiwari.number(0.2, minimum=0, about="How far the leg template runs on past the socket at its wide end, "
-                                                                    "as a fraction of its length, so the bit doesn't leave it"),
-    leg_template_narrow_runout=kiwari.number(0.05, minimum=0, about="The same at its narrow end"),
+    leg_template_wide_runout=kiwari.length(mm(25), minimum=0, about="How far the leg template runs on past the socket "
+                                                                    "at its wide end, along the leg, so the bit doesn't leave it"),
+    leg_template_narrow_runout=kiwari.length(mm(25), minimum=0, about="The same at its narrow end"),
     add_jigs_and_accessories=kiwari.flag(True, about="Show the templates in the viewer, as extra accessories"),
 )
 
@@ -359,17 +359,16 @@ def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: fl
 def _run_out(outline: List[Tuple[float, float]], up: np.ndarray, wide: float, narrow: float) -> List[Tuple[float, float]]:
     """Return a convex outline with its bottom and top ends moved out along its flanks.
 
-    The bottom end (facing most against `up`, unit 2D) moves `wide` times the outline's length along
-    `up`, the top end `narrow` times; the other edges keep their lines.
+    The bottom end (facing most against `up`, unit 2D) moves `wide` down along `up`, the top end `narrow`
+    up it; the other edges keep their lines.
     """
     points = np.array(outline)
     normals, offsets = _edge_lines(points)
-    length = float(np.ptp(points @ up))
     offsets = offsets.copy()
     bottom, top = int(np.argmin(normals @ up)), int(np.argmax(normals @ up))
-    offsets[bottom] += wide * length * float(-(normals[bottom] @ up))
-    offsets[top] += narrow * length * float(normals[top] @ up)
-    reach = 10 * (np.abs(points).max() + length)
+    offsets[bottom] += wide * float(-(normals[bottom] @ up))
+    offsets[top] += narrow * float(normals[top] @ up)
+    reach = 10 * (np.abs(points).max() + wide + narrow + 1)
     moved = [(-reach, -reach), (reach, -reach), (reach, reach), (-reach, reach)]
     for normal, offset in zip(normals, offsets):
         moved = _clip_between(moved, normal, -np.inf, float(offset))
@@ -384,7 +383,7 @@ def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[C
     offset, with the uncut beam taken out of its underside so it sits on the beam. The leg template lies
     on the wide face, on the side away from the leg, as the wide face moved in by the leg offset, its wide
     end square to `leg`'s length so it can be squared off the leg's edge. Its flanks run on past the
-    socket at both ends, by the runouts (fractions of its length), so the bit doesn't leave it. Each has
+    socket at both ends, by the runouts (along the leg), so the bit doesn't leave it. Each has
     clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
     `CLAMP_FLOOR` under its slot.
     """
@@ -419,8 +418,8 @@ def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[C
                    else _clip_between(wide_outline, along, float(reach.min()), np.inf))
     lowest = float((in_beam @ np.array([frame.u, frame.v]).T @ up_in_face).min())
     leg_outline = _clip_between(leg_outline, up_in_face, lowest, np.inf)
-    leg_outline = _run_out(leg_outline, up_in_face, float(t.number("leg_template_wide_runout")),
-                           float(t.number("leg_template_narrow_runout")))
+    leg_outline = _run_out(leg_outline, up_in_face, float(t.length("leg_template_wide_runout")),
+                           float(t.length("leg_template_narrow_runout")))
     beam_offset, leg_offset = t.length("beam_bushing_offset"), t.length("leg_bushing_offset")
     top = t.length("top_depth")
     socket_template = router_template((frame, [outline]), body, beam_offset, top, t.length("base_support_width"),

@@ -62,6 +62,16 @@ module.exports = {
         const shown = await waitFor(() => extras().then((text) => text.endsWith(' / 4') ? text : null), { timeoutMs: 20000 })
             .catch(() => extras());
         await capture('03g-extra-accessories');
+        // How long the A leg template is, along the longest side of its box, in mm.
+        const legTemplate = () => inShell(`(() => {
+            const app = ${app};
+            const entry = [...app.sceneManager.entries()].find(([key]) => app.memberMetadataByKey.get(key)?.name === 'A leg template');
+            if (!entry) return null;
+            entry[1].mesh.geometry.computeBoundingBox();
+            const size = entry[1].mesh.geometry.boundingBox.getSize(new entry[1].mesh.position.constructor());
+            return Math.round(1000 * Math.max(size.x, size.y, size.z));
+        })()`);
+        const legBefore = await legTemplate();
         const tints = await inShell(`(() => {
             const app = ${app};
             return [...new Set([...app.sceneManager.entries()]
@@ -75,6 +85,17 @@ module.exports = {
         await inShell(`${app}.requestRefresh()`);
         const afterRebuild = await waitFor(() => extras().then((text) => text === ' / 0' ? text : null), { timeoutMs: 60000 })
             .catch(() => extras());
+        // A tool parameter typed in the panel reaches the tool: a longer runout, a longer leg template.
+        await inShell(`(() => {
+            const box = ${viewDoc}.getElementById('kiwari-tool0-leg_template_wide_runout');
+            box.value = '100mm';
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
+        await inShell(`${viewDoc}.querySelector('#tool-controls .tool-run').click()`);
+        const legAfter = await waitFor(() => legTemplate().then((size) => (size && size !== legBefore ? size : null)), { timeoutMs: 60000 })
+            .catch(() => legTemplate());
+        check('a runout typed for the tool lengthens the leg template it shows',
+            legBefore > 0 && legAfter > legBefore + 50, `${legBefore} mm -> ${legAfter} mm`);
         check('a tool\'s extra accessories are listed and drawn, one can be deleted, and a rebuild clears them',
             shown === 'A beam template|A leg template|B beam template|B leg template / 4'
                 && afterDelete === 'A beam template|B beam template|B leg template / 3' && afterRebuild === ' / 0'
