@@ -5,7 +5,7 @@ Goal: make it practical to write and adjust drawings in Python (by a person or t
 generate them with `with_auto_drawings`. The viewport UI (select, resize, split, floating views) comes
 after; this plan only settles the API it will sit on.
 
-Status: design agreed in part on 2026-11-24. Nothing built yet. Open decisions are in §3.
+Status: design agreed in part on 2026-11-24 and 2026-11-25. Nothing built yet. Open decisions are in §3.
 
 ## 1. Where we are
 
@@ -51,21 +51,29 @@ Nothing in `patterns/` or `hidden_structures/` writes one this way. The problems
 3. **The agent gets a feature listing.** `describe_frame` becomes `describe`, taking a frame, a timber or
    a joint.
 4. **API before UI.** The viewport UI notes (9/6/2026) are implemented later, on top of this.
+5. **Features come from joint objects** (2026-11-25): `joint.feature(MT.SHOULDER)` searches that joint's
+   cuts by name, raises if missing or ambiguous, and takes an index for repeats. A handle from the joint
+   passed to the frame resolves on the final cut timber (checked: all 252 features on the cute frame's
+   joints). One taken before a step that rebuilds the joint's cuts (`FauxTimber.restore_joint`) does
+   not, so `joint.feature` checks and raises.
+6. **Layering on generated drawings** (2026-11-25): supported as one pattern, e.g.
+   `with_drawings(frame, fn, fixed_path=...)`; the exact shape is open to whatever builds cleanly.
+7. **View names** (2026-11-25): the label by default, an optional separate `id`; old position-keyed
+   files are read, names written on the next save.
+8. **Constants roll out** mortise and tenon first, then per family as touched (2026-11-25).
+9. **`describe`** names timbers and joints by ticket path; `describe_frame` stays as an alias for now
+   (2026-11-25).
 
 ## 3. Still to decide
 
 Each has my recommendation; none is settled.
 
-**A. Is `joint.feature(...)` the main way to get a feature?**
-Constants fix renames of the name but not the label path. Proposal: `joint.feature(MT.MORTISE_BOTTOM)`
-searches that joint's cuts for the name and raises if it is missing or ambiguous; repeats take an index
-(`joint.feature(MT.PEG_HOLE_AXIS, 0)`). The label-path form stays for the drawings file and odd cases.
-*Recommend: yes.* Asked on 2026-11-24, not yet answered.
-
 **B. Placement in sheet terms.**
-Replace signed world offsets, for authors, with a side and a lane: `side="left", lane=2` (lanes are fixed
-paper spacing, as the auto-placer already uses). Unplaced measurements go through the auto-placer.
-Explained on 2026-11-24; not yet confirmed.
+Replace signed world offsets, for authors, with a side and a lane. `side` is an enum (`LEFT`, `RIGHT`,
+`ABOVE`, `BELOW`) read against the view the measurement is in: which side of the work, as seen on that
+sheet, the dimension line goes. `lane` is which row out from the work (1 is nearest; each lane a fixed
+paper distance further, 7 mm as the auto-placer uses), so dimensions on one side stack. Both optional;
+unplaced measurements go through the auto-placer. Explained again on 2026-11-25; awaiting confirmation.
 *Recommend: yes, keeping `MeasurementPlacement(offset, along)` as the stored form.*
 - Sub-question: lanes only, or also explicit paper millimetres?
 
@@ -83,7 +91,13 @@ Proposal: the name is the view's label, unique within a drawing (raise on a dupl
 - Existing drawings files are keyed by position. Migrate on load and rewrite on save, or keep reading
   both forever? *Recommend: read both, write names.*
 
-**E. Viewport model.**
+**E. What a view is (API part).**
+Agreed direction (2026-11-25): a view is a direction and a scale, built with helpers
+(`View.of_face(post, TimberFace.FRONT, scale=1/5)`, `View.world("front")`, ...); the label is only text.
+Open: a view also needs an up direction (default: the timber's length or world Z) and a centre (default:
+fit the drawing's timbers; set it to frame a detail). Asked whether a view carries those two.
+
+**E2. Viewport layout model (for the UI work).**
 The UI notes want one grid (split rows/columns, at least one cell) plus ordered floating views. Today
 every root floats and the grid is a subdivision inside a page-covering root.
 *Recommend: `Drawing(grid=..., floating=[...])`, with today's form still accepted.*
@@ -93,14 +107,12 @@ every root floats and the grid is a subdivision inside a page-covering root.
   (`look=TimberFace.FRONT` vs `look=World.FRONT`) and keep the label as text only?
 
 **F. Derived features.**
-`edge(a, b)` and `corner(a, b, c)` as public constructors for derived anchors. Where they live: on the
-joint, the cut timber, or free functions? *Recommend: on the cut timber, since the two faces can belong
-to different joints.*
-
-**G. Rolling out constants.**
-Mortise and tenon first (about a dozen names), then the rest per family as they are touched; or all
-families in one pass? *Recommend: mortise and tenon first.* Timber faces keep `rptw.*` / `ptw.*` with a
-`TimberFace` shortcut.
+Edges and corners that exist only where declared faces meet (`shoulder×rptw.top`); dimensions usually
+run to edges and the auto-dimensioner uses them, but code cannot name one today. `cut_timber.edge(a, b)`
+and `cut_timber.corner(a, b, c)`, on the cut timber since the faces can come from different joints. Face
+to face covers most cases (a face seen edge-on draws as a line); these matter for faces seen at an angle
+(sloped shoulders, dovetail flanks). *Recommend: include, build late.* Explained on 2026-11-25; awaiting
+confirmation.
 
 **H. `describe` details.**
 - Frame: what `describe_frame` returns today. Timber: faces, joints on it, feature names. Joint: members,
