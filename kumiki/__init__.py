@@ -42,7 +42,7 @@ from .drawings.drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Sh
                       elevation_viewports, rows, shop_drawing_viewports,
                       Measure, MeasurementDirection, MeasurementFeature,
                       MeasurementKind, MeasurementOperation, MeasurementPlacement,
-                      MeasurementSpace, kinds_for)
+                      MeasurementSpace, kinds_for, Placement, Auto, Offset, Beside, DimensionSide)
 from .timber import *
 from .footprint import *
 from .construction import *

@@ -82,8 +82,8 @@ class MeasureKindWire(TypedDict):
 
 class PlacementWire(TypedDict, total=False):
     offset: float
-    along: float  # MeasurementPlacement.along
-    flip: bool  # MeasurementPlacement.flip
+    along: float  # Offset.along
+    flip: bool  # Measure.flip
 
 
 class ExtentsWire(TypedDict):
@@ -712,7 +712,7 @@ if TYPE_CHECKING:
     # Annotations only: import kumiki inside functions at runtime, since a reload purges it.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
     from kumiki.drawings.drawing import Viewport, ViewportId
-    from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
+    from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement, Offset,
                                            MeasurementPlane, MeasurementSpace, VectorLike, ViewAxes)
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
@@ -2207,11 +2207,14 @@ def _plane_for_pick(
         in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
-def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
-    wire = cast(PlacementWire, {"offset": placement.offset})
-    if placement.along is not None:
+def _placement_wire(placement: Optional['Offset'], flip: bool) -> Optional[PlacementWire]:
+    """Return a measure's placement as the viewer reads it, or None when it has none of its own."""
+    if placement is None and not flip:
+        return None
+    wire = cast(PlacementWire, {"offset": placement.offset if placement is not None else None})
+    if placement is not None and placement.along is not None:
         wire["along"] = placement.along
-    if placement.flip:
+    if flip:
         wire["flip"] = True
     return wire
 
@@ -2229,7 +2232,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         "measureId": str(measure.measure_id) if measure.measure_id else None,
         # Not identity; sent so a file override starts from what the code asked for.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
-        "placement": _placement_wire(placement) if placement is not None else None,
+        "placement": _placement_wire(placement, bool(getattr(measure, "flip", False))),
         # Likewise not identity. Absent on the wire means "take the viewport's
         # plane", which is what an orthographic viewport's measurements may
         # always mean -- FromViewport.as_wire() is how the python side says it.
@@ -2298,6 +2301,31 @@ def _file_measurements_by_viewport(entry: Optional[DrawingWire]) -> Dict[str, Li
         if isinstance(viewport, dict) and isinstance(viewport.get("id"), str):
             by_viewport[viewport["id"]] = list(viewport.get("measurements") or [])
     return by_viewport
+
+
+_PLACED_DRAWINGS: Dict[int, Tuple[Any, Any]] = {}
+
+
+def _with_placed_dimensions(declared: Any, frame: 'Frame') -> Any:
+    """Return a code drawing with its Auto and Beside placements worked out, once per drawing object."""
+    try:
+        from kumiki.drawings.auto_drawings import needs_placing, with_placed_dimensions
+    except ImportError:
+        return declared  # an older kumiki: every placement is already its own
+    if not needs_placing(declared):
+        return declared
+    cached = _PLACED_DRAWINGS.get(id(declared))
+    if cached is not None and cached[0] is declared:
+        return cached[1]
+    try:
+        placed = with_placed_dimensions(declared, frame)
+    except Exception as exc:
+        log_warning(f"could not place the dimensions of drawing {declared.name!r}: {exc}")
+        placed = declared
+    if len(_PLACED_DRAWINGS) > 64:
+        _PLACED_DRAWINGS.clear()
+    _PLACED_DRAWINGS[id(declared)] = (declared, placed)
+    return placed
 
 
 def _measurements_by_viewport(
@@ -2616,6 +2644,7 @@ def collect_drawings(
         # The layout is always the code's. A file entry that wants a layout of
         # its own is a drawing of its own, which is what keeps adding one
         # dimension from taking a drawing's page and viewports with it.
+        declared = _with_placed_dimensions(declared, frame)
         scene = _drawing_from_code(frame, declared)
         override = overrides.get(str(declared.drawing_id))
         if override is not None:

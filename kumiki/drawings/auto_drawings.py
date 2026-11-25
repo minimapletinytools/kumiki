@@ -31,7 +31,9 @@ from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, Dim
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
 from .drawing import ELEVATION_IDS, Drawing, Page, Viewport, columns, covering_page, elevation_viewports, rows
-from .measure import FromViewport, Measure, MeasurementOperation, MeasurementPlacement, ViewAxes
+from .measure import (Auto, Beside, DimensionSide, FromViewport, Measure, MeasurementOperation, Offset, Placement,
+                      ViewAxes)
+from ..user_warnings import warn_user
 from .measure_solving import DrawingSolve
 from .visibility import visible_by_view
 from .xray import xray_sides
@@ -338,6 +340,25 @@ class MaterialGrid:
         inside = (l1 >= -1e-6) & (l2 >= -1e-6) & (1 - l1 - l2 >= -1e-6)
         self.cells[lo[1]:hi[1] + 1, lo[0]:hi[0] + 1] |= inside
 
+    def material(self) -> np.ndarray:
+        """Return the centres of the cells with material on them, in sheet mm, (n, 2)."""
+        if not hasattr(self, "_material"):
+            rows, cols = np.nonzero(self.cells)
+            self._material = self.origin + (np.stack([cols, rows], axis=1) + 0.5) * CELL_MM
+        return self._material
+
+    def beyond(self, a: np.ndarray, b: np.ndarray, toward: np.ndarray, gap: float) -> float:
+        """Return how far to move the line from `a` to `b` along unit `toward` (sheet) so it lies `gap` mm
+        past the work's outline in that direction, over the stretch between the two ends."""
+        run = b - a
+        run = run / max(float(np.linalg.norm(run)), 1e-9)
+        low, high = sorted((float(a @ run), float(b @ run)))
+        points = self.material()
+        along = points @ run
+        near = points[(along >= low - CELL_MM) & (along <= high + CELL_MM)]
+        edge = max([float(a @ toward), float(b @ toward)] + ([float((near @ toward).max())] if len(near) else []))
+        return max(edge + gap - float(a @ toward), edge + gap - float(b @ toward))
+
     def fraction(self, points: np.ndarray) -> float:
         """Return the fraction of sheet `points` that sit on material."""
         cells = np.floor((np.atleast_2d(points) - self.origin) / CELL_MM).astype(int)
@@ -446,10 +467,15 @@ class Placed:
     cost: float
 
 
-def _candidates(dim: Dim, view: SheetView) -> List[Tuple[Optional[float], float, np.ndarray, np.ndarray]]:
-    """Return the (along, offset, a, b) to try."""
+def _lane_gap(lane: int) -> float:
+    """Return how far lane `lane` (from 1) sits past the work's outline, in sheet mm."""
+    return BASE_MM + (lane - 1) * PITCH_MM
+
+
+def _candidates(dim: Dim, view: SheetView, grid: MaterialGrid) -> List[Tuple[Optional[float], float, np.ndarray, np.ndarray]]:
+    """Return the (along, offset, a, b) to try: each lane past the work's outline, on either side."""
     out = []
-    lanes = [BASE_MM + lane * PITCH_MM for lane in range(LANES)]
+    ends = [(None, dim.a, dim.b)]
     if dim.slide is not None and dim.stretch is not None:
         slide_sheet = view.direction_to_sheet(dim.slide)
         facing = float(slide_sheet @ dim.away)
@@ -457,10 +483,27 @@ def _candidates(dim: Dim, view: SheetView) -> List[Tuple[Optional[float], float,
             # The ends slid to the end of the stretch on this side.
             along = (dim.stretch[1] if facing * side > 0 else dim.stretch[0]) - dim.t0
             shift = slide_sheet * along * view.mm_per_world
-            out += [(along, side * lane, dim.a + shift, dim.b + shift) for lane in lanes]
-    for side in (1.0, -1.0):
-        out += [(None, side * lane, dim.a, dim.b) for lane in lanes]
+            ends.append((along, dim.a + shift, dim.b + shift))
+    for along, a, b in ends:
+        for side in (1.0, -1.0):
+            out += [(along, side * grid.beyond(a, b, side * dim.away, _lane_gap(lane)), a, b)
+                    for lane in range(1, LANES + 1)]
     return out
+
+
+#: Each side as a sheet direction (y down).
+_SIDE_DIRECTIONS = {DimensionSide.LEFT: (-1.0, 0.0), DimensionSide.RIGHT: (1.0, 0.0),
+                    DimensionSide.ABOVE: (0.0, -1.0), DimensionSide.BELOW: (0.0, 1.0)}
+
+
+def _beside(dim: Dim, beside: Beside, grid: MaterialGrid) -> Optional[float]:
+    """Return the offset (sheet mm, along `dim.away`) putting `dim` in `beside`'s lane, or None if its line
+    can't lie on that side (the dimension runs across it)."""
+    toward = np.array(_SIDE_DIRECTIONS[beside.side])
+    facing = float(dim.away @ toward)
+    if abs(facing) < 0.5:
+        return None
+    return float(np.sign(facing)) * grid.beyond(dim.a, dim.b, toward, _lane_gap(beside.lane)) / abs(facing)
 
 
 def _try(dim: Dim, along, offset, a, b, grid: MaterialGrid, placed: List[Placed], rect) -> Placed:
@@ -490,18 +533,34 @@ def _try(dim: Dim, along, offset, a, b, grid: MaterialGrid, placed: List[Placed]
     return Placed(dim, along, offset, a, b, (la, lb), label, cost)
 
 
-def place(dims: Sequence[Dim], view: SheetView, meshes: Sequence[Mesh]) -> Dict[int, MeasurementPlacement]:
+def place(dims: Sequence[Dim], view: SheetView, meshes: Sequence[Mesh], beside: Mapping[int, Beside] = {},
+          grid: Optional[MaterialGrid] = None) -> Dict[int, Offset]:
     """Return a placement for each of `dims`, by its index, with the offset as the viewer reads it
-    for the ends in the order given (positive along `Dim.away`)."""
+    for the ends in the order given (positive along `Dim.away`).
+
+    A dim whose index is in `beside` goes in that lane, if it can lie on that side; the rest are placed
+    clear of the work and of each other.
+    """
     if not dims:
         return {}
-    grid = MaterialGrid(view, meshes)
+    grid = grid or MaterialGrid(view, meshes)
     rect = view.rect_mm()
     placed: List[Placed] = []
-    for dim in sorted(dims, key=lambda d: d.span):
+    free = []
+    for dim in dims:
+        wanted = beside.get(dim.index)
+        offset = _beside(dim, wanted, grid) if wanted is not None else None
+        if wanted is not None and offset is None:
+            warn_user(f"A dimension ({dim.text}) can't go {wanted.side.value} of the work: it runs across "
+                      "that side, so it is placed automatically.")
+        if offset is None:
+            free.append(dim)
+        else:
+            placed.append(_try(dim, None, offset, dim.a, dim.b, grid, placed, rect))
+    for dim in sorted(free, key=lambda d: d.span):
         placed.append(min((_try(dim, along, offset, a, b, grid, placed, rect)
-                           for along, offset, a, b in _candidates(dim, view)), key=lambda p: p.cost))
-    return {one.dim.index: MeasurementPlacement(offset=one.offset / view.mm_per_world, along=one.along)
+                           for along, offset, a, b in _candidates(dim, view, grid)), key=lambda p: p.cost))
+    return {one.dim.index: Offset(offset=one.offset / view.mm_per_world, along=one.along)
             for one in placed}
 
 
@@ -606,28 +665,52 @@ def _dim(index: int, measure: Measure, view: SheetView, frame: 'Frame') -> Optio
     return (dim, swapped) if dim.span > 0.3 else None
 
 
+def _without_measurements(viewport: Viewport) -> Viewport:
+    """Return `viewport` and everything inside it with no measurements of their own."""
+    subdivision = viewport.subdivision
+    if subdivision is not None:
+        subdivision = replace(subdivision, portions=[replace(portion, viewport=_without_measurements(portion.viewport))
+                                                     for portion in subdivision.portions])
+    return replace(viewport, measurements=(), subdivision=subdivision)
+
+
+def needs_placing(drawing: Drawing) -> bool:
+    """Return whether any of `drawing`'s measurements has a placement still to be worked out."""
+    return any(not isinstance(measure.placement, Offset)
+               for measures in drawing.measurements_by_viewport().values() for measure in measures)
+
+
 def with_placed_dimensions(drawing: Drawing, frame: 'Frame', page: Page = SHEET) -> Drawing:
-    """Return `drawing` with a placement on each of its lengths (in `Drawing.measurements`) that has none,
-    in the orthographic views the viewer frames on `page`."""
+    """Return `drawing` with each length's `Auto` or `Beside` placement worked out as an `Offset`, in the
+    orthographic views the viewer frames on `page`. Its measurements all end up in `Drawing.measurements`.
+
+    A placement that can't be worked out (an angle, a 3D measurement, a view with no camera) stays as it is.
+    """
+    by_viewport = drawing.measurements_by_viewport()
+    if not needs_placing(drawing):
+        return drawing
     cuts = [cut for cut in (frame.cut_timber_of(timber) for timber in drawing.timbers) if cut is not None]
     views = sheet_views(drawing, cuts, page)
     meshes = [mesh for mesh in (_world_mesh(cut) for cut in cuts) if mesh is not None]
     measurements = {}
-    for viewport_id, measures in drawing.measurements.items():
+    for viewport_id, measures in by_viewport.items():
         measures = list(measures)
         view = views.get(str(viewport_id))
         if view is None:
-            measurements[viewport_id] = measures
+            measurements[ViewportId(viewport_id)] = measures
             continue
         found = {}
         for index, measure in enumerate(measures):
-            one = _dim(index, measure, view, frame) if measure.placement is None else None
+            one = None if isinstance(measure.placement, Offset) else _dim(index, measure, view, frame)
             if one is not None:
                 found[index] = one
-        for index, placement in place([dim for dim, _ in found.values()], view, meshes).items():
+        beside = {index: measures[index].placement for index in found
+                  if isinstance(measures[index].placement, Beside)}
+        for index, placement in place([dim for dim, _ in found.values()], view, meshes, beside).items():
             if found[index][1] and placement.offset is not None:
                 # The measure's own order runs the other way: wire_anchors negates it back.
                 placement = replace(placement, offset=-placement.offset)
             measures[index] = replace(measures[index], placement=placement)
-        measurements[viewport_id] = measures
-    return replace(drawing, measurements=measurements)
+        measurements[ViewportId(viewport_id)] = measures
+    return replace(drawing, viewports=[_without_measurements(root) for root in drawing.roots],
+                   measurements=measurements)
