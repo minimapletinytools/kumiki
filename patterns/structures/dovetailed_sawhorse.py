@@ -54,7 +54,7 @@ SAWHORSE = kiwari(
         about="How far the legs splay out to the side; the slope is determined by the rise and run, at least 1:1. "
               "By default, the board thickness and beam height are used, so that the splay angle is  atan of the leg's thickness over the beam's height"),
     beam_size=kiwari.point2(create_v2(inches(2), inches(15, 4)), about="Across and tall"),
-    leg_size=kiwari.point2(create_v2(inches(13, 2), inches(3, 4)), about="Width and thickness"),
+    leg_size=kiwari.point2(create_v2(inches(11, 2), inches(3, 4)), about="Width and thickness"),
     sawhorse_height=kiwari.length(inches(30), about="Floor to the top of the beam"),
     sawhorse_length=kiwari.length(inches(42), about="The beam's length"),
 )
