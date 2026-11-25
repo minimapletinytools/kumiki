@@ -371,8 +371,8 @@ SHEET = Page(0.420, 0.297)
 TEXT_MM = 4.8
 CHAR_MM = 2.8
 #: The first lane's distance from the features, and lane to lane, in sheet millimetres.
-BASE_MM = 5.0
-PITCH_MM = 7.0
+BASE_MM = 9.0
+PITCH_MM = 8.0
 LANES = 8
 #: The material grid's cell, in sheet millimetres.
 CELL_MM = 0.5
@@ -519,8 +519,8 @@ def text_up(run: np.ndarray) -> np.ndarray:
     """Return which way a label stands on the sheet: the viewer reads it along `run`, within 90
     degrees of upright, set on the line's upper side."""
     angle = np.degrees(np.arctan2(run[1], run[0]))
-    # As the viewer turns it (measurements.js dimensionLayout).
-    while angle > 90:
+    # As the viewer turns it (measurements.js dimensionLayout): a vertical one reads bottom to top.
+    while angle > 90 - 1e-6:
         angle -= 180
     while angle < -90:
         angle += 180

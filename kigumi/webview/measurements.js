@@ -445,7 +445,8 @@ function dimensionLayout(from, to, options) {
 
 function normalizeAngle(degrees) {
     let angle = degrees;
-    while (angle > 90) {
+    // A vertical label reads from the right, bottom to top, whichever way its anchors run.
+    while (angle > 90 - 1e-6) {
         angle -= 180;
     }
     while (angle < -90) {
