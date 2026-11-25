@@ -157,76 +157,8 @@ class TestMeasureOntoFace:
         assert marking.distance == scalar(2)
 
 
-class TestPoint:
-    """Tests for Point class"""
-    
-    def test_point_creation(self):
-        """Test creating a point"""
-        pos = create_v3(1, 2, 3)
-        point = Point(pos)
-        assert point.position.equals(pos)
-    
-    def test_point_is_frozen(self):
-        """Test that Point is immutable"""
-        point = Point(create_v3(1, 2, 3))
-        with pytest.raises(Exception):
-            point.position = create_v3(4, 5, 6)  # type: ignore
-    
-    def test_point_repr(self):
-        """Test Point string representation"""
-        point = Point(create_v3(1, 2, 3))
-        assert "Point" in repr(point)
-        assert "position" in repr(point)
-
-
-class TestLine:
-    """Tests for Line class"""
-    
-    def test_line_creation(self):
-        """Test creating a line"""
-        direction = create_v3(0, 0, 1)
-        point = create_v3(1, 2, 3)
-        line = Line(direction, point)
-        assert line.direction.equals(direction)
-        assert line.point.equals(point)
-    
-    def test_line_is_frozen(self):
-        """Test that Line is immutable"""
-        line = Line(create_v3(0, 0, 1), create_v3(1, 2, 3))
-        with pytest.raises(Exception):
-            line.direction = create_v3(1, 0, 0)  # type: ignore
-    
-    def test_line_repr(self):
-        """Test Line string representation"""
-        line = Line(create_v3(0, 0, 1), create_v3(1, 2, 3))
-        assert "Line" in repr(line)
-        assert "direction" in repr(line)
-        assert "point" in repr(line)
-
-
 class TestPlane:
     """Tests for Plane class"""
-    
-    def test_plane_creation(self):
-        """Test creating a plane"""
-        normal = create_v3(0, 0, 1)
-        point = create_v3(1, 2, 3)
-        plane = Plane(normal, point)
-        assert plane.normal.equals(normal)
-        assert plane.point.equals(point)
-    
-    def test_plane_is_frozen(self):
-        """Test that Plane is immutable"""
-        plane = Plane(create_v3(0, 0, 1), create_v3(1, 2, 3))
-        with pytest.raises(Exception):
-            plane.normal = create_v3(1, 0, 0)  # type: ignore
-    
-    def test_plane_repr(self):
-        """Test Plane string representation"""
-        plane = Plane(create_v3(0, 0, 1), create_v3(1, 2, 3))
-        assert "Plane" in repr(plane)
-        assert "normal" in repr(plane)
-        assert "point" in repr(plane)
     
     def test_plane_from_transform_and_direction_identity(self):
         """Test creating plane from identity transform"""

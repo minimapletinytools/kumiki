@@ -906,55 +906,31 @@ class TestPegStuff:
 
     # 🐪
     def test_peg_with_tenon_hole_offset(self, simple_T_configuration):
-        """Test that tenon_hole_offset shifts the peg hole in the tenon towards the shoulder."""
+        """A draw-bore offset moves the tenon's peg hole toward the shoulder; the mortise's stays put."""
         tenon_timber, mortise_timber = simple_T_configuration
-        
-        distance_from_shoulder = scalar(2)
-        offset = scalar(1, 4)  # 0.25 units offset
-        
-        # Create joint with offset
-        peg_params_with_offset = SimplePegParameters(
-            shape=PegShape.SQUARE,
-            peg_positions=[(distance_from_shoulder, scalar(0))],
-            depth=scalar(5),
-            size=scalar(1, 2),
-            tenon_hole_offset=offset
-        )
-        
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint_with_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-            arrangement=arrangement,
-            tenon_width_relative_to_joint=scalar(2),
-            tenon_height_relative_to_joint=scalar(2),
-            tenon_length=scalar(4),
-            mortise_depth=scalar(4),
-            peg_parameters=peg_params_with_offset,
-        )
-        
-        # Create joint without offset for comparison
-        peg_params_no_offset = SimplePegParameters(
-            shape=PegShape.SQUARE,
-            peg_positions=[(distance_from_shoulder, scalar(0))],
-            depth=scalar(5),
-            size=scalar(1, 2),
-            tenon_hole_offset=scalar(0)
-        )
-        
-        joint_no_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-            arrangement=arrangement,
-            tenon_width_relative_to_joint=scalar(2),
-            tenon_height_relative_to_joint=scalar(2),
-            tenon_length=scalar(4),
-            mortise_depth=scalar(4),
-            peg_parameters=peg_params_no_offset,
-        )
-        
-        # TODO test actual stuff here
+
+        def offset_between_holes(offset):
+            pegs = SimplePegParameters(shape=PegShape.ROUND, peg_positions=[(scalar(2), scalar(0))],
+                                       depth=scalar(5), size=scalar(1, 2), tenon_hole_offset=offset)
+            joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement, tenon_width_relative_to_joint=scalar(2),
+                tenon_height_relative_to_joint=scalar(2), tenon_length=scalar(4), mortise_depth=scalar(4),
+                peg_parameters=pegs)
+            holes = []
+            for timber in (tenon_timber, mortise_timber):
+                axis = joint.feature(MortiseAndTenonFeatures.PEG_HOLE_AXIS, on=timber)
+                holes.append(timber.transform.local_to_global(axis.feature.locate_simple_unbounded(axis.hit.owner).point))
+            # Up the tenon timber, from its bottom end toward the shoulder.
+            return float(safe_dot_product(holes[0] - holes[1], tenon_timber.get_length_direction_global()))
+
+        assert offset_between_holes(scalar(0)) == pytest.approx(0)
+        assert offset_between_holes(scalar(1, 4)) == pytest.approx(0.25)
 
     # 🐪
     def test_peg_orientation_mortise_space_face_aligned(self):
@@ -1935,3 +1911,14 @@ def test_merge_rebuilds_rough_scribe_after_both_mortises():
     combined = mortise.children[0]
     assert isinstance(combined, SolidUnion)
     assert [cut.label.name for cut in combined.children] == ["mortise_0", "mortise_1"]
+
+
+def test_a_tenon_that_would_reach_past_its_timber_is_refused(simple_T_configuration):
+    tenon_timber, mortise_timber = simple_T_configuration
+    arrangement = ButtJointTimberArrangement(receiving_timber=mortise_timber, butt_timber=tenon_timber,
+                                             butt_timber_end=TimberEnd.BOTTOM, front_face_on_butt_timber=None)
+    # The tenon timber is 4 wide: a 2 wide tenon centred 1.5 off its centreline sticks 0.5 past its side.
+    with pytest.raises(AssertionError):
+        cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement, tenon_size=create_v2(scalar(2), scalar(2)), tenon_length=scalar(4),
+            mortise_depth=scalar(5), tenon_position=create_v2(scalar(3, 2), scalar(0)))

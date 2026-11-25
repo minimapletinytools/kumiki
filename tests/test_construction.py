@@ -436,7 +436,7 @@ class TestTimberCreation:
 
 
 
-class TestHelperFunctions:
+class TestTimberFaceHelpers:
     """Test helper functions."""
     
     def test_timber_face_get_direction(self):

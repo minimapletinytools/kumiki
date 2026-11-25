@@ -1,7 +1,8 @@
 name: Kigumi Tests
 
-# The unit tests, and every integration suite on each host (kigumi/test/integration.js), on every
-# change, so a failure shows up on the PR rather than when a tag is pushed.
+# The unit tests on every change, and the integration suites on each host (kigumi/test/integration.js):
+# on a pull request the core suites and those whose feature it changes (--changed), on a push to main
+# or a manual run every one.
 on:
   push:
     branches:
@@ -9,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   test:
@@ -79,6 +81,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # The base branch too, to see what a pull request changes.
+          fetch-depth: 0
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -131,7 +136,7 @@ jobs:
 
       # No GPU here: the views draw with SwiftShader.
       - name: Run the ${{ matrix.host }} integration suites
-        run: xvfb-run -a npm run test:int -- ${{ matrix.host }}
+        run: xvfb-run -a npm run test:int -- ${{ matrix.host }} ${{ github.event_name == 'pull_request' && format('--changed origin/{0}', github.base_ref) || '' }}
         env:
           KIGUMI_SOFTWARE_GL: '1'
           KIGUMI_TEST_ARTIFACTS: ${{ github.workspace }}/kigumi/.artifacts/app

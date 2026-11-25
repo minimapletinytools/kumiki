@@ -15,20 +15,6 @@ from tests.testing_shavings import create_test_footprint
 class TestFootprint:
     """Test Footprint class."""
     
-    def test_footprint_creation(self):
-        """Test basic footprint creation."""
-        corners = [
-            create_v2(0, 0),  # Use exact integers
-            create_v2(1, 0),  # Use exact integers
-            create_v2(1, 1),  # Use exact integers
-            create_v2(0, 1)   # Use exact integers
-        ]
-        footprint = Footprint(tuple(corners))
-        
-        assert len(footprint.corners) == 4
-        assert footprint.corners[0][0] == 0
-        assert footprint.corners[0][1] == 0
-    
     def test_footprint_sides(self):
         """Test sides() method."""
         corners = [

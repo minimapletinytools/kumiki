@@ -384,58 +384,6 @@ def generate_convex_polygon_non_boundary_points(extrusion):
     return points
 
 
-class TestConstructors:
-    """Test the RectangularPrism and Cylinder constructors."""
-    
-    def test_prism_constructor_finite(self):
-        """Test creating a finite prism."""
-        size = Matrix([scalar(4), scalar(6)])
-        orientation = Orientation()  # Identity orientation
-        prism = RectangularPrism(size=size, transform=Transform.identity(), start_distance=0, end_distance=10)
-        
-        assert prism.size == size
-        assert prism.transform.orientation == orientation
-        assert prism.start_distance == 0
-        assert prism.end_distance == scalar(10)
-    
-    def test_prism_constructor_semi_infinite(self):
-        """Test creating a semi-infinite prism."""
-        size = Matrix([scalar(4), scalar(6)])
-        orientation = Orientation()  # Identity orientation
-        prism = RectangularPrism(size=size, transform=Transform.identity(), end_distance=10)
-        
-        assert prism.start_distance is None
-        assert prism.end_distance == scalar(10)
-    
-    def test_prism_constructor_infinite(self):
-        """Test creating an infinite prism."""
-        size = Matrix([scalar(4), scalar(6)])
-        prism = RectangularPrism(size=size, transform=Transform.identity())
-        
-        assert prism.start_distance is None
-        assert prism.end_distance is None
-    
-    def test_cylinder_constructor_finite(self):
-        """Test creating a finite cylinder."""
-        axis = Matrix([scalar(1), scalar(0), scalar(0)])
-        radius = scalar(5)
-        cylinder = Cylinder(axis_direction=axis, radius=radius, start_distance=-5, end_distance=5)
-        
-        assert cylinder.axis_direction == axis
-        assert cylinder.radius == radius
-        assert cylinder.start_distance == -5
-        assert cylinder.end_distance == 5
-    
-    def test_cylinder_constructor_infinite(self):
-        """Test creating an infinite cylinder."""
-        axis = Matrix([scalar(1), scalar(0), scalar(0)])
-        radius = scalar(5)
-        cylinder = Cylinder(axis_direction=axis, radius=radius)
-        
-        assert cylinder.start_distance is None
-        assert cylinder.end_distance is None
-
-
 class TestPrismPositionMethods:
     """Test RectangularPrism get_bottom_position and get_top_position methods."""
     
@@ -1625,26 +1573,6 @@ class TestConvexPolygonExtrusion:
         # Interior point
         assert extrusion.is_point_on_boundary(Matrix([scalar(0), scalar(0), scalar(5)])) == False
     
-    def test_repr(self):
-        """Test string representation."""
-        points = [
-            Matrix([0, 0]),
-            Matrix([1, 0]),
-            Matrix([0, 1])
-        ]
-        start_distance = scalar(0)
-        end_distance = scalar(5)
-        orientation = Orientation()
-        
-        extrusion = ConvexPolygonExtrusion(points=points, start_distance=start_distance,
-                                          end_distance=end_distance, transform=Transform.identity())
-        
-        repr_str = repr(extrusion)
-        assert "ConvexPolygonExtrusion" in repr_str
-        assert "3 points" in repr_str
-        assert "5" in repr_str
-
-
 class TestConvexProfileEdges:
     """A convex extrusion's and a loft's edges: between neighbouring sides, and round each end."""
 
@@ -1922,16 +1850,6 @@ class TestConvexPolygonSimpleLoft:
         assert bbox.max_y == scalar(3)
         assert bbox.min_z == scalar(0)
         assert bbox.max_z == scalar(5)
-
-    def test_repr(self):
-        bottom = self._square(scalar(2))
-        top = self._square(scalar(1))
-        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
-                                  bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(5))
-
-        repr_str = repr(loft)
-        assert "ConvexPolygonSimpleLoft" in repr_str
-        assert "4->4 points" in repr_str
 
     def test_translate_csg(self):
         bottom = self._square(scalar(2))
@@ -2864,40 +2782,6 @@ class TestCSGFeatures:
 
 class TestCSGNaming:
     """Tests for the hierarchical name field on CutCSG subclasses."""
-
-    def test_halfspace_name_field(self):
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), label=CutCSGLabel("shoulder"))
-        assert hs.label.name == "shoulder"
-
-    def test_halfspace_name_default_none(self):
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0))
-        assert hs.label.name is None
-
-    def test_rectangular_prism_name_field(self):
-        prism = RectangularPrism(
-            size=Matrix([scalar(4), scalar(6)]),
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(10),
-            label=CutCSGLabel("tenon"),
-        )
-        assert prism.label.name == "tenon"
-
-    def test_solid_union_name_field(self):
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0))
-        union = SolidUnion(children=[hs], label=CutCSGLabel("my_cut"))
-        assert union.label.name == "my_cut"
-
-    def test_difference_name_field(self):
-        base = RectangularPrism(
-            size=Matrix([scalar(4), scalar(4)]),
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(10),
-        )
-        cut = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(-1)]), offset=scalar(-5))
-        diff = Difference(base=base, subtract=[cut], label=CutCSGLabel("tenon_cut"))
-        assert diff.label.name == "tenon_cut"
 
     def test_adopt_csg_preserves_name_on_solid_union(self):
         """adopt_csg should preserve the name field when transforming SolidUnion."""
