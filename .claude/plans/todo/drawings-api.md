@@ -5,7 +5,8 @@ Goal: make it practical to write and adjust drawings in Python (by a person or t
 generate them with `with_auto_drawings`. The viewport UI (select, resize, split, floating views) comes
 after; this plan only settles the API it will sit on.
 
-Status: design agreed in part on 2026-11-24 and 2026-11-25. Nothing built yet. Open decisions are in §3.
+Status: design agreed on 2026-11-24 and 2026-11-25. Built on branch feat/drawings-api (placement, feature lookup,
+viewport names, View, with_drawings, describe, docs); the viewport layout model (§3 E2) waits for the UI work.
 
 ## 1. Where we are
 
