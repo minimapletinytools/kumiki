@@ -72,9 +72,10 @@ Click and hover both come here, so a hover always shows what a click would take.
 
 - **Gather every member near the ray** (`_drawing_candidates`):
   - Skip a member whose box the ray doesn't come within the slack of.
-  - The member that was hit, and any member the ray passes through, is asked at the hit point.
-  - A member the ray just misses is asked at the point of its mesh nearest the ray, so an edge is
-    picked from outside its silhouette as well as from inside.
+  - Every member is asked at the point of its mesh nearest the ray, so an edge is picked from
+    either side of the line it draws: outside a silhouette, or past a mortise's mouth.
+  - The member that was hit, and any member the ray passes through, is also asked at the hit
+    point. A feature found at both keeps the nearer place.
 - **Find each member's candidates** (`candidates_under_pointer` → `features_near_ray`), in that
   member's own space:
   - The 3D pick's steps, at its point (`find_all_features`, `SLANT_REACH`, plane traces).
@@ -111,8 +112,9 @@ Click and hover both come here, so a hover always shows what a click would take.
 
 - Walk the tree and collect every declared feature the point is on, each at its own tolerance
   (`collect_feature_hits`).
-- At each node, drop the real ones if the point is not on that node's boundary. Non-real ones
-  skip this check.
+- At each node, drop the real ones if the point is not on that node's boundary, except an edge or
+  corner whose own nearest point is on it: beside a mortise's mouth the point is on the timber's
+  face, not the hole's. Non-real ones skip this check.
 - Gather faces again at the corner slack, and make **derived edges** from pairs of them and
   **derived points** from edges crossing faces; keep those the point is near.
 - Sort by feature priority, and drop derived duplicates of the same geometry.

@@ -85,11 +85,11 @@ def picked():
     return pick
 
 
-def test_an_edge_on_a_silhouette_is_picked_from_its_own_side(picked):
-    # The pointer on the beam's face beside the flank's front edge: found at that surface. From the
-    # socket side the ray lands on the flank behind it, and the front edge is not there to find.
+def test_an_edge_on_a_silhouette_is_picked_from_either_side(picked):
+    # Beside the flank's front edge on the beam's face, and from the socket side, where the ray lands
+    # on the flank behind it: the edge is the line drawn there either way.
     assert FRONT in picked(-0.0004, "projected")
-    assert FRONT not in picked(0.0004, "projected")
+    assert FRONT in picked(0.0004, "projected")
 
 
 def test_the_3d_view_still_picks_the_surface_the_pointer_is_on(picked):

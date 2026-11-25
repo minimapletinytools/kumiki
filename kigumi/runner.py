@@ -446,6 +446,8 @@ class MeshCacheEntry(TypedDict, total=False):
     world_box: Tuple[List[float], List[float]]
     # The mesh's triangles, world space: worked out on first use.
     world_triangles: 'WorldTriangles'
+    # The mesh's drawn lines (creases and open edges), world space, as (starts, runs): on first use.
+    world_creases: Tuple['np.ndarray', 'np.ndarray']
 
 
 class RemeshMetricWire(TypedDict, total=False):
@@ -4336,8 +4338,8 @@ def _drawing_candidates(
 ) -> Tuple[List['MemberCandidate'], int]:
     """Return what is under the pointer in a drawing, across every drawn member near the ray.
 
-    A member the ray hits is asked at that surface point; one it just misses, at its mesh point
-    nearest the ray.
+    Each member is asked at its mesh point nearest the ray (a line drawn there), and a member the
+    ray hits also at that surface point: the ray can strike deep inside a mortise past its mouth.
     """
     from kumiki.viewer.picking import DrawnMember, drawing_candidates
     from kumiki.viewer.rule_at_home import LocalFrame
@@ -4365,11 +4367,11 @@ def _drawing_candidates(
             # Nothing of a member is at a surface point out of its reach.
             if at is not None and all(low - reach <= x <= high + reach for x, low, high in zip(at, *box)):
                 surface = local_frame.point(at)
-        else:
-            near = _mesh_point_near_ray(entry, origin, direction, reach)
-            if near is not None:
-                surface = local_frame.point(near)
-        members.append(DrawnMember(key, root, cut_timber.timber, surface))
+        near = _mesh_point_near_ray(entry, origin, direction, reach)
+        edge = local_frame.point(near) if near is not None else None
+        if surface is None:
+            surface, edge = edge, None
+        members.append(DrawnMember(key, root, cut_timber.timber, surface, edge))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
         entry = ss.mesh_cache[key]
@@ -4397,6 +4399,35 @@ def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
         entry["world_box"] = ([min(vertices[axis::3]) for axis in range(3)],
                               [max(vertices[axis::3]) for axis in range(3)])
     return entry["world_box"]
+
+
+#: Neighbouring triangles whose normals agree this closely lie on one face: the edge between them is
+#: not drawn. About 8 degrees, under the finest facet a cylinder is meshed with.
+CREASE_COSINE = 0.99
+
+
+def _world_creases(entry: MeshCacheEntry) -> Tuple['np.ndarray', 'np.ndarray']:
+    """Return a member's drawn lines, world space, as (starts, runs): its triangles' edges, less those
+    across a flat face (a face's triangulation is not drawn). Cached on its entry."""
+    import numpy as np
+
+    if "world_creases" not in entry:
+        a, b, c = _world_triangles(entry)
+        normals = np.cross(b - a, c - a)
+        lengths = np.linalg.norm(normals, axis=1)
+        normals = normals / np.where(lengths > 0, lengths, 1.0)[:, None]
+        starts, ends = np.concatenate([a, b, c]), np.concatenate([b, c, a])
+        owner = np.tile(np.arange(len(a)), 3)
+        # One key per edge, whichever way round: the mesh repeats corners per face, so by position.
+        rounded = lambda points: np.round(points, 6)
+        keys = [tuple(sorted((tuple(p), tuple(q)))) for p, q in zip(rounded(starts), rounded(ends))]
+        sides: Dict[Any, List[int]] = {}
+        for index, key in enumerate(keys):
+            sides.setdefault(key, []).append(index)
+        drawn = [indices[0] for indices in sides.values()
+                 if len(indices) != 2 or float(normals[owner[indices[0]]] @ normals[owner[indices[1]]]) < CREASE_COSINE]
+        entry["world_creases"] = (starts[drawn], ends[drawn] - starts[drawn])
+    return entry["world_creases"]
 
 
 def _world_triangles(entry: MeshCacheEntry) -> WorldTriangles:
@@ -4431,12 +4462,12 @@ def _ray_meets_mesh(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3'
 
 def _mesh_point_near_ray(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3',
                          reach: float) -> Optional[List[float]]:
-    """Return the point on a member's mesh edges nearest the ray (nearest the camera among equals), if within `reach`, else None."""
+    """Return the point on a member's drawn lines nearest the ray (nearest the camera among equals), if within `reach`, else None."""
     import numpy as np
 
-    a, b, c = _world_triangles(entry)
-    starts = np.concatenate([a, b, c])
-    runs = np.concatenate([b - a, c - b, a - c])
+    starts, runs = _world_creases(entry)
+    if len(starts) == 0:
+        return None
     o, d = np.array(origin, dtype=float), np.array(direction, dtype=float)
     # Across the view: everything with its component along the ray taken off.
     flat_starts = (starts - o) - np.outer((starts - o) @ d, d)
@@ -4448,7 +4479,8 @@ def _mesh_point_near_ray(entry: MeshCacheEntry, origin: 'Float3', direction: 'Fl
     if nearest > reach:
         return None
     points = starts + runs * t[:, None]
-    depth = np.where(across <= nearest + 1e-9, (points - o) @ d, np.inf)
+    # Lines drawn over one another are equally near to within rounding: a micron, not exact.
+    depth = np.where(across <= nearest + 1e-6, (points - o) @ d, np.inf)
     return [float(x) for x in points[int(np.argmin(depth))]]
 
 

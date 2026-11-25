@@ -1057,6 +1057,9 @@ class DrawnMember(NamedTuple):
     root: 'CutCSG'
     timber: 'PerfectTimberWithin'
     surface_point: Optional[Float3]
+    #: Where else to look: the member's drawn line nearest the ray, when the ray struck somewhere
+    #: deeper (into a mortise, past its mouth).
+    edge_point: Optional[Float3] = None
 
 
 class MemberCandidate(NamedTuple):
@@ -1091,9 +1094,15 @@ def drawing_candidates(
     for member in members:
         rotation = LocalFrame.of(member.timber.transform)
         local_ray = (rotation.point(origin), rotation.direction(direction))
-        for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray,
-                                                  member.timber):
-            found.append(MemberCandidate(member.key, member.timber, candidate))
+        nearest: Dict[Any, PointerCandidate] = {}
+        for at in (member.surface_point, member.edge_point):
+            if at is None and nearest:
+                continue
+            for candidate in candidates_under_pointer(member.root, at, tolerances, local_ray, member.timber):
+                key = _hit_key(candidate.hit)
+                if key not in nearest or candidate.depth < nearest[key].depth:
+                    nearest[key] = candidate
+        found += [MemberCandidate(member.key, member.timber, candidate) for candidate in nearest.values()]
 
     # One depth order over every member: grouped as order_along_ray groups, then the library's order.
     separation = float(tolerances.edge)
