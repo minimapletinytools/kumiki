@@ -101,9 +101,10 @@ module.exports = {
             const off = snapshot('off'), on = snapshot('on'), selected = snapshot('selection');
             return { committed, off, on, selected };
         })()`);
-        check('the mortise depth is revealed only in its authored elevation and stays with its dimension',
+        check('the mortise is revealed from both side elevations and stays with its dimension',
             xray.committed.length === 1 && xray.off.length === 0 &&
-            [xray.on, xray.selected].every(ids => ids.length === 1 && ids[0] === xray.committed[0]),
+            xray.on.length === 2 && xray.on.includes(xray.committed[0]) &&
+            xray.selected.length === 1 && xray.selected[0] === xray.committed[0],
             JSON.stringify(xray));
 
         if (ARTIFACTS) {

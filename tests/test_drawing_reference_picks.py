@@ -183,15 +183,18 @@ def test_a_shoulder_crossing_a_perfect_face_of_rough_stock_has_a_line_to_draw(fr
     assert abs(sum((a - b) ** 2 for a, b in zip(start, end)) ** 0.5 - 0.1154) < 0.002, "across the rough stock"
 
 
-def test_mortise_xray_pick_is_enabled_only_from_its_authored_side(frame):
+def test_mortise_xray_pick_is_enabled_only_from_its_authored_sides(frame):
     runner, slot = frame
     member = 'Left Side#0'
-    outline, = slot.mesh_cache[member]['mesh']['xrayLines']
+    outline, opposite = slot.mesh_cache[member]['mesh']['xrayLines']
     normal = np.array(outline['normal'])
+    assert np.allclose(opposite['normal'], -normal)
     segments = np.array(outline['positions']).reshape(-1, 2, 3)
     a, b = max(segments, key=lambda pair: np.linalg.norm(np.cross(pair[1] - pair[0], normal)))
     at = (a + b) / 2
-    for look, enabled, revealed in [(-normal, True, True), (-normal, False, False), (normal, True, False)]:
+    across = np.cross(b - a, normal) / np.linalg.norm(np.cross(b - a, normal))
+    for look, enabled, revealed in [(-normal, True, True), (normal, True, True), (-normal, False, False),
+                                    (across, True, False), (-across, True, False)]:
         payload = {'memberKey': member, 'point': at.tolist(), 'space': 'projected', 'drawnMembers': [member],
                    'xrayMembers': [member] if enabled else [], 'look': look.tolist(),
                    'ray': {'origin': (at - 2 * look).tolist(), 'direction': look.tolist()},

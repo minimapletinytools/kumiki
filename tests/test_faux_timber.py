@@ -117,3 +117,23 @@ def test_each_face_pair_describes_the_same_stock(top, front):
     assert view.get_face_direction_global(TimberFace.TOP) == board.get_face_direction_global(top)
     assert view.get_face_direction_global(TimberFace.FRONT) == board.get_face_direction_global(front)
     assert view.can_be_extended_for_joints() == (top in (TimberFace.TOP, TimberFace.BOTTOM))
+
+
+def test_xray_sides_are_restored_to_the_original_faces():
+    from kumiki import RectangularPrism
+    from kumiki.csg.cutcsg import walk_csg_with_parity, with_xray_from
+
+    board = Board(mm(100), create_v2(mm(12), mm(16)), Transform.identity(), TimberTicket("board"))
+    view = FauxTimber(board, top=TimberFace.RIGHT, front=TimberFace.TOP)
+    hole = RectangularPrism(size=create_v2(mm(4), mm(4)), transform=Transform.identity(),
+                            start_distance=mm(2), end_distance=mm(6))
+    untagged = Cutting(view, negative_csg=hole)
+    tagged = Cutting(view, negative_csg=with_xray_from(hole, TimberFace.FRONT, TimberFace.TOP))
+
+    def sides(cut):
+        restored = view.restore_joint(Joint({"board": cut}, JointTicket("hole"))).cuttings["board"]
+        return {feature.properties.xray_from_faces for owner, _ in walk_csg_with_parity(restored.negative_csg)
+                for feature in owner.get_declared_features()}
+
+    assert sides(untagged) == {frozenset()}
+    assert sides(tagged) == {frozenset([TimberFace.TOP, TimberFace.RIGHT])}
