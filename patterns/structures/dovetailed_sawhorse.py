@@ -249,7 +249,7 @@ ROUTER_TEMPLATE = kiwari(
     tail_clamp_length=kiwari.length(inches(1), minimum=0, about="How far the tail template's clamp slot runs in from its top end"),
     leg_template_wide_runout=kiwari.length(mm(25), minimum=0, about="How far the leg template runs on past the socket "
                                                                     "at its wide end, along the leg, so the bit doesn't leave it"),
-    leg_template_narrow_runout=kiwari.length(mm(25), minimum=0, about="The same at its narrow end"),
+    leg_template_narrow_runout=kiwari.length(mm(5), minimum=0, about="The same at its narrow end"),
     add_jigs_and_accessories=kiwari.flag(True, about="Show the templates in the viewer, as extra accessories"),
 )
 

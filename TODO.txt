@@ -203,8 +203,6 @@ DONE-the web browser file browser should also show json files for saved drawings
 DONE-add a tool allowing you to open drawings in a project. maybe look ta the current set of tools and see if you can do some cleanup since we have a bunch of tool salerady
 DONE-rewrite content to be not slop ugh
 DONE-add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
-
-
 DONE-DRAWING DOCS EXPREMIENT
   DONE-add optinoal labels to measurements (label only, label and measure, measure only (default))
   DONE-ask the agent to document each joint  by rendering as SVG with measurements
