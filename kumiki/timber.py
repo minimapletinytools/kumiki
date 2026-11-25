@@ -2741,8 +2741,9 @@ class Joint:
             for cutting in self.cuttings.values()
         ), f"Joint '{self.ticket.path}' has no cutting that removes anything"
 
-    def feature(self, name: str, index: Optional[int] = None) -> 'FeatureHandle':
-        """Return a handle to this joint's declared feature `name`, on whichever timber it cuts.
+    def feature(self, name: str, index: Optional[int] = None,
+                on: Optional['PerfectTimberWithin'] = None) -> 'FeatureHandle':
+        """Return a handle to this joint's declared feature `name`, on whichever timber it cuts, or on `on`.
 
         `index` picks one of several features with that name (pegs), in the order of the joint's
         cuttings. Raises KeyError, naming the closest names, if there is none, and ValueError if there
@@ -2753,13 +2754,15 @@ class Joint:
 
         def declared():
             for cutting in self.cuttings.values():
-                if cutting.negative_csg is not None:
+                if cutting.negative_csg is not None and (on is None or cutting.timber is on):
                     for owner, _ in walk_csg_with_parity(cutting.negative_csg):
                         for feature in owner.get_declared_features():
                             yield cutting.timber, owner, feature
 
         found = [(timber, owner, feature) for timber, owner, feature in declared() if feature.name == name]
-        timber, owner, feature = _pick_named(found, name, index, f"joint {self.ticket.path!r}",
+        named = self.ticket.path if self.ticket.path != "[no-name]" else self.ticket.joint_type
+        where = f"joint {named!r}" + (f" on {on.ticket.path!r}" if on is not None else "")
+        timber, owner, feature = _pick_named(found, name, index, where,
                                              lambda: [feature.name for _, _, feature in declared()])
         return FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
 

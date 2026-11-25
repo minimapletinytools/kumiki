@@ -1,6 +1,7 @@
 """with_drawings: the generated plan and piece drawings, changed in code."""
 
 import importlib.util
+from dataclasses import replace
 
 import pytest
 
@@ -18,7 +19,7 @@ def cute():
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.my_cute_frame()
+    return replace(module.my_cute_frame(), drawings=[])  # only the generated ones
 
 
 def _between(measure):
