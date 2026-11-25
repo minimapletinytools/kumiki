@@ -132,6 +132,7 @@ def test_xray_sides_are_restored_to_the_original_faces():
 
     def sides(cut):
         restored = view.restore_joint(Joint({"board": cut}, JointTicket("hole"))).cuttings["board"]
+        assert restored.negative_csg is not None
         return {feature.properties.xray_from_faces for owner, _ in walk_csg_with_parity(restored.negative_csg)
                 for feature in owner.get_declared_features()}
 
