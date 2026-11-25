@@ -226,10 +226,12 @@ DRAWING NEXT TODO
     -figure out xray joints tagging (could be a per joint/direction property)
       -XRAY_FROM_AXIS (enum face aligned timber directions) 
       -we can add more sophistitacted filter sin the future
+  DONE-agent API for mesaurements
+  DONE-disable centerline by defalut if there are no centerline measurements? 
+    -or maybe theer's an option that only shows centerline if there's a measurement to it. 
   -do viewport customization UI it won't be hard, make sure it can be saved
   -add agent instructions for converting some json measurement back into code?? (or when/when not to do this)
-  -disable centerline by defalut if there are no centerline measurements? 
-    -or maybe theer's an option that only shows centerline if there's a measurement to it. 
+  
   -refine centerline, refreence edge and PTW highlighting in drawings view
   -add option to color refreences arris/face differently maybe,  (should match the svg export colors I guess)
   -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
