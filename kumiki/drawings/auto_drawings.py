@@ -31,8 +31,8 @@ from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, Dim
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
 from .drawing import ELEVATION_IDS, Drawing, Page, View, Viewport, columns, covering_page, elevation_viewports, rows
-from .measure import (Auto, Beside, DimensionSide, FromViewport, Measure, MeasurementOperation, Offset, Placement,
-                      ViewAxes)
+from .measure import (Auto, Beside, DimensionSide, FromViewport, Measure, MeasurementKind, MeasurementOperation, Offset,
+                      Placement, ViewAxes)
 from ..user_warnings import warn_user
 from .measure_solving import DrawingSolve
 from .visibility import visible_by_view
@@ -251,6 +251,115 @@ def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[Extr
             finishing.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
             piece = piece_drawing(group, extra_views(group.representative) if extra_views else {})
             finishing.add_drawing(with_placed_dimensions(piece, frame))
+
+    return frame.with_finishing(generate)
+
+
+class ViewEdit:
+    """One view of a drawing being edited in `with_drawings`: add or remove its dimensions."""
+
+    def __init__(self, measures: List[Measure], frame: Frame):
+        self._measures = measures
+        self._frame = frame
+
+    def measure(self, a: FeatureHandle, b: FeatureHandle, *, kind: Optional[MeasurementKind] = None,
+                placement: Optional[Placement] = None, label: Optional[str] = None, flip: bool = False) -> Measure:
+        """Add a dimension between `a` and `b` and return it. Placed automatically unless `placement` says."""
+        measure = Measure(a, b, kind=kind, placement=placement or Auto(), label=label, flip=flip)
+        self._measures.append(measure)
+        return measure
+
+    def remove(self, a: FeatureHandle, b: FeatureHandle) -> int:
+        """Remove every dimension between `a` and `b`, either way round; return how many there were."""
+        wanted = Measure(a, b).pair_identity(self._frame)
+        kept = [measure for measure in self._measures if measure.pair_identity(self._frame) != wanted]
+        removed = len(self._measures) - len(kept)
+        self._measures[:] = kept
+        return removed
+
+
+class DrawingEdit:
+    """A drawing being edited in `with_drawings`: its views by name, and the timbers it draws."""
+
+    def __init__(self, drawing: Drawing, frame: Frame):
+        self.drawing = drawing
+        self._frame = frame
+        self._measures: Dict[str, List[Measure]] = {name: list(measures)
+                                                    for name, measures in drawing.measurements_by_viewport().items()}
+
+    @property
+    def cut_timbers(self) -> List[CutTimber]:
+        """Return the cut timbers it draws, the frame's own."""
+        return [cut for cut in (self._frame.cut_timber_of(timber) for timber in self.drawing.timbers) if cut is not None]
+
+    def view(self, name: str) -> ViewEdit:
+        """Return the view `name` ("Front", or a viewport's id); raises KeyError, naming them, if there is none."""
+        found = self.drawing.viewport_at(name)
+        if found is None or not found.is_leaf:
+            names = [str(placed) for placed, viewport in self.drawing.leaves()]
+            raise KeyError(f"Drawing {self.drawing.name!r} has no view {name!r}; it has "
+                           + ", ".join(self.drawing.viewport_name(one) for one in names))
+        return ViewEdit(self._measures.setdefault(self.drawing.viewport_name(name), []), self._frame)
+
+    def built(self) -> Drawing:
+        """Return the drawing with the edits made."""
+        return replace(self.drawing, viewports=[_without_measurements(root) for root in self.drawing.roots],
+                       measurements={ViewportId(name): measures for name, measures in self._measures.items()})
+
+
+class DrawingEdits:
+    """What a `with_drawings` routine is handed: the generated drawings to change, and a way to add more."""
+
+    def __init__(self, plan: DrawingEdit, pieces: List[Tuple[SymmetricTimberGroup, DrawingEdit]], frame: Frame):
+        #: The plan: every timber in world elevations.
+        self.plan = plan
+        self._pieces = pieces
+        self._frame = frame
+        self._added: List[Drawing] = []
+
+    def piece(self, path: str) -> DrawingEdit:
+        """Return the shop drawing of the piece the timber at `path` is (or matches); raises KeyError if none is."""
+        for group, edit in self._pieces:
+            if path in [cut.timber.ticket.path for cut in (group.representative, *(m.cut for m in group.matches))]:
+                return edit
+        raise KeyError(f"No piece drawing has a timber at {path!r}; the pieces are "
+                       + ", ".join(group.representative.timber.ticket.path for group, _ in self._pieces))
+
+    def add(self, drawing: Drawing) -> None:
+        """Add a drawing of your own."""
+        self._added.append(drawing)
+
+    def all(self) -> List[Drawing]:
+        """Return every drawing, edited, then those added."""
+        return [self.plan.built(), *(edit.built() for _, edit in self._pieces), *self._added]
+
+
+def with_drawings(frame: Frame, edit: Callable[[DrawingEdits], None], fixed_path: str,
+                  extra_views: Optional[ExtraViews] = None,
+                  dimensioned: Optional[Callable[[CutTimber], bool]] = None) -> Frame:
+    """Return `frame` with the generated plan and piece drawings (as with_auto_drawings), changed by `edit`.
+
+    `edit(drawings)` runs once they are generated, in the frame's finishing work: it can add and remove
+    dimensions in any view (`drawings.piece("post").view("Front").measure(a, b)`) and add drawings of its
+    own. Every dimension not given a placement is then placed clear of the work.
+    """
+    cut_timbers = list(frame.cut_timbers)
+    members = [cut for cut in cut_timbers if dimensioned(cut)] if dimensioned else None
+
+    def generate(finishing: Finishing) -> None:
+        groups = match_timbers(cut_timbers)
+        finishing.progress(0, 2 + len(groups), "plan")
+        plan = DrawingEdit(plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members), frame)
+        pieces = []
+        for done, group in enumerate(groups, start=1):
+            finishing.progress(done, 2 + len(groups), group.representative.timber.ticket.path)
+            drawing = piece_drawing(group, extra_views(group.representative) if extra_views else {})
+            pieces.append((group, DrawingEdit(drawing, frame)))
+        finishing.progress(1 + len(groups), 2 + len(groups), "edits")
+        edits = DrawingEdits(plan, pieces, frame)
+        edit(edits)
+        for drawing in edits.all():
+            finishing.add_drawing(with_placed_dimensions(drawing, frame))
 
     return frame.with_finishing(generate)
 
