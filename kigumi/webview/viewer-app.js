@@ -2713,7 +2713,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         geometry.computeBoundingSphere();
         indexedGeometry.dispose();
 
-        const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed);
+        const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed, Boolean(mesh.extraAccessory));
 
         if (memberType === 'timber' && mesh.timberToWorld && !mesh.stlPlacement?.needed) {
             for (const material of [materialSet.solid, materialSet.reflection]) {

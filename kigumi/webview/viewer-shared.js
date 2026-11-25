@@ -800,6 +800,9 @@ export function edgeSegmentPositions(segments) {
 export { KigumiMeasurements, CsgTreeView, KigumiKiwariValues, choosePickAction, SelectionStore, CameraController, GeometryMode, KigumiTags, KigumiUnits, AssemblyTimeline };
 
 // Shared placement appearance for the main viewer and isolated editor.
+/** The solid colour of an extra accessory (shown by a tool, see Kigumi.add_extra_accessory). */
+export const EXTRA_ACCESSORY_COLOR = 0x5fa894;
+
 export const STL_PLACEMENT_STYLE = Object.freeze({
     placeholder: 0xdca638, reference: 0xdca638, uniformScale: 0xe8c957,
     axes: [0xd24a43, 0x439f66, 0x487bd5],

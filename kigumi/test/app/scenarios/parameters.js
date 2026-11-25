@@ -46,7 +46,7 @@ module.exports = {
             .catch(() => '');
         await capture('03f-kiwari-tools');
         check('the Kiwari tab lists the frame\'s tools under its parameters, with their own, and runs one',
-            tab.includes('Kiwari') && tools === 'export router templates' && toolParameters === 'beam_bushing_offset|leg_bushing_offset|top_depth|bottom_depth|base_support_width|sides|supports|support_thickness|clamp_width|clamp_depth|clamp_clearance|tail_clamp_length'
+            tab.includes('Kiwari') && tools === 'export router templates' && toolParameters === 'beam_bushing_offset|leg_bushing_offset|top_depth|bottom_depth|base_support_width|sides|supports|support_thickness|clamp_width|clamp_depth|clamp_clearance|tail_clamp_length|leg_template_wide_runout|leg_template_narrow_runout|add_jigs_and_accessories'
                 && output.startsWith('Wrote 4 router templates'),
             `tab "${tab}", tools "${tools}", its parameters "${toolParameters}", output "${output.split('\n')[0]}"`);
         await showTab('tree');
@@ -62,6 +62,12 @@ module.exports = {
         const shown = await waitFor(() => extras().then((text) => text.endsWith(' / 4') ? text : null), { timeoutMs: 20000 })
             .catch(() => extras());
         await capture('03g-extra-accessories');
+        const tints = await inShell(`(() => {
+            const app = ${app};
+            return [...new Set([...app.sceneManager.entries()]
+                .filter(([key]) => app.memberMetadataByKey.get(key)?.mesh?.extraAccessory)
+                .map(([, bundle]) => bundle.mesh.material.color.getHex().toString(16)))].join();
+        })()`);
         await inShell(`${app}.removeExtraAccessories([...${app}.memberMetadataByKey.entries()]
             .filter(([, meta]) => meta.mesh?.extraAccessory && meta.name === 'A leg template').map(([key]) => key))`);
         const afterDelete = await waitFor(() => extras().then((text) => text.endsWith(' / 3') ? text : null), { timeoutMs: 20000 })
@@ -71,7 +77,8 @@ module.exports = {
             .catch(() => extras());
         check('a tool\'s extra accessories are listed and drawn, one can be deleted, and a rebuild clears them',
             shown === 'A beam template|A leg template|B beam template|B leg template / 4'
-                && afterDelete === 'A beam template|B beam template|B leg template / 3' && afterRebuild === ' / 0',
-            `${shown} -> ${afterDelete} -> ${afterRebuild}`);
+                && afterDelete === 'A beam template|B beam template|B leg template / 3' && afterRebuild === ' / 0'
+                && tints === '5fa894',
+            `${shown} (tint ${tints}) -> ${afterDelete} -> ${afterRebuild}`);
     },
 };

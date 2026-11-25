@@ -1,5 +1,5 @@
 import { showTimberGrain } from './timber-grain.js';
-import { STL_PLACEMENT_STYLE } from './viewer-shared.js';
+import { EXTRA_ACCESSORY_COLOR, STL_PLACEMENT_STYLE } from './viewer-shared.js';
 /**
  * How the scene looks: theme and geometry mode, the center gizmo, edges, shadows, reflections, footprints, materials, the light and cylinder silhouettes.
  *
@@ -660,12 +660,14 @@ export const RenderingMixin = (Base) => class extends Base {
         return this.renderer ? this.renderer.getSize(new THREE.Vector2()) : new THREE.Vector2(1, 1);
     }
 
-    createMaterialSetForMemberType(memberType, stlPlaceholder = false) {
+    createMaterialSetForMemberType(memberType, stlPlaceholder = false, extraAccessory = false) {
         const profileId = this.resolveRenderProfileIdForMemberType(memberType);
         const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
         if (stlPlaceholder) specs.solid.color = STL_PLACEMENT_STYLE.placeholder;
+        if (extraAccessory) specs.solid.color = EXTRA_ACCESSORY_COLOR;
         const solid = new THREE.MeshStandardMaterial(specs.solid);
         solid.userData.stlPlaceholder = stlPlaceholder;
+        solid.userData.extraAccessory = extraAccessory;
         return {
             profileId,
             solid,
@@ -680,6 +682,7 @@ export const RenderingMixin = (Base) => class extends Base {
         }
         const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
         if (bundle.mesh.material.userData.stlPlaceholder) specs.solid.color = STL_PLACEMENT_STYLE.placeholder;
+        if (bundle.mesh.material.userData.extraAccessory) specs.solid.color = EXTRA_ACCESSORY_COLOR;
         bundle.profileId = profileId;
         this.applyMaterialSpec(bundle.mesh.material, specs.solid);
         this.applyMaterialSpec(bundle.edges.material, specs.edge);

@@ -247,6 +247,10 @@ ROUTER_TEMPLATE = kiwari(
     clamp_depth=kiwari.length(inches(3, 8), minimum=0, about="How deep each clamp slot is, into the template's router side"),
     clamp_clearance=kiwari.length(inches(1, 4), minimum=0, about="How far the socket template's clamp slots stop short of its opening"),
     tail_clamp_length=kiwari.length(inches(1), minimum=0, about="How far the tail template's clamp slot runs in from its top end"),
+    leg_template_wide_runout=kiwari.number(0.2, minimum=0, about="How far the leg template runs on past the socket at its wide end, "
+                                                                    "as a fraction of its length, so the bit doesn't leave it"),
+    leg_template_narrow_runout=kiwari.number(0.05, minimum=0, about="The same at its narrow end"),
+    add_jigs_and_accessories=kiwari.flag(True, about="Show the templates in the viewer, as extra accessories"),
 )
 
 CLAMP_FLOOR = inches(1, 4)    # the least a template keeps under a clamp slot; thinner ones are thickened
@@ -352,6 +356,26 @@ def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: fl
     return [(float(x), float(y)) for x, y in points]
 
 
+def _run_out(outline: List[Tuple[float, float]], up: np.ndarray, wide: float, narrow: float) -> List[Tuple[float, float]]:
+    """Return a convex outline with its bottom and top ends moved out along its flanks.
+
+    The bottom end (facing most against `up`, unit 2D) moves `wide` times the outline's length along
+    `up`, the top end `narrow` times; the other edges keep their lines.
+    """
+    points = np.array(outline)
+    normals, offsets = _edge_lines(points)
+    length = float(np.ptp(points @ up))
+    offsets = offsets.copy()
+    bottom, top = int(np.argmin(normals @ up)), int(np.argmax(normals @ up))
+    offsets[bottom] += wide * length * float(-(normals[bottom] @ up))
+    offsets[top] += narrow * length * float(normals[top] @ up)
+    reach = 10 * (np.abs(points).max() + length)
+    moved = [(-reach, -reach), (reach, -reach), (reach, reach), (-reach, reach)]
+    for normal, offset in zip(normals, offsets):
+        moved = _clip_between(moved, normal, -np.inf, float(offset))
+    return moved
+
+
 def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG]:
     """Return the router templates for one dovetail's socket in the beam and for its tail, in world space.
 
@@ -359,7 +383,9 @@ def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[C
     beam. The beam template lies on the neck's plane, its opening the wide face moved out by the beam
     offset, with the uncut beam taken out of its underside so it sits on the beam. The leg template lies
     on the wide face, on the side away from the leg, as the wide face moved in by the leg offset, its wide
-    end square to `leg`'s length so it can be squared off the leg's edge. Each has clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
+    end square to `leg`'s length so it can be squared off the leg's edge. Its flanks run on past the
+    socket at both ends, by the runouts (fractions of its length), so the bit doesn't leave it. Each has
+    clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
     `CLAMP_FLOOR` under its slot.
     """
     body = adopt_csg(beam.transform, None, CutTimber(beam, cuts=[]).render_timber_with_cuts_csg_local())
@@ -393,6 +419,8 @@ def _templates(beam: Timber, leg: Timber, socket: Cutting, t: Kiwari) -> Tuple[C
                    else _clip_between(wide_outline, along, float(reach.min()), np.inf))
     lowest = float((in_beam @ np.array([frame.u, frame.v]).T @ up_in_face).min())
     leg_outline = _clip_between(leg_outline, up_in_face, lowest, np.inf)
+    leg_outline = _run_out(leg_outline, up_in_face, float(t.number("leg_template_wide_runout")),
+                           float(t.number("leg_template_narrow_runout")))
     beam_offset, leg_offset = t.length("beam_bushing_offset"), t.length("leg_bushing_offset")
     top = t.length("top_depth")
     socket_template = router_template((frame, [outline]), body, beam_offset, top, t.length("base_support_width"),
@@ -434,20 +462,23 @@ TEMPLATE_PAIRS = {"A": "leg +x +y", "B": "leg +x -y"}
 def _export_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari, *, kigumi: Kigumi) -> str:
     """Write the beam and leg templates for each pair of legs to STLs in millimetres, in kigumi_exports/, and say where.
 
-    Also show them in the viewer as extra accessories, in place of any shown before.
+    Also show them in the viewer as extra accessories, in place of any shown before, if
+    `add_jigs_and_accessories` is on.
     """
     folder = pathlib.Path.cwd() / "kigumi_exports" / "dovetailed_sawhorse"
     folder.mkdir(parents=True, exist_ok=True)
     joint_of = {leg.timber.ticket.path: joint for leg, joint in zip(legs, joints)}
     written = []
     kigumi.remove_all_extra_accessories()
+    show = t.flag("add_jigs_and_accessories")
     for pair, leg in TEMPLATE_PAIRS.items():
         joint = joint_of[leg]
         beam_template, leg_template = _templates(beam, joint.cuttings["dovetail_timber"].timber,
                                                  joint.cuttings["receiving_timber"], t)
         for part, template in (("beam_template", beam_template), ("leg_template", leg_template)):
-            kigumi.add_extra_accessory(CSGAccessory(transform=Transform.identity(), positive_csg=template),
-                                       name=f"{pair} {part.replace('_', ' ')}")
+            if show:
+                kigumi.add_extra_accessory(CSGAccessory(transform=Transform.identity(), positive_csg=template),
+                                           name=f"{pair} {part.replace('_', ' ')}")
             mesh = mesh_cutcsg(template).mesh.copy()
             mesh.apply_scale(1000)
             path = folder / f"{pair} {part}.stl"
@@ -553,7 +584,7 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
     sawhorse = Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
                      source_joints=joints, name="Dovetailed sawhorse", kiwari=k,
                      tools=[Tool("export router templates",
-                                 "Write the router templates for each leg's socket in the beam and its tail to STLs, in mm, and show them",
+                                 "Write the router templates for each leg's socket in the beam and its tail to STLs, in mm, and show them if asked",
                                  lambda t, *, kigumi: _export_templates(beam, legs, joints, t, kigumi=kigumi),
                                  kiwari=ROUTER_TEMPLATE)])
     return with_auto_drawings(sawhorse, fixed_path="beam", extra_views=_leg_top_view)
