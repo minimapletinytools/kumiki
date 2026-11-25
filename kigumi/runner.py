@@ -66,6 +66,7 @@ class AnchorWire(TypedDict, total=False):
     b: FeatureRefWire
     at: Optional[Vec3]
     geometry: Optional[GeometryWire]
+    xray: Vec3
 
 
 class PlaneWire(TypedDict):
@@ -172,6 +173,7 @@ class PickRequest(TypedDict, total=False):
     right: Optional[Vec3]
     up: Optional[Vec3]
     space: Optional[str]  # "3d" | "projected"
+    xrayMembers: List[str]
     drawnMembers: Optional[List[str]]  # in a drawing, the members it draws: what can hide something
 
 
@@ -226,6 +228,7 @@ class CandidateWire(TypedDict, total=False):
     priority: int
     path: List[str]
     hidden: bool
+    xray: bool
 
 
 class PickStatsWire(TypedDict, total=False):
@@ -259,6 +262,7 @@ class DerivationWire(TypedDict):
 
 class PickResultWire(NodeDescriptionWire, total=False):
     """The answer to a click, a hover or a pick from the tree."""
+    xrayLook: Vec3
     memberKey: str
     path: List[str]
     reference: Optional[AnchorWire]
@@ -411,6 +415,7 @@ class MemberMeshWire(TypedDict, total=False):
     perfectTimberWithinIndices: List[int]
     referenceFacePlanes: List[ReferenceFacePlane]
     centerplanes: List[PlaneOutlineWire]
+    xrayLines: List[PlaneOutlineWire]
     perfectFaces: List[PlaneOutlineWire]
     perfectBoxNoJointsVertices: List[float]
     perfectBoxNoJointsIndices: List[int]
@@ -1124,7 +1129,9 @@ def _cut_timber_to_triangle_mesh_payload(
     local_csg: 'CutCSG',
     timber_key: str,
 ) -> MemberMeshWire:
+    import numpy as np
     from kumiki.drawings.reference_lines import reference_face_colors
+    from kumiki.drawings.svg import hidden_xray_lines
     from kumiki.measuring import locate_face
 
     actual = _triangulate_local_csg(cut_timber, local_csg)
@@ -1200,6 +1207,9 @@ def _cut_timber_to_triangle_mesh_payload(
     else:
         payload["hasActualGeometryDifferentFromPerfect"] = False
     payload["centerplanes"] = _perfect_reference_outlines(timber, local_csg, centerplanes=True)
+    triangles = np.asarray(vertices).reshape(-1, 3)[np.asarray(indices, dtype=int).reshape(-1, 3)]
+    payload["xrayLines"] = [PlaneOutlineWire(normal=normal.tolist(), positions=lines.ravel().tolist())
+                            for normal, lines in hidden_xray_lines(local_csg, timber, triangles)]
     payload["perfectFaces"] = _perfect_reference_outlines(timber, local_csg, centerplanes=False)
 
     # No-joints box: the plain box cropped only by end-cut trims, for every timber shape.
@@ -2047,7 +2057,7 @@ def _derivation_wire(
 
 
 def _sight_blocker(
-    ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3',
+    ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3', *, through_own: bool = False,
 ) -> Callable[['Float3'], bool]:
     """Return `blocked(place)`: whether a drawn member hides `place` (in `own`'s local space) from the camera.
 
@@ -2056,7 +2066,7 @@ def _sight_blocker(
     from kumiki.viewer.picking import sight_blocker
 
     drawn = payload.get("drawnMembers")
-    occluders = [(own_root, own.timber.transform)] + [
+    occluders = ([] if through_own else [(own_root, own.timber.transform)]) + [
         (cast('CutCSG', entry["local_csg"]), entry["cut_timber"].timber.transform)
         for key, entry in ss.mesh_cache.items()
         if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
@@ -2671,6 +2681,8 @@ def _resolve_measurement(
             continue
         found[key], spans[key] = placed
         resolved[key] = {**(measure.get(key) or {}), **found[key]}
+        if not found[key].get("xray"):
+            resolved[key].pop("xray", None)
 
     if broken:
         # Shown greyed rather than dropped: a reference that stops resolving is
@@ -2983,10 +2995,18 @@ def _anchor_payload(
     from kumiki.drawings.feature_span import feature_span
 
     handle = _handle_of(feature, node, timber)
-    return ({
-        "at": _anchor_floats(handle, root_csg),
-        "geometry": _world_geometry_payload(handle),
-    }, feature_span(handle, root_csg, plane, solid_space))
+    wire: AnchorWire = {"at": _anchor_floats(handle, root_csg), "geometry": _world_geometry_payload(handle)}
+    if plane is not None and not solid_space:
+        import numpy as np
+        from kumiki.drawings.xray import xray_from_view
+        from kumiki.drawings.visibility import nearest_visible_depth
+        from kumiki.csg.feature_extent import timber_reach
+        from kumiki.rule import unit_ndarray
+        look = unit_ndarray(np.asarray(plane, dtype=float).reshape(3))
+        if xray_from_view(handle.hit, timber, look):
+            if nearest_visible_depth(handle, root_csg, look, [(root_csg, timber.transform)], timber_reach(timber)) is None:
+                wire["xray"] = look.tolist()
+    return wire, feature_span(handle, root_csg, plane, solid_space)
 
 
 def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[ReferenceLineWire]:
@@ -4297,7 +4317,17 @@ def _drawing_candidates(
         local_frame = LocalFrame.of(cut_timber.timber.transform)
         return _sight_blocker(ss, cut_timber, root, payload, local_frame.direction(direction))
 
-    return drawing_candidates(members, (origin, direction), tolerances, blocked_for)
+    revealed = set(payload.get("xrayMembers") or ())
+
+    def through_own(key: str) -> Optional[Callable[['Float3'], bool]]:
+        if key not in revealed:
+            return None
+        entry = ss.mesh_cache[key]
+        timber = entry["cut_timber"]
+        local = LocalFrame.of(timber.timber.transform).direction(direction)
+        return _sight_blocker(ss, timber, cast('CutCSG', entry["local_csg"]), payload, local, through_own=True)
+
+    return drawing_candidates(members, (origin, direction), tolerances, blocked_for, through_own if revealed else None)
 
 
 def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
@@ -4387,6 +4417,8 @@ def _member_candidates_wire(ss: SlotState, merged: List['MemberCandidate'], visi
     for index, one in enumerate(merged):
         wire = _candidates_wire(cast('CutCSG', ss.mesh_cache[one.member]["local_csg"]), [one.candidate.hit],
                                 1 if index < visible_count else 0)[0]
+        if one.xray:
+            wire["xray"] = True
         wire["memberKey"] = one.member
         wires.append(wire)
     return wires
@@ -4519,6 +4551,9 @@ def _pick_in_drawing(state: RunnerState, ss: 'SlotState', payload: PickRequest, 
     result = _pick_on_member(state, ss, payload, ask, chosen.member, point, (merged, merged_visible, chosen_index))
     # The menu and Tab go through everything under the pointer, every member's.
     result["candidates"] = _member_candidates_wire(ss, merged, merged_visible)
+    ray = payload.get("ray")
+    if chosen.xray and ray is not None:
+        result["xrayLook"] = ray["direction"]
     result["candidateCount"] = merged_visible
     result["candidateIndex"] = chosen_index
     return result

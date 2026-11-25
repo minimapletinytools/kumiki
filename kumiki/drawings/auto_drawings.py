@@ -34,6 +34,7 @@ from .drawing import ELEVATION_IDS, Drawing, Page, Viewport, columns, covering_p
 from .measure import FromViewport, Measure, MeasurementOperation, MeasurementPlacement, ViewAxes
 from .measure_solving import DrawingSolve
 from .visibility import visible_by_view
+from .xray import xray_sides
 
 #: World elevations for the plan: name -> (right, up, look).
 PLAN_VIEWS = {
@@ -122,6 +123,18 @@ def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle
     assumptions += coincidence_assumptions(visible, views, solve)
 
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
+    revealed = set()
+    for view, handles in visible.items():
+        tagged = [handle for handle in handles if xray_sides(handle.hit)]
+        if tagged:
+            ordinary = visible_by_view(tagged, {view: views[view]}, cut_timbers, allow_xray=False)[view]
+            revealed.update((view, handle) for handle in set(tagged).difference(ordinary))
+    if revealed:
+        @fixed
+        def needs_xray(candidate: DimensionCandidate, context: PickContext) -> float:
+            return float(any((candidate.view, end) in revealed
+                             for end in (candidate.measure.anchor_a, candidate.measure.anchor_b)))
+        policy = replace(policy, prefer=(*policy.prefer, needs_xray))
     result = auto_dimension(sheet_candidates(visible, views, solve), measurable, known_rows, solve, policy)
     return faces_to_edges(result, cut_timbers, directed, views, carriers) if onto_edges else result
 

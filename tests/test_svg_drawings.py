@@ -161,3 +161,24 @@ def test_inherit_viewer_materials_and_edge_mode_on_a_blind_bore(mode):
     if hidden is not None:
         assert hidden.get('stroke-dasharray')
         assert any(' A' in p.attrib['d'] for p in hidden.findall('{*}path'))
+
+
+def test_directional_xray_through_own_stock_clips_at_another_member():
+    from kumiki.csg.cutcsg import START_CAP, FeatureOverride, FeatureProperties
+    from kumiki.timber_features import TimberFace
+
+    timber = Timber(length=4, size=create_v2(4, 4), transform=Transform.identity(), ticket=TimberTicket('beam'))
+    cutter = RectangularPrism(size=create_v2(2, 2), start_distance=1, end_distance=5,
+                              feature_overrides=[FeatureOverride(START_CAP, 'floor', FeatureProperties(
+                                  xray_from_faces=frozenset([TimberFace.FRONT])))])
+    root = Difference(_box(top=4), [cutter])
+    members = {'beam': DrawingSolid(root, timber.transform, timber),
+               'cover': DrawingSolid(_box(width=2, height=1, bottom=0, top=2, x=-1, y=3), Transform.identity())}
+    for side in [1, -1]:
+        view = _view(members, right=(-side, 0, 0), up=(0, 0, 1))
+        paths = view.findall(".//{*}g[@class='feature-xray']/{*}path")
+        assert bool(paths) == (side == 1)
+        for path in paths:
+            coords = list(map(float, path.get('d').replace('M', '').replace('L', '').split()))
+            assert max(coords[0], coords[2]) <= 50.00001
+            assert coords[1] == pytest.approx(40)

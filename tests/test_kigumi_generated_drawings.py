@@ -118,3 +118,15 @@ def test_dimensions_are_placed_in_the_views_the_viewer_draws(loaded):
             assert view.extent == pytest.approx(camera["extent"])
             checked += 1
     assert checked
+
+
+def test_front_shop_dimension_keeps_xray_after_its_face_becomes_an_arris(loaded):
+    slot, _ = loaded
+    drawing = next(d for d in runner.collect_drawings(slot.frame, None) if d['members'] == ['Left Side#0'])
+    revealed = [(view['id'], m) for view in drawing['viewports'] for m in view.get('measurements', [])
+                if m['a'].get('xray') or m['b'].get('xray')]
+    (view_id, measure), = revealed
+    assert view_id == '0.0.0'
+    assert measure['a']['feature'].startswith('arris.')
+    assert measure['b']['feature'] == 'peg_hole_axis'
+    assert measure['settled']['value']['value'] == pytest.approx(.0435)

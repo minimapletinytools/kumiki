@@ -152,7 +152,8 @@ export const MenusMixin = (Base) => class extends Base {
             // Where it is declared, so two named alike (a dovetail_wide_face on each of two
             // dovetails) can be told apart.
             note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2),
-                candidate.hidden ? t('viewer.contextMenu.hidden') : null]
+                candidate.hidden ? t('viewer.contextMenu.hidden') : null,
+                candidate.xray ? t('viewer.options.drawingXray') : null]
                 .filter(Boolean).join(' \u00b7 '),
         }));
     }

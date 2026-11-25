@@ -215,3 +215,12 @@
     stroke: var(--hv-panel-bg);
     stroke-width: 3px;
 }
+
+.xray-legend::before {
+    content: '';
+    display: inline-block;
+    width: 1.5em;
+    margin-right: 0.4em;
+    vertical-align: middle;
+    border-top: 2px dashed currentColor;
+}

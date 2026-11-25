@@ -89,6 +89,7 @@ function featureStateSummary(state) {
         state.key,
         ROLES.filter((role) => roles[role]),
         Boolean(roles.hover && roles.hover.refused),
+        ...(leadingRole(state)?.source.xrayLook || []),
     ];
 }
 

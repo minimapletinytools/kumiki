@@ -28,6 +28,7 @@ from .measure import Measure, MeasurementKind, MeasurementOperation, ViewAxes
 from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
 from .visibility import visible_by_view
+from .xray import xray_from_view
 
 if TYPE_CHECKING:
     from ..timber import CutTimber, PerfectTimberWithin
@@ -729,8 +730,12 @@ def faces_to_edges(result: AutoDimensioning, cut_timbers: Sequence['CutTimber'],
         if key not in memo:
             root = roots.get(id(end.timber))
             look = unit_ndarray(as_ndarray(views[view].look))
-            memo[key] = end if root is None else _nearest_edge_of(
+            edge = None if root is None else _nearest_edge_of(
                 end, look, root, by_timber.get(id(end.timber), []), carriers)
+            if edge is not None and edge != end and xray_from_view(end.hit, end.timber, look):
+                if not visible_by_view([edge], {view: views[view]}, cut_timbers)[view]:
+                    edge = None
+            memo[key] = edge or end
         return memo[key]
 
     picks = []

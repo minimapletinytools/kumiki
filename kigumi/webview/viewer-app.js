@@ -729,7 +729,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.viewLight.castShadow = false;
         this.scene.add(this.viewLight);
         this.scene.add(this.viewLight.target);
-        this._viewLightAim = new THREE.Vector3();
+        this._viewportLook = new THREE.Vector3();
 
         this.createOrUpdateShadowCatcher(this.lastBounds);
         this.syncCameraControls();
@@ -916,7 +916,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
      * view they were made in; a hover to the view under the pointer; a reference to every view.
      * With one viewport there is nothing to choose.
      */
-    _showHighlightsFor(viewportId) {
+    _showHighlightsFor(viewportId, look) {
         const single = this.viewports.length < 2;
         for (const object of this._highlightObjects.values()) {
             const role = object.userData.role;
@@ -924,7 +924,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 || viewportId === (role === 'hover' ? this._hoverViewportId : this.selectionManager.scope);
             // The selection echoes softly in the other views, so it can be found there too.
             const echo = !own && role === 'selection';
-            object.visible = (!this._exportingDrawing || role === 'reference') && (own || echo);
+            const xrayLook = object.userData.xrayLook;
+            const xrayVisible = !xrayLook || (own && this.drawingXray !== 'off' && look && xrayLook.dot(look) > 1 - 1e-8);
+            object.visible = xrayVisible && (!this._exportingDrawing || role === 'reference') && (own || echo);
             object.material.opacity = object.userData.opacity * (echo ? SELECTION_ECHO_OPACITY : 1);
         }
     }
@@ -954,9 +956,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         const scissored = onPaper || this.viewports.length > 1;
         this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
-            this._showHighlightsFor(viewport.id);
+            this._showHighlightsFor(viewport.id, viewport.camera.getWorldDirection(this._viewportLook));
             const anyDrawingLines = this.drawingOverlays.showFor(
-                this.sceneManager.bundles(), viewport.camera, { inDrawing: this.isInDrawing, options: this });
+                this.sceneManager.bundles(), viewport.camera, { inDrawing: this.isInDrawing, options: this,
+                    xrayMembers: this.xrayMembers(viewport) });
             const rect = viewport.pixelRect(pageRect, size.y);
             if (anyDrawingLines && this.memberIds) {
                 // Who is in front where, for the dotted lines to clip themselves by.
@@ -1048,9 +1051,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         if (!this.viewLight) {
             return;
         }
-        camera.getWorldDirection(this._viewLightAim);
+        camera.getWorldDirection(this._viewportLook);
         this.viewLight.position.copy(camera.position);
-        this.viewLight.target.position.copy(camera.position).add(this._viewLightAim);
+        this.viewLight.target.position.copy(camera.position).add(this._viewportLook);
     }
 
     /**
@@ -1251,6 +1254,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.setDrawingOption('highlightReferenceEdges', ui.referenceFeatures !== 'never' && ui.showDrawingReferenceFeatures !== false);
         }
         const colorFaces = ui.colorReferenceFaces ?? ui.tintSvgReferenceFaces;
+        if (typeof ui.drawingXray === 'string') this.setDrawingXray(ui.drawingXray);
         if (typeof colorFaces === 'boolean') this.setDrawingOption('colorReferenceFaces', colorFaces);
         for (const key of ['showDrawingCenterplanes', 'showDrawingPerfectFaces']) {
             if (typeof ui[key] === 'boolean') this.setDrawingOption(key, ui[key]);

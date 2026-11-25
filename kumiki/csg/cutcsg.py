@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, Flag
 import warnings
 from ..rule import *
+from ..timber_features import TimberFace
 from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, perpendicular_axes, planes_are_coincident, planes_are_parallel,
                        points_are_coincident, unit_vector)
@@ -387,6 +388,9 @@ class FeatureProperties:
     marking_override: Optional[FeatureMarkingSpec] = None
     purpose: FeaturePurpose = FeaturePurpose.NOT_SPECIFIED
     datum: Datum = Datum.NEUTRAL
+
+    #: Timber-local sides from which a drawing may reveal this feature through its own stock.
+    xray_from_faces: frozenset[TimberFace] = frozenset()
 
     @property
     def real(self) -> bool:
@@ -2295,20 +2299,33 @@ def strip_features(csg: CutCSG) -> CutCSG:
                           if primitive.feature_overrides or primitive.extra_features else cast(CutCSG, primitive))
 
 
-def with_purpose(csg: CutCSG, purpose: 'FeaturePurpose') -> CutCSG:
-    """Return `csg` with every feature, all the way down, given purpose `purpose`."""
+def map_feature_properties(csg: CutCSG, update: Callable[[FeatureProperties], FeatureProperties]) -> CutCSG:
+    """Return a subtree with updated properties on its declared features, preserving names and keys."""
     def change(primitive: 'HasFeatures') -> CutCSG:
         authored = {override.key: override for override in primitive.feature_overrides}
         overrides = []
         for key, default in primitive.default_features().items():
             override = authored.get(key, FeatureOverride(key))
             properties = override.properties if override.properties is not None else default.properties
-            overrides.append(replace(override, properties=replace(properties, purpose=purpose)))
-        extras = [replace(extra, properties=replace(extra.properties, purpose=purpose))
+            updated = update(properties)
+            if updated != properties or key in authored:
+                overrides.append(replace(override, properties=updated) if updated != properties else override)
+        extras = [replace(extra, properties=update(extra.properties))
                   for extra in primitive.extra_features]
         return cast(CutCSG, replace(primitive, feature_overrides=overrides, extra_features=extras))
 
     return map_primitives(csg, change)
+
+
+def with_purpose(csg: CutCSG, purpose: FeaturePurpose) -> CutCSG:
+    """Return the subtree with every feature given the specified purpose."""
+    return map_feature_properties(csg, lambda props: replace(props, purpose=purpose))
+
+
+def with_xray_from(csg: CutCSG, *faces: TimberFace) -> CutCSG:
+    """Set the drawing X-ray sides of the features in a subtree, in the receiving timber's axes."""
+    sides = frozenset(faces)
+    return map_feature_properties(csg, lambda props: replace(props, xray_from_faces=sides))
 
 
 class CSGParity(Enum):

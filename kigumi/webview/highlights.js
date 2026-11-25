@@ -167,6 +167,10 @@ function highlightsFor(state) {
         // renderViewports.
         for (let index = from; index < out.length; index += 1) {
             out[index].role = leading.role;
+            if (leading.source.xrayLook) {
+                out[index].xrayLook = leading.source.xrayLook;
+                out[index].id += ':xray:' + leading.source.xrayLook.join(',');
+            }
         }
     }
     return out;

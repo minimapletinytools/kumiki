@@ -1063,11 +1063,13 @@ class MemberCandidate(NamedTuple):
     member: str
     timber: 'PerfectTimberWithin'
     candidate: PointerCandidate
+    xray: bool = False
 
 
 def drawing_candidates(
     members: List[DrawnMember], world_ray: LocalRay, tolerances: 'FeatureTestTolerances',
     blocked_for: Callable[[str], Optional[Callable[[Float3], bool]]],
+    through_own: Optional[Callable[[str], Optional[Callable[[Float3], bool]]]] = None,
 ) -> Tuple[List[MemberCandidate], int]:
     """Return every feature under the pointer in a drawing view, across all members drawn there, and how many are visible.
 
@@ -1078,6 +1080,8 @@ def drawing_candidates(
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_measuring_helpers import world_geometry
     from kumiki.drawings.visibility import drawn_over, never_hidden
+    from kumiki.drawings.xray import xray_from_view
+    from kumiki.rule import as_ndarray
 
     origin, direction = Float3.of(world_ray[0]), Float3.of(world_ray[1]).unit()
     if direction is None:
@@ -1112,7 +1116,9 @@ def drawing_candidates(
         return worlds[id(one)]
 
     visible: List[MemberCandidate] = []
+    revealed: List[MemberCandidate] = []
     hidden: List[MemberCandidate] = []
+    world_look = as_ndarray(direction.v3())
     for one in found:
         hit, candidate = one.candidate.hit, one.candidate
         if never_hidden(hit.feature):
@@ -1122,7 +1128,12 @@ def drawing_candidates(
         covered = any(other.candidate.group < candidate.group
                       and drawn_over(world(other), world(one), look, float(tolerances.edge)) for other in visible)
         if covered or (blocked is not None and candidate.place is not None and blocked(candidate.place)):
+            if through_own is not None and candidate.place is not None and xray_from_view(hit, one.timber, world_look):
+                other_blocks = through_own(one.member)
+                if other_blocks is not None and not other_blocks(candidate.place):
+                    revealed.append(one._replace(xray=True))
+                    continue
             hidden.append(one)
         else:
             visible.append(one)
-    return visible + hidden, len(visible)
+    return visible + revealed + hidden, len(visible) + len(revealed)

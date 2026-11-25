@@ -182,6 +182,33 @@ class TestMortiseAndTenonGeometry:
             assert mortise_csg.contains_point(point_mortise_local), \
                 f"Point at z={z} should be in mortise centerline"
 
+    @pytest.mark.parametrize("options,revealed", [
+        (dict(mortise_depth=scalar(5)),
+         {"mortise_right", "mortise_left", "mortise_front", "mortise_back", "mortise_bottom"}),
+        (dict(), {"mortise_right", "mortise_left", "mortise_front", "mortise_back", "mortise_bottom"}),
+        (dict(mortise_depth=scalar(5), use_round_tenon=True), {"cap.1", "side.0"}),
+    ])
+    def test_mortise_walls_and_bottom_xray_from_both_side_faces(self, simple_T_configuration, options, revealed):
+        from kumiki.csg.cutcsg import walk_csg_with_parity
+
+        tenon_timber, mortise_timber = simple_T_configuration
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber, butt_timber=tenon_timber,
+                butt_timber_end=TimberEnd.BOTTOM, front_face_on_butt_timber=None),
+            tenon_width_relative_to_joint=scalar(2), tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(4), **options)
+        tagged = {feature.name: feature.properties.xray_from_faces
+                  for owner, _ in walk_csg_with_parity(_render_cutting(joint.cuttings["mortise_timber"]))
+                  for feature in owner.get_declared_features() if feature.properties.xray_from_faces}
+        assert set(tagged) == revealed
+        # The tenon stands along world z.
+        entry = mortise_timber.get_closest_oriented_face_from_global_direction(create_v3(0, 0, -1))
+        sides = {face for face in (TimberFace.FRONT, TimberFace.BACK, TimberFace.RIGHT, TimberFace.LEFT)
+                 if face.is_perpendicular(entry)}
+        assert len(sides) == 2
+        assert set(tagged.values()) == {frozenset(sides)}
+
     def test_tenon_negative_csg_has_no_cut_behind_shoulder(self, simple_T_configuration):
         """Ensure the tenon cut volume does not extend past the shoulder into the timber body."""
         from kumiki.csg.cutcsg import Difference, HalfSpace, Intersection
