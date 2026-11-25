@@ -4,7 +4,7 @@ const path = require('path');
 
 const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
-const { viewFrames, checkFrameTool, describeFrameTool, drawingsTool } = require('../agent/frames');
+const { viewFrames, checkFrameTool, describeTool, describeFrameTool, drawingsTool } = require('../agent/frames');
 const { sharedTools, agentTools, viewHost } = require('../agent/agent');
 const { startMcpHttpServer } = require('../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
@@ -83,8 +83,8 @@ describe('the tools', () => {
         expect(shared).toEqual(expect.arrayContaining(['describe_panel', 'screenshot', 'check_frame', 'kumiki_api', 'kumiki_source']));
         expect(shared).not.toContain('edit_file');
         expect(own).toEqual([...shared, 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'update_todos']);
-        // Headless: no views, so no view tools; a host whose frames can be described still has describe_frame.
-        expect(sharedTools({ ...host, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame', 'describe_frame']);
+        // Headless: no views, so no view tools; a host whose frames can be described still has describe (and its old name).
+        expect(sharedTools({ ...host, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame', 'describe', 'describe_frame']);
         const noDescribe = { ...host.frames, describe: undefined };
         expect(sharedTools({ ...host, frames: noDescribe, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame']);
     });
@@ -118,6 +118,19 @@ describe('the tools', () => {
         expect(yaml).toContain('faces: {TOP: +Z');
         answer = { ok: false, reason: 'not-built', filePath: '/p/a.py' };
         expect(textOf(await describe.run({ file_path: '/p/a.py' }))).toEqual(answer);
+    });
+
+    test('describe with a timber asks the view for that timber\'s features; describe_frame takes no timber', async () => {
+        const ran = [];
+        const frames = viewFrames({ panels: directory(), files: { resolve: (file) => file }, run: async (id, args) => {
+            ran.push([id, args.timber]);
+            return id === 'kigumi.automationOpenFileInViewer' ? { ok: true, filePath: args.filePath }
+                : { ok: true, timber: args.timber, faces: { front: 'rptw.front' }, joints: [] };
+        } });
+
+        expect(textOf(await describeTool(frames).run({ file_path: '/p/a.py', timber: 'post' }))).toMatchObject({ timber: 'post' });
+        expect(ran.at(-1)).toEqual(['kigumi.automationDescribeTimber', 'post']);
+        expect(Object.keys(describeFrameTool(frames).shape)).toEqual(['file_path']);
     });
 
     test('drawings opens a frame no view shows before listing its drawings, and goes to the one asked for', async () => {

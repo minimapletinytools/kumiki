@@ -17,6 +17,7 @@ import inspect
 import json
 import math
 import os
+import re
 import select
 import sys
 import threading
@@ -4031,7 +4032,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "run_finishing", "list_tools", "run_tool", "remove_extra_accessories",
+            "run_finishing", "list_tools", "run_tool", "remove_extra_accessories", "describe_timber",
             "shutdown",
         ],
         "frame": {
@@ -5186,6 +5187,68 @@ def _serialize_tools(frame: Any) -> List[ToolWire]:
     return tools
 
 
+#: A feature name a primitive gives itself by number ("arris.3"), left out of a description.
+_NUMBERED_FEATURE = re.compile(r"^(arris|corner|cap|side|edge)\.\d+$")
+
+
+def _feature_constants() -> Dict[str, str]:
+    """Return the constant each joint feature name has (kumiki.joints.workshop.feature_names), by name."""
+    try:
+        from kumiki.joints.workshop import feature_names
+    except ImportError:
+        return {}
+    constants: Dict[str, str] = {}
+    for holder in vars(feature_names).values():
+        if isinstance(holder, type) and holder.__module__ == feature_names.__name__:
+            for attribute, value in vars(holder).items():
+                if attribute.isupper() and isinstance(value, str):
+                    constants.setdefault(value, f"{holder.__name__}.{attribute}")
+    return constants
+
+
+def describe_timber(frame: Any, path: str) -> Dict[str, Any]:
+    """Return what can be measured on the timber at `path`: its own faces, and each joint on it with
+    the other timbers it joins and the features it names (with their constants, if they have one)."""
+    from kumiki.csg.cutcsg import walk_csg_with_parity
+    from kumiki.timber_features import TimberFace
+
+    cuts = {cut.timber.ticket.path: cut for cut in frame.cut_timbers}
+    cut = cuts.get(path)
+    if cut is None:
+        raise ValueError(f"No timber at {path!r}. The timbers are: {', '.join(sorted(cuts))}")
+    faces = {}
+    for face in TimberFace:
+        try:
+            faces[face.name.lower()] = cut.face(face).feature.name
+        except (KeyError, AttributeError):
+            pass
+    constants = _feature_constants()
+
+    def named(csg: Any, timber_path: str) -> List[Dict[str, Any]]:
+        counts: Dict[Tuple[str, str], int] = {}
+        for owner, _ in walk_csg_with_parity(csg):
+            for feature in owner.get_declared_features():
+                if not _NUMBERED_FEATURE.match(feature.name):
+                    key = (feature.name, feature.feature_type().name)
+                    counts[key] = counts.get(key, 0) + 1
+        return [{"name": name, "type": kind, "on": timber_path, **({"count": count} if count > 1 else {}),
+                 **({"constant": constants[name]} if name in constants else {})}
+                for (name, kind), count in counts.items()]
+
+    joints = []
+    for joint in list(getattr(frame, "source_joints", ()) or ()):
+        timbers = [cutting.timber.ticket.path for cutting in joint.cuttings.values()]
+        if path not in timbers:
+            continue
+        features = [feature for cutting in joint.cuttings.values() if cutting.negative_csg is not None
+                    for feature in named(cutting.negative_csg, cutting.timber.ticket.path)]
+        joints.append({"type": getattr(joint.ticket, "joint_type", None), "name": _joint_display_name(joint),
+                       "timbers": timbers, "features": features})
+    return {"timber": path, "faces": faces, "joints": joints,
+            "howTo": "In Python: cut_timber.face(TimberFace.FRONT), cut_timber.feature(name), joint.feature(constant "
+                     "or name, index) for one of several, cut_timber.edge(a, b), cut_timber.corner(edge, face)."}
+
+
 EXTRA_ACCESSORY_KEY_PREFIX = "accessory:extra#"
 
 
@@ -5556,6 +5619,11 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         ss = _resolve_slot(state, payload)
         name = _require_str(payload, "name", "run_tool requires payload.name")
         return state, make_success_response(request_id, command, run_tool(ss, name, _opt_mapping(payload, "kiwari"))), False
+
+    if command == "describe_timber":
+        ss = _resolve_slot(state, payload)
+        path = _require_str(payload, "timber", "describe_timber requires payload.timber")
+        return state, make_success_response(request_id, command, describe_timber(ss.frame, path)), False
 
     if command == "remove_extra_accessories":
         ss = _resolve_slot(state, payload)

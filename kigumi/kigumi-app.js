@@ -411,6 +411,18 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData, session._lastGeometryData, session._lastLayersData) }
             : { ok: false, reason: 'not-built', filePath: session.filePath })),
 
+        // One timber's faces and joints, and the features they name (runner.py describe_timber).
+        'kigumi.automationDescribeTimber': async (options = {}) => withSession(options, async (session) => {
+            if (!session.runnerSession) return { ok: false, reason: 'not-built', filePath: session.filePath };
+            try {
+                const described = await session.runnerSession.slotRequest('describe_timber', session.slotName,
+                    { timber: String(options.timber || '') });
+                return { ok: true, filePath: session.filePath, ...described };
+            } catch (error) {
+                return { ok: false, reason: 'describe-failed', error: error.message || String(error), filePath: session.filePath };
+            }
+        }),
+
         'kigumi.automationReadSessionLogs': async (options = {}) => withSession(options, async (session) => {
             const snapshot = session.getLogSnapshot({
                 minLevel: options.minLevel,

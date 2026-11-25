@@ -7,7 +7,8 @@
  *   check(file)    build the file, opening a view first if none shows it
  *   rebuild(file)  build a file a view shows, after an edit
  *   picture(file)  a picture of its view as a data URL, or null; optional
- *   describe(file) where its timbers are (frame-description.js describeFrame), or { ok: false, … }; optional
+ *   describe(file, timber) where its timbers are (frame-description.js describeFrame), or with `timber` that
+ *                  timber's faces and joints and the features they name; or { ok: false, … }; optional
  *   drawings(file, open) a view's drawings, after going to `open`; the active view's with no file; optional
  * check and rebuild resolve to a build report: { ok, error, entries: [{ level, message }] }. A file is
  * relative to the project folder or absolute; check refuses one outside the project and the folders
@@ -39,12 +40,14 @@ function viewFrames({ panels, run, files }) {
             if (opened && opened.ok === false) return { ok: false, reason: opened.reason, filePath: file };
             return run('kigumi.automationBuildReport', { filePath: (opened && opened.filePath) || target });
         },
-        async describe(file) {
+        async describe(file, timber) {
             const target = resolved(file);
             if (!target) return { ok: false, reason: 'outside-project', filePath: file };
             const opened = await run('kigumi.automationOpenFileInViewer', { filePath: target });
             if (opened && opened.ok === false) return { ok: false, reason: opened.reason, filePath: file };
-            return run('kigumi.automationDescribeFrame', { filePath: (opened && opened.filePath) || target });
+            const filePath = (opened && opened.filePath) || target;
+            return timber ? run('kigumi.automationDescribeTimber', { filePath, timber })
+                : run('kigumi.automationDescribeFrame', { filePath });
         },
         async drawings(file, open) {
             let target = null;
@@ -85,23 +88,37 @@ function checkFrameTool(frames) {
     };
 }
 
-/** The describe_frame tool over `frames`: a built frame as YAML, or why there is none. */
-function describeFrameTool(frames) {
+const DESCRIBE_FRAME = 'Where a frame\'s timbers are, as YAML: for each timber its size, the centres of its two ends, '
+    + 'the world direction each face (TOP, BOTTOM, RIGHT, LEFT, FRONT, BACK) looks, its box as cut, the timbers '
+    + 'it touches and its joints; then whether every timber is connected. Metres, Z up. Use it after building '
+    + 'to read off which face points where, rather than working it out, and to check joined timbers meet.';
+
+/** The describe tool over `frames`: a built frame as YAML, or one timber's features; `name` for its old name. */
+function describeTool(frames, name = 'describe') {
+    const timbered = name === 'describe';
     return {
-        name: 'describe_frame',
-        description: 'Where a frame\'s timbers are, as YAML: for each timber its size, the centres of its two ends, '
-            + 'the world direction each face (TOP, BOTTOM, RIGHT, LEFT, FRONT, BACK) looks, its box as cut, the timbers '
-            + 'it touches and its joints; then whether every timber is connected. Metres, Z up. Use it after building '
-            + 'to read off which face points where, rather than working it out, and to check joined timbers meet.',
-        shape: { file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.') },
+        name,
+        description: timbered
+            ? `${DESCRIBE_FRAME} Give timber (its path) for that timber instead: its faces' feature names, and each joint `
+                + 'on it with the timbers it joins and the features it names, with their kumiki constants, to measure in a drawing.'
+            : `${DESCRIBE_FRAME} The same as describe without a timber.`,
+        shape: {
+            file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.'),
+            ...(timbered ? { timber: z.string().optional().describe('A timber\'s path, as the frame description names it.') } : {}),
+        },
         effect: 'run',
-        run: async ({ file_path: filePath }) => {
-            const described = await frames.describe(filePath);
+        run: async ({ file_path: filePath, timber }) => {
+            const described = await frames.describe(filePath, timbered ? timber : undefined);
             const text = described && described.ok !== false && Array.isArray(described.timbers)
                 ? formatFrameDescription(described) : JSON.stringify(described, null, 2);
             return [{ type: 'text', text }];
         },
     };
+}
+
+/** The describe_frame tool: describe without a timber, under the name it had before. */
+function describeFrameTool(frames) {
+    return describeTool(frames, 'describe_frame');
 }
 
 /** The drawings tool over `frames`: list a frame's drawings, or open one. */
@@ -120,4 +137,4 @@ function drawingsTool(frames) {
     };
 }
 
-module.exports = { viewFrames, checkFrameTool, describeFrameTool, drawingsTool };
+module.exports = { viewFrames, checkFrameTool, describeTool, describeFrameTool, drawingsTool };

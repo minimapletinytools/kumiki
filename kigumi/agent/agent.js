@@ -18,7 +18,7 @@ const { createKigumiTools } = require('./tools');
 const { createProjectTools } = require('./project-tools');
 const { createFileManagementTools } = require('./file-management-tools');
 const { createFileTools } = require('./file-tools');
-const { viewFrames, checkFrameTool, describeFrameTool, drawingsTool } = require('./frames');
+const { viewFrames, checkFrameTool, describeTool, describeFrameTool, drawingsTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
 const { kumikiSourceTool } = require('./kumiki-source-tool');
 const { createSharedTools } = require('./shared-tools');
@@ -42,7 +42,7 @@ function sharedTools(host) {
         ...(host.projects ? createProjectTools(host.projects) : []),
         ...(host.shared || []),
         checkFrameTool(host.frames),
-        ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
+        ...(host.frames.describe ? [describeTool(host.frames), describeFrameTool(host.frames)] : []),
         ...(host.view && host.frames.drawings ? [drawingsTool(host.frames)] : []),
         // Both read the project's kumiki: its names, and its docs and files.
         ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi), kumikiSourceTool({ docs: host.kumikiDocs || (() => null),
