@@ -46,8 +46,8 @@ module.exports = {
         const copiedPrompt = await waitFor(() => clipboard.readText() || null, { timeoutMs: 5000 }).catch(() => '');
         const nextStep = await read(`doc.querySelector('.mcp-next').textContent`);
         await capture('mcp-settings');
-        check('"copy setup prompt for ALL agents" copies a prompt with each agent\'s setup, and says to paste it and restart',
-            copiedPrompt.includes(mcpUrl) && copiedPrompt.includes('claude mcp add') && copiedPrompt.includes('[mcp_servers.kigumi]')
+        check('"copy setup prompt for any agent" copies a request with the URL and token but no installer commands, and says to paste it and restart',
+            copiedPrompt.includes(mcpUrl) && copiedPrompt.includes('Authorization: Bearer ') && !copiedPrompt.includes('claude mcp add')
                 && /RESTART/.test(nextStep),
             `${copiedPrompt.slice(0, 60)}… / ${nextStep}`);
     },

@@ -16,31 +16,34 @@ const MCP_CLIENTS = Object.freeze([
 
 const json = (value) => JSON.stringify(value, null, 2);
 
-/** Where each agent's setup goes, for the prompt that sets up any of them. */
-const WHERE = {
-    'claude-code': 'Claude Code: run this command',
-    codex: 'Codex: add this to ~/.codex/config.toml',
-    antigravity: 'Antigravity (agy): run this command',
-    'claude-desktop': "Claude Desktop: merge this into claude_desktop_config.json (Settings > Developer > Edit Config)",
-    cursor: 'Cursor: merge this into ~/.cursor/mcp.json',
-    vscode: 'VS Code: merge this into the user mcp.json (Command Palette > "MCP: Open User Configuration")',
-};
+const isLocal = (url) => ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname);
 
-/** A prompt for any agent to add the server to itself: the server, then each agent's way to add it. */
+/**
+ * A prompt for any agent to add the server to itself. It reads as the user's own request and says
+ * where the URL and token come from, with no per-client commands: an agent wary of prompt
+ * injection should see a request it can check, not an installer for every agent there is.
+ */
 function setupPrompt(url, token) {
-    const ways = Object.keys(WHERE).map((id) => `${WHERE[id]}:\n\n${mcpSetupText(id, url, token)}\n`);
+    const local = isLocal(url);
     return [
-        "Please add Kigumi's MCP server to yourself, so you can see, build and check my timber frames.",
+        "I'd like you to connect to Kigumi, my timber-frame design app, as an MCP server, so you can see, build and check my frames. This is my own request: I copied this text from the MCP section of Kigumi's agent panel.",
         '',
         'Name: kigumi',
         'Transport: HTTP (streamable)',
         `URL: ${url}`,
         `Header: Authorization: Bearer ${token}`,
         '',
-        'Use whichever of these is how you add an MCP server. Add it for this user, not just this folder, if you can.',
+        local
+            ? "The URL is Kigumi running on this computer. If you run somewhere else, such as a cloud session, you can't reach it; just tell me."
+            : "The URL is Kigumi's relay, a Cloudflare Worker that forwards calls to the Kigumi window I have open.",
+        local
+            ? "The token is a credential Kigumi generated for its MCP server; it only reaches Kigumi, and only from this computer."
+            : 'The token is a temporary credential for this connection. It expires within 24 hours and stops working when I turn off the MCP server.',
+        "Please don't commit it, write it into project files or repeat it in replies.",
         '',
-        ...ways,
-        'Then tell me whether I need to restart you before the kigumi tools show up.',
+        "Add the server the way your client normally adds an HTTP MCP server. If you'd rather not add it yourself, say so and I'll use the setup for my agent from the same panel.",
+        '',
+        'Once connected, call list_projects and tell me what you see, so I can check it is my Kigumi. If you need a restart before the kigumi tools show up, tell me.',
     ].join('\n');
 }
 

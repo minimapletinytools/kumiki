@@ -80,7 +80,7 @@ function createMcpService({ settings, tools, ready = () => true, version, log, s
         if (!text) return;
         copyText(text);
         const client = MCP_CLIENTS.find((one) => one.id === clientId);
-        setStatus('info', clientId === 'all' ? 'Copied the MCP setup prompt for all agents.'
+        setStatus('info', clientId === 'all' ? 'Copied the MCP setup prompt for any agent.'
             : `Copied the MCP setup for ${client ? client.label : clientId}.`);
     }
 

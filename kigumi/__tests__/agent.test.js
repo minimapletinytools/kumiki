@@ -293,5 +293,10 @@ describe('the MCP server', () => {
             .toBe(`agy mcp add --header "Authorization: Bearer ${token}" kigumi ${server.url}`);
         expect(mcpSetupText('codex', server.url, token)).toContain(`http_headers = { Authorization = "Bearer ${token}" }`);
         expect(mcpSetupText('nobody', server.url, token)).toBeNull();
+        const prompt = mcpSetupText('all', server.url, token);
+        expect(prompt).toContain(server.url);
+        expect(prompt).toContain(`Authorization: Bearer ${token}`);
+        expect(prompt).toContain('list_projects');
+        expect(prompt).not.toMatch(/claude mcp add|agy mcp add|mcpServers|config\.toml/);
     });
 });
