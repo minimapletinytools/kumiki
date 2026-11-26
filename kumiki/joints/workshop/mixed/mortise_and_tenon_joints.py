@@ -765,6 +765,14 @@ def cut_mortise_and_tenon_joint(
                 ),
                 start_distance=scalar(0),
                 end_distance=depth,
+                # A square hole has no axis to name, but its centre planes cross on it: what it is
+                # dimensioned from, as a round one is from its axis.
+                extra_features=[
+                    MidplaneFeature(name=MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT,
+                                    between=(prism_face_key(PrismFace.RIGHT), prism_face_key(PrismFace.LEFT))),
+                    MidplaneFeature(name=MT.PEG_HOLE_CENTERPLANE_FRONT_BACK,
+                                    between=(prism_face_key(PrismFace.FRONT), prism_face_key(PrismFace.BACK))),
+                ],
                 label=CutCSGLabel(label),
             )
 

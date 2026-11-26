@@ -25,5 +25,8 @@ class MortiseAndTenonFeatures:
     MORTISE_BOTTOM = "mortise_bottom"
     #: Where a flared (wedged) mortise starts, on the shoulder side.
     MORTISE_ENTRY = "mortise_entry"
-    #: Each peg hole's axis; one per peg, so `Joint.feature` takes an index.
+    #: Each peg hole's axis; one per peg, so `Joint.feature` takes an index. Round pegs only.
     PEG_HOLE_AXIS = "peg_hole_axis"
+    #: A square peg hole's two centre planes, which cross on its axis; one of each per peg.
+    PEG_HOLE_CENTERPLANE_LEFT_RIGHT = "peg_hole_centerplane_left_right"
+    PEG_HOLE_CENTERPLANE_FRONT_BACK = "peg_hole_centerplane_front_back"
