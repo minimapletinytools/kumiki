@@ -2172,8 +2172,60 @@ def face_view(frame: Frame, label: str, timber: Timber, face: TimberFace, mortis
         for target in mark(top):
             measurements.append(Measure(bottom, target, placement=Beside(ABOVE, lane if ends or openings else 1)))
             lane += 1
+    measurements += across_face(frame, timber, face, mortises, pegged)
     return Viewport(label=label, camera=View.of_face(timber, face, scale=scale_to_fit(timber)),
                     measurements=[*measurements, *extra])
+
+
+def across_face(frame: Frame, timber: Timber, face: TimberFace, mortises, pegged) -> list:
+    """Where each mortise and peg hole sits across `face`: from the reference face beside it (else the
+    first face beside it) to the mortise's nearer long wall and the hole's centre. Each on the side of
+    the work nearer it, one lane further out each; an offset already given isn't given again."""
+    cut = frame.cut_timber_of(timber)
+    beside = (TimberFace.FRONT, TimberFace.BACK) if face in (TimberFace.RIGHT, TimberFace.LEFT) else (TimberFace.RIGHT, TimberFace.LEFT)
+    references = [TimberFace[f.name] for feature in timber.ticket.reference_features for f in feature.long_faces_it_rests_on()]
+    side_face = next((f for f in beside if f in references), beside[0])
+    normal = _NORMALS[side_face]
+    half = float(timber.size[0] if side_face in (TimberFace.RIGHT, TimberFace.LEFT) else timber.size[1]) / 2
+    along_normal = lambda handle: abs(sum(a * b for a, b in zip(_local(handle)[1], normal))) > 0.9
+    depth_from_face = lambda handle: half - sum(a * b for a, b in zip(_local(handle)[0], normal))
+
+    targets = []
+    for joint in mortises:
+        long_walls = [joint.feature(name, on=timber) for name in MORTISE_WALLS]
+        long_walls = [wall for wall in long_walls if along_normal(wall)]
+        if long_walls:
+            targets.append(min(long_walls, key=depth_from_face))
+    for joint in pegged:
+        for crossing in peg_holes(joint, timber, face):
+            if crossing.feature.name == MT.PEG_HOLE_AXIS:
+                continue  # a round hole's axis is a line: seen end-on here, it is placed by its one dimension
+            other = (MT.PEG_HOLE_CENTERPLANE_FRONT_BACK if crossing.feature.name == MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT
+                     else MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT)
+            index = [_station(h) for h in _all_named(joint, crossing.feature.name, timber)].index(_station(crossing))
+            targets.append(joint.feature(other, index=index, on=timber))
+
+    measurements, given, lanes = [], set(), {LEFT: 1, RIGHT: 1}
+    for target in sorted(targets, key=_station):
+        offset = round(depth_from_face(target), 5)
+        if offset < 1e-6 or offset in given:
+            continue  # flush with the face, or the same offset as one already given
+        given.add(offset)
+        side = RIGHT if _station(target) > float(timber.length) / 2 else LEFT
+        measurements.append(Measure(cut.face(side_face), target, placement=Beside(side, lanes[side])))
+        lanes[side] += 1
+    return measurements
+
+
+def _all_named(joint: Joint, name: str, timber: Timber) -> list:
+    """Every feature `name` of `joint` on `timber`, in the joint's order."""
+    found = []
+    for index in range(16):
+        try:
+            found.append(joint.feature(name, index=index, on=timber))
+        except (KeyError, ValueError):
+            break
+    return found
 
 
 def tenon_section(frame: Frame, label: str, timber: Timber, joint: Joint) -> Viewport:
