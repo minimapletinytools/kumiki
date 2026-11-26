@@ -26,8 +26,9 @@ from ..geometry import Plane
 from ..identity import DrawingId, ViewportId
 from ..rule import Orientation, Transform, create_v3
 from ..finishing import Finishing
-from ..timber import CutTimber, Frame, PerfectTimberWithin
-from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
+from ..timber import PTW_FACE_PREFIX, RPTW_FACE_PREFIX, CutTimber, Frame, PerfectTimberWithin
+from ..csg.dof_solver import remaining
+from .auto_dimensioning import (ANGLE, DEFAULT_POLICY, PERPENDICULAR, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
                                 is_reference, measurable_targets, sheet_candidates, without_edges_on_faces)
 from .drawing import ELEVATION_IDS, Drawing, Page, View, Viewport, columns, covering_page, elevation_viewports, rows
@@ -104,10 +105,20 @@ def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
     return [row for handle in handles for row in solve.dof_rows(handle)]
 
 
-def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle], known: Sequence[FeatureHandle],
-               sheets: Mapping[str, Sheet], solve: DrawingSolve, policy: Policy, onto_edges: bool = True) -> AutoDimensioning:
-    """Return dimensions in `sheets` solving `targets`, starting from `known`; with `onto_edges`, picked
-    faces are moved onto their nearest edges."""
+@dataclass(frozen=True)
+class _Known:
+    """What a drawing says before any dimension: the known rows, and per view what can be dimensioned there."""
+    rows: List[Row]
+    visible: Dict[str, List[FeatureHandle]]
+    measurable: List[FeatureHandle]
+    directed: List[FeatureHandle]
+    views: Dict[str, ViewAxes]
+
+
+def _known(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle], known: Sequence[FeatureHandle],
+           sheets: Mapping[str, Sheet], solve: DrawingSolve) -> _Known:
+    """Return the known rows of `known` and the assumptions `sheets` make (square, along the sheet's
+    axes, lined up in a view), with what each view can see."""
     carriers = solve.carriers
     directed = list({_feature_key(handle): handle for handle in [*targets, *known]}.values())
     assumptions = square_assumptions(directed, carriers)
@@ -125,6 +136,16 @@ def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle
     assumptions += coincidence_assumptions(visible, views, solve)
 
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
+    return _Known(known_rows, dict(visible), list(measurable), directed, views)
+
+
+def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle], known: Sequence[FeatureHandle],
+               sheets: Mapping[str, Sheet], solve: DrawingSolve, policy: Policy, onto_edges: bool = True) -> AutoDimensioning:
+    """Return dimensions in `sheets` solving `targets`, starting from `known`; with `onto_edges`, picked
+    faces are moved onto their nearest edges."""
+    said = _known(cut_timbers, targets, known, sheets, solve)
+    known_rows, visible, measurable, directed, views = said.rows, said.visible, said.measurable, said.directed, said.views
+    carriers = solve.carriers
     revealed = set()
     for view, handles in visible.items():
         tagged = [handle for handle in handles if xray_sides(handle.hit)]
@@ -189,6 +210,85 @@ def solve_piece(cut: CutTimber, extra_views: Mapping[str, ViewAxes] = {}, policy
     if extra_views:
         policy = replace(policy, prefer=(in_views(list(extra_views)), *policy.prefer))
     return _dimension([cut], targets, known, sheets, solve, policy, onto_edges)
+
+
+@dataclass(frozen=True)
+class UnknownFeature:
+    """A feature a drawing's dimensions leave unknown."""
+    handle: FeatureHandle
+    #: How many ways it could still move (along, tilting) without changing anything the drawing says.
+    free: int
+    #: Whether one of the drawing's views can see it to dimension; if not, it needs another view.
+    seen: bool
+
+
+def _measured_rows(solve: DrawingSolve, measure: Measure, axes: ViewAxes) -> List[Row]:
+    """Return what `measure` pins down, read in a view along `axes`: as it says, else as the viewer
+    draws it there (a distance square to the lines, or failing that the angle between them)."""
+    kinds = [measure.kind] if measure.kind else [PERPENDICULAR, ANGLE]
+    for kind in kinds:
+        try:
+            return [solve.row(replace(measure, kind=kind), axes)]
+        except ValueError:
+            continue
+    return []
+
+
+_STOCK_NAMES = frozenset(prefix + name for prefix in (PTW_FACE_PREFIX, RPTW_FACE_PREFIX)
+                         for name in ("right", "left", "front", "back",
+                                      "centerplane_left_right", "centerplane_front_back"))
+
+
+def _stock_face(handle: FeatureHandle) -> bool:
+    """Return whether the feature is one of its timber's long faces or centerplanes, as it comes to size."""
+    return not handle.feature.is_derived() and handle.feature.name in _STOCK_NAMES
+
+
+def _sized_by_its_peg(handle: FeatureHandle) -> bool:
+    """Return whether the feature is a peg hole's own wall or end: the hole is bored to the peg's size,
+    so only where it is (its axis, or a square one's centreplanes) is dimensioned."""
+    label = getattr(handle.owner, "label", None)
+    return (label is not None and label.name.startswith("peg_hole")
+            and not isinstance(handle.feature, MidplaneFeature) and handle.feature.name != "peg_hole_axis")
+
+
+def unknown_features(frame: Frame, drawing: Drawing) -> List[UnknownFeature]:
+    """Return the features of a one-piece drawing that its dimensions leave unknown.
+
+    Solved as a generated shop drawing is, from the piece's bottom end and its stock (long faces and
+    centerplanes, which come to size from the cut list), with what is square staying square and
+    what a view shows lined up known, plus every dimension in each view. A feature is unknown when it could still move without changing any of that. Raises
+    ValueError for a drawing of more or less than one timber.
+    """
+    if len(drawing.timbers) != 1:
+        raise ValueError(f"{drawing.name!r} draws {len(drawing.timbers)} timbers; unknown_features checks one piece")
+    cut = frame.cut_timber_of(drawing.timbers[0])
+    if cut is None:
+        raise ValueError(f"{drawing.name!r} draws a timber that is not in the frame")
+    solve = DrawingSolve([cut])
+    targets = list({_feature_key(required.handle): required.handle for required in required_features(cut)}.values())
+    # The stock comes to size from the cut list: its long faces and centerplanes need no dimension.
+    known = [handle for handle in targets if is_reference(handle) or _stock_face(handle)]
+    known += [_end_datum(targets, cut.timber)]
+    axes = {drawing.viewport_name(viewport_id): (viewport.camera.axes if isinstance(viewport.camera, View)
+                                                 else viewport.camera)
+            for viewport_id, viewport in drawing.leaves() if viewport.camera is not None}
+    said = _known([cut], targets, known, {name: _sheet(view) for name, view in axes.items()}, solve)
+    rows = list(said.rows)
+    for name, measures in drawing.measurements_by_viewport().items():
+        if name in axes:
+            rows += [row for measure in measures for row in _measured_rows(solve, measure, axes[name])]
+    # A midplane is never hidden, but no view lists it as something to dimension to.
+    seen = {_feature_key(handle) for handle in said.measurable}
+    unknown = []
+    for handle in targets:
+        if _sized_by_its_peg(handle):
+            continue
+        free = remaining(rows, solve.dof_rows(handle)).count
+        if free:
+            unknown.append(UnknownFeature(handle, free, _feature_key(handle) in seen
+                                          or isinstance(handle.feature, MidplaneFeature)))
+    return unknown
 
 
 def piece_drawing(group: SymmetricTimberGroup, extra_views: Mapping[str, ViewAxes] = {},
