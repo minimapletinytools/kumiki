@@ -34,6 +34,7 @@ const { mcpTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 const { unprivilegedNamespacesAllowed } = require('./linux-sandbox');
+const { registerAppImage } = require('./appimage-desktop');
 const { createAutoInstaller } = require('./auto-update');
 const { LANGUAGE_SETTING, LANGUAGE_CHOICES, chooseLanguage } = require('../../i18n');
 
@@ -1045,7 +1046,13 @@ async function start() {
 // would hand them to the bare Electron app instead. KIGUMI_REGISTER_PROTOCOL=1 takes them from source.
 if (backendConfig(process.env).supabaseUrl && (app.isPackaged || process.env.KIGUMI_REGISTER_PROTOCOL === '1')) {
     const fromSource = process.defaultApp && process.argv.length >= 2;
-    app.setAsDefaultProtocolClient('kigumi', ...(fromSource ? [process.execPath, [path.resolve(process.argv[1])]] : []));
+    if (process.platform === 'linux' && process.env.APPIMAGE) {
+        // Nothing installed it, so it registers itself (appimage-desktop.js).
+        registerAppImage({ appImage: process.env.APPIMAGE, iconSource: path.join(__dirname, '..', '..', 'app-icon.png'),
+            log: (line) => console.warn(line) });
+    } else {
+        app.setAsDefaultProtocolClient('kigumi', ...(fromSource ? [process.execPath, [path.resolve(process.argv[1])]] : []));
+    }
 }
 app.on('open-url', (event, url) => {
     event.preventDefault();

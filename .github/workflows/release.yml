@@ -313,7 +313,7 @@ jobs:
 
           - **macOS**: `-mac-arm64.dmg` for Apple Silicon, `-mac-x64.dmg` for Intel.
           - **Windows**: `-windows-setup.exe`. If Windows protects your PC, click **More info** > **Run anyway**.
-          - **Linux**: `-linux-x86_64.AppImage` or `-linux-arm64.AppImage` (make it executable, then run it), or `-linux-amd64.deb` for Debian and Ubuntu.
+          - **Linux**: `-linux-amd64.deb` (`-linux-arm64.deb` on ARM) for Debian and Ubuntu. Elsewhere, `-linux-x86_64.AppImage` or `-linux-arm64.AppImage`: make it executable, then run it.
           - Already installed? The app updates itself: it offers each new version, or look with **Check for Updates…**.
 
           EOF

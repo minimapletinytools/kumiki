@@ -26,9 +26,10 @@ export const appDownloads = {
   macArm: `${downloads}/Kigumi-${kigumiVersion}-mac-arm64.dmg`,
   macIntel: `${downloads}/Kigumi-${kigumiVersion}-mac-x64.dmg`,
   windows: `${downloads}/Kigumi-${kigumiVersion}-windows-setup.exe`,
-  linux: `${downloads}/Kigumi-${kigumiVersion}-linux-x86_64.AppImage`,
-  linuxArm: `${downloads}/Kigumi-${kigumiVersion}-linux-arm64.AppImage`,
   linuxDeb: `${downloads}/Kigumi-${kigumiVersion}-linux-amd64.deb`,
+  linuxArmDeb: `${downloads}/Kigumi-${kigumiVersion}-linux-arm64.deb`,
+  linuxAppImage: `${downloads}/Kigumi-${kigumiVersion}-linux-x86_64.AppImage`,
+  linuxArmAppImage: `${downloads}/Kigumi-${kigumiVersion}-linux-arm64.AppImage`,
 };
 export const marketplace = 'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi';
 export const openVsx = 'https://open-vsx.org/extension/minimaple/kigumi';

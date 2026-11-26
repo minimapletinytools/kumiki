@@ -53,9 +53,10 @@ const values = { version: kigumiVersion, releasePage, marketplace, openVsx, inst
             <a class="btn btn-primary btn-sm" href={appDownloads.macArm}>{s.app.macArm}</a>
             <a class="btn btn-secondary btn-sm" href={appDownloads.macIntel}>{s.app.macIntel}</a>
             <a class="btn btn-secondary btn-sm" href={appDownloads.windows}>{s.app.windows}</a>
-            <a class="btn btn-secondary btn-sm" href={appDownloads.linux}>{s.app.linux}</a>
-            <a class="btn btn-secondary btn-sm" href={appDownloads.linuxArm}>{s.app.linuxArm}</a>
             <a class="btn btn-secondary btn-sm" href={appDownloads.linuxDeb}>{s.app.linuxDeb}</a>
+            <a class="btn btn-secondary btn-sm" href={appDownloads.linuxArmDeb}>{s.app.linuxArmDeb}</a>
+            <a class="btn btn-secondary btn-sm" href={appDownloads.linuxAppImage}>{s.app.linuxAppImage}</a>
+            <a class="btn btn-secondary btn-sm" href={appDownloads.linuxArmAppImage}>{s.app.linuxArmAppImage}</a>
           </div>
           <p set:html={fill(s.app.downloadBody, values)} />
         </li>
