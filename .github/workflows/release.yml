@@ -60,7 +60,7 @@ on:
         default: true
         type: boolean
       kigumi_app:
-        description: "Build the standalone app for macOS and Windows and attach it to the kigumi release."
+        description: "Build the standalone app for macOS, Windows and Linux and attach it to the kigumi release."
         required: true
         default: true
         type: boolean
@@ -295,17 +295,17 @@ jobs:
           path: app-builds
           merge-multiple: true
 
-      - name: Add the Mac and Windows installers
+      - name: Add the installers
         shell: bash
         run: |
           : > release-notes.md
           shopt -s nullglob
-          installers=(app-builds/*.dmg app-builds/*.exe)
+          installers=(app-builds/*.dmg app-builds/*.exe app-builds/*.AppImage app-builds/*.deb)
           if [ ${#installers[@]} -gt 0 ]; then
             cp "${installers[@]}" release-assets/
             # What the app updates itself from (hosts/electron/auto-update.js): the Mac's signed .zips,
             # and each platform's update file and blockmaps (for downloading only what changed).
-            for file in app-builds/*-mac-*.zip app-builds/latest-mac.yml app-builds/latest.yml app-builds/*.blockmap; do
+            for file in app-builds/*-mac-*.zip app-builds/latest-mac.yml app-builds/latest.yml app-builds/latest-linux*.yml app-builds/*.blockmap; do
               if [ -f "$file" ]; then cp "$file" release-assets/; fi
             done
             cat > release-notes.md <<'EOF'
@@ -313,6 +313,7 @@ jobs:
 
           - **macOS**: `-mac-arm64.dmg` for Apple Silicon, `-mac-x64.dmg` for Intel.
           - **Windows**: `-windows-setup.exe`. If Windows protects your PC, click **More info** > **Run anyway**.
+          - **Linux**: `-linux-x86_64.AppImage` or `-linux-arm64.AppImage` (make it executable, then run it), or `-linux-amd64.deb` for Debian and Ubuntu.
           - Already installed? The app updates itself: it offers each new version, or look with **Check for Updates…**.
 
           EOF

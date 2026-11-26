@@ -33,6 +33,7 @@ const { createProjectContext } = require('../../agent/project-context');
 const { mcpTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
+const { unprivilegedNamespacesAllowed } = require('./linux-sandbox');
 const { createAutoInstaller } = require('./auto-update');
 const { LANGUAGE_SETTING, LANGUAGE_CHOICES, chooseLanguage } = require('../../i18n');
 
@@ -579,7 +580,8 @@ let autoInstaller = null;
 function installer() {
     if (!autoInstaller) {
         autoInstaller = createAutoInstaller({ autoUpdater: require('electron-updater').autoUpdater,
-            packaged: app.isPackaged, platform: process.platform, log: (line) => logChannel.appendLine(line) });
+            packaged: app.isPackaged, platform: process.platform, arch: process.arch, appImage: Boolean(process.env.APPIMAGE),
+            log: (line) => logChannel.appendLine(line) });
     }
     return autoInstaller;
 }
@@ -1050,6 +1052,12 @@ app.on('open-url', (event, url) => {
     if (url.startsWith('kigumi://auth')) handleAuthLink(url);
     else if (url.startsWith('kigumi://publish/')) handlePublishLink(url);
 });
+
+// An AppImage can't carry Chromium's setuid sandbox helper, so its sandbox needs unprivileged user
+// namespaces; where the system forbids them (Ubuntu 23.10 on) the app would not start at all.
+if (process.platform === 'linux' && process.env.APPIMAGE && !unprivilegedNamespacesAllowed()) {
+    app.commandLine.appendSwitch('no-sandbox');
+}
 
 // One Kigumi at a time: a second launch focuses the running window.
 if (!app.requestSingleInstanceLock()) {
