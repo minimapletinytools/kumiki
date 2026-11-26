@@ -235,6 +235,22 @@ Drawings can also be automtaically generated using `with_auto_drawings` e.g. `wi
 
 To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
 
+### Drawing by hand
+
+Hand-placed drawings read far better than generated ones. What has worked (see `patterns/structures/my_cute_frame.py` for a small frame, `hidden_structures/cat_corner_cot.py` for a large one with helpers):
+
+- **One drawing per distinct piece.** `match_timbers(frame.cut_timbers)` groups identical, turned and mirrored pieces; draw the representative and put the count in the drawing's name ("Rafter ×7"). Viewport labels are not printed on the sheet, so a count belongs in the drawing's name.
+- **An overview sheet**: `View.world("front")`, `"right"` and `"top"` of the members (leave boards out), with the overall sizes and the heights that matter, from the ground.
+- **Only views that show something**: a long face for each face mortises open on, and an end view at 1:2 for a tenon's section. Not a fixed set of four.
+- **A scale that fits**: the largest standard scale that fits the piece's length in its column.
+- **One datum per piece**: its bottom end, or its bottom shoulder where a tenon takes the end. Locate everything from it below the work, nearest on lane 1 and one lane further out each; put sizes (a mortise's length, a tenon's) above on lane 1, and overall lengths further out. A piece's second view leaves the sizes to the first.
+- **A row of like features chains** along one lane: each rafter housing from the one before.
+- **Name features through the joint**: keep the joints the frame code makes (return them by name) so a drawing can say `joint.feature(MortiseAndTenonFeatures.MORTISE_LEFT, on=post)`. Where a joint only has positional names (`side.0`), pick the walls by their geometry, e.g. the two that cross the timber.
+- **A plane at a slope** has no distance from a square end. Measure where it meets the faces: in the view that sees the slope, its long and short points, `cut.edge(shoulder, cut.face(side))` with the faces either side; in a view that doesn't, its line across that face, `cut.edge(shoulder, cut.face(viewed_face))`.
+- **Peg holes** are measured in the view that looks into them, to a round hole's `PEG_HOLE_AXIS` or a square hole's `PEG_HOLE_CENTERPLANE_LEFT_RIGHT` / `_FRONT_BACK`.
+- In an end view, `Beside(ABOVE)` and `Beside(LEFT)` currently land on the work; use `BELOW` and `RIGHT` there.
+- **Check every dimension resolves**, then look at the sheets: a dimension that can't be measured is listed in Kigumi rather than drawn.
+
 ### Deferring drawing generation and other slow work.
 
 Generating drawings can take seconds. Put that work in a finishing routine: a function inside the frame function, handed a `Finishing`. Kigumi shows the frame first, then runs the routine in the background and lists each drawing as it is added. `with_auto_drawings` already works this way.
