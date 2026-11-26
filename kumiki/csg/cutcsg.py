@@ -621,8 +621,25 @@ def _drop_real_hits_if_not_on_boundary(
     if node.is_point_on_boundary(point, eps=tolerances.face):
         return hits
 
-    # if the tested point is not on the boundary, return only the non real features
-    return [hit for hit in hits if not hit.feature.real]
+    # Off the boundary, an edge or a corner can still be one within its own (wider) tolerance: it is
+    # kept if its nearest point to `point` is on the boundary. Faces and other real hits are dropped.
+    return [hit for hit in hits if not hit.feature.real or _nearest_on_boundary(node, hit, point, tolerances.face)]
+
+
+def _nearest_on_boundary(node: 'CutCSG', hit: 'OwnedFeatureHit', point: V3, eps: Numeric) -> bool:
+    """Return whether an edge or corner hit's point nearest `point` is on `node`'s boundary; False for other hits."""
+    if hit.feature.feature_type() not in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
+        return False
+    located = hit.feature.locate_simple_unbounded(hit.owner)
+    if isinstance(located, Point):
+        nearest = located.position
+    elif isinstance(located, Line):
+        run = located.direction
+        nearest = located.point + run * (safe_dot_product(point - located.point, run) / safe_dot_product(run, run))
+    else:
+        return False
+    # The owner's space is the node's: a hit only ever rises through the nodes above its owner.
+    return node.is_point_on_boundary(nearest, eps=eps)
 
 
 def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
