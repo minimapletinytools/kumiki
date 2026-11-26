@@ -4,16 +4,18 @@
  * update-check.js finds the newest kigumi release; this reads that release's update file
  * (latest-mac.yml, latest.yml) straight from its downloads, rather than letting electron-updater
  * find "the latest release", which in this repository may be kumiki's. The Mac installs from the
- * signed .zip, Windows from the setup .exe. Elsewhere, and where a release has no update file,
- * there is nothing to install from: the caller sends the user to the download instead.
+ * signed .zip, Windows from the setup .exe, Linux's AppImage from the new AppImage. Elsewhere (a
+ * .deb, which needs root to install), and where a release has no update file, there is nothing to
+ * install from: the caller sends the user to the download instead.
  */
 
 const RELEASE_DOWNLOADS = 'https://github.com/minimapletinytools/kumiki/releases/download';
 
 /** The update file electron-updater reads on this platform, or null where it can't install. */
-function updateFileName(platform) {
+function updateFileName(platform, { arch = 'x64', appImage = false } = {}) {
     if (platform === 'darwin') return 'latest-mac.yml';
     if (platform === 'win32') return 'latest.yml';
+    if (platform === 'linux' && appImage) return arch === 'x64' ? 'latest-linux.yml' : `latest-linux-${arch}.yml`;
     return null;
 }
 
@@ -22,9 +24,11 @@ function updateFileName(platform) {
  * @param {object} options.autoUpdater  electron-updater's
  * @param {boolean} options.packaged  app.isPackaged: a dev run has nothing to replace
  * @param {string} options.platform
+ * @param {string} [options.arch]  process.arch
+ * @param {boolean} [options.appImage]  running from an AppImage (process.env.APPIMAGE)
  * @param {(line: string) => void} [options.log]
  */
-function createAutoInstaller({ autoUpdater, packaged, platform, log = () => {} }) {
+function createAutoInstaller({ autoUpdater, packaged, platform, arch, appImage, log = () => {} }) {
     let downloading = null;
     autoUpdater.autoDownload = false;
     // Downloaded but not restarted yet: it goes in when the app next quits.
@@ -34,7 +38,7 @@ function createAutoInstaller({ autoUpdater, packaged, platform, log = () => {} }
 
     /** Whether `release` (update-check.js's) can be installed here, in place. */
     function canInstall(release) {
-        const file = updateFileName(platform);
+        const file = updateFileName(platform, { arch, appImage });
         return Boolean(packaged && file && release && release.assets.some((asset) => asset.name === file));
     }
 

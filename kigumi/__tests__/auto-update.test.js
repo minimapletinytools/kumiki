@@ -20,6 +20,15 @@ function fakeUpdater({ available = true, failDownload = null } = {}) {
 const release = (names) => ({ version: '0.9.2', tag: 'kigumi-v0.9.2', assets: names.map((name) => ({ name, url: `https://x/${name}` })) });
 
 describe('installing an update in place', () => {
+    test('a Linux AppImage installs from its arch\'s update file; a .deb does not install in place', () => {
+        const linux = release(['latest-linux.yml', 'latest-linux-arm64.yml']);
+        const make = (options) => createAutoInstaller({ autoUpdater: fakeUpdater(), packaged: true, platform: 'linux', ...options });
+        expect(make({ arch: 'x64', appImage: true }).canInstall(linux)).toBe(true);
+        expect(make({ arch: 'arm64', appImage: true }).canInstall(linux)).toBe(true);
+        expect(make({ arch: 'arm64', appImage: true }).canInstall(release(['latest-linux.yml']))).toBe(false);
+        expect(make({ arch: 'x64', appImage: false }).canInstall(linux)).toBe(false);
+    });
+
     test('the Mac and Windows install from a release with their update file; a dev run and Linux do not', () => {
         const withBoth = release(['latest-mac.yml', 'latest.yml']);
         const make = (options) => createAutoInstaller({ autoUpdater: fakeUpdater(), packaged: true, ...options });
