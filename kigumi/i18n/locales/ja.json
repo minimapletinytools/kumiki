@@ -649,5 +649,13 @@
   "message.publishedOpen": "リンクを開く",
   "message.publishedDone": "閉じる",
   "editor.readOnly.shared": "読み取り専用です。変更するにはコピーを作成してください。",
-  "editor.readOnly.makeCopy": "コピーを作成"
+  "editor.readOnly.makeCopy": "コピーを作成",
+  "viewer.layout.move": "移動：別のビューの端で離すとその隣に、それ以外で離すとフロートします",
+  "viewer.layout.splitAcross": "左右に分割（新しい側は同じビューを表示）",
+  "viewer.layout.splitDown": "上下に分割（新しい側は同じビューを表示）",
+  "viewer.layout.toFront": "最前面へ",
+  "viewer.layout.toBack": "最背面へ",
+  "viewer.layout.reset": "コードのレイアウトに戻す",
+  "viewer.layout.delete": "ビューを削除",
+  "viewer.layout.deleteLast": "最後のビューは削除できません"
 }

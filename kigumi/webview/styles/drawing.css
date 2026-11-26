@@ -224,3 +224,75 @@
     vertical-align: middle;
     border-top: 2px dashed currentColor;
 }
+
+/* Editing the layout (viewer-layout-editing.js): only the handles take the pointer. */
+/* A line between a grid's cells, drawn thin and grabbed by the wide clear line over it. */
+.vp-divider-line {
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-opacity: 0.6;
+    stroke-width: 1;
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+}
+
+.vp-divider {
+    stroke: transparent;
+    stroke-width: 10;
+    pointer-events: stroke;
+}
+
+.vp-divider-columns { cursor: col-resize; }
+.vp-divider-rows { cursor: row-resize; }
+
+.vp-handle {
+    fill: var(--hv-panel-bg, #fff);
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 1.5;
+    pointer-events: auto;
+}
+
+.vp-handle-nw, .vp-handle-se { cursor: nwse-resize; }
+.vp-handle-ne, .vp-handle-sw { cursor: nesw-resize; }
+.vp-handle-n, .vp-handle-s { cursor: ns-resize; }
+.vp-handle-e, .vp-handle-w { cursor: ew-resize; }
+
+.vp-grip,
+.vp-tool {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.vp-grip { cursor: move; }
+
+.vp-grip rect,
+.vp-tool rect {
+    fill: var(--hv-panel-bg, #fff);
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 1;
+}
+
+.vp-grip text,
+.vp-tool text {
+    fill: var(--hv-accent, #4a7dbd);
+    font-size: 13px;
+    user-select: none;
+}
+
+.vp-tool-disabled { cursor: not-allowed; opacity: 0.4; }
+
+/* Where a dragged view will land. */
+.vp-drop {
+    fill: var(--hv-accent, #4a7dbd);
+    fill-opacity: 0.22;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+.vp-ghost {
+    fill: none;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+}

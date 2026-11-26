@@ -220,6 +220,8 @@ export const PickingMixin = (Base) => class extends Base {
         if (under) {
             this.selectionManager.enterScope(under.viewport.id);
         }
+        // A click on nothing in a drawing picks out the view it is in (selectViewportForClick).
+        this._clickViewportId = under ? under.viewport.id : null;
         const { hits, camera: pickCamera, ray: pickRay, viewHeight: pickViewHeight } =
             this._findMembersAlongRay(event.clientX, event.clientY);
         const decision = choosePickAction({
@@ -238,6 +240,7 @@ export const PickingMixin = (Base) => class extends Base {
         if (decision.action === 'clear') {
             this._dropCsgFocus();
             this.selectionManager.clearTimberSelection();
+            this.selectViewportForClick();
             return;
         }
 

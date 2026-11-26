@@ -649,5 +649,13 @@
   "message.publishedOpen": "Open Link",
   "message.publishedDone": "Done",
   "editor.readOnly.shared": "Read only. Make a copy to make changes.",
-  "editor.readOnly.makeCopy": "Make a Copy"
+  "editor.readOnly.makeCopy": "Make a Copy",
+  "viewer.layout.move": "Move: let go on another view's edge to put it beside that view, anywhere else to float it",
+  "viewer.layout.splitAcross": "Split side by side (the new half shows the same view)",
+  "viewer.layout.splitDown": "Split top and bottom (the new half shows the same view)",
+  "viewer.layout.toFront": "Bring to front",
+  "viewer.layout.toBack": "Send to back",
+  "viewer.layout.reset": "Put back the layout the code gives",
+  "viewer.layout.delete": "Delete view",
+  "viewer.layout.deleteLast": "The last view can't be deleted"
 }

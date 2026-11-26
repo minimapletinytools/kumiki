@@ -61,6 +61,7 @@ push to main. The slow ones are `app:drawings` (about 90 s), `web:browser` (90 s
 | **Measurements** | kinds, planes, angles, slide: `test_measurement_kinds.py`, `test_measurement_anchors.py`, `test_measurement_plane.py`, `test_measurement_slide.py`, `test_measurement_end_to_end.py` | end-on lines, oblique corners, perspective views check nothing | |
 | **Placement** | `Auto`, `Offset`, `Beside`: `test_measurement_placement.py`, `test_dimension_placement.py` | a side the dimension runs across warns and auto-places; lane 1 a base gap past the work | |
 | **Auto dimensioning** | `test_auto_dimensioning.py`, `test_kigumi_generated_drawings.py`, `test_kigumi_sawhorse_drawings.py` | sloped shoulders by angle, rough stock, mirrored pieces | |
+| **Editing the layout on the sheet** | `test_kigumi_drawing_layout.py`, `viewport-layout.test.js`, `app:layout-edit` | a copy of a view the runner points by label; a view the code gains after the layout was saved; deleted views keep their measurements; the last view can't be deleted | Touch input isn't covered. |
 | **with_drawings** | `test_with_drawings.py` | unknown view or piece names what there is | |
 | **Hand-placed starter drawings** | `test_kigumi_starter_drawings.py` | every dimension resolves to its source value | |
 | **Drawings file and overrides** | `test_kigumi_drawings_file.py` | dangling overrides, deleted code measurements, unplaceable ones kept | |

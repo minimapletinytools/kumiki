@@ -135,6 +135,7 @@ export const DrawingsMixin = (Base) => class extends Base {
         // was being made in, and either left behind is something the new mode
         // cannot act on. The store drops the selection; this drops the draft.
         this.clearMeasureDraft();
+        this._layoutDraft = null;
         // Before clearHover, which a menu holding the hover pinned would refuse.
         this.closeMemberContextMenu();
         this.clearHover();

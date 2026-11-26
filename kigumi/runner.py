@@ -11,6 +11,7 @@ Protocol:
 from __future__ import annotations
 
 import contextlib
+import copy
 import importlib
 import importlib.util
 import inspect
@@ -323,6 +324,12 @@ class DrawingWire(TypedDict, total=False):
     dangling: bool
     dirty: bool
     unplaceableMeasurements: Dict[str, List[MeasureWire]]
+    # The viewport tree the viewer edits (kumiki.drawings.layout.layout_to_wire), and whether the
+    # drawings file has changed it from the code's.
+    layout: Dict[str, Any]
+    layoutEdited: bool
+    # Views of a drawing of the file's own its layout leaves out, so their measurements aren't warned about.
+    hiddenViewports: List[str]
 
 
 # --- frame and geometry --------------------------------------------------------
@@ -1955,6 +1962,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str],
     ("Front", "Top", "Preview", ...).
     """
     from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, orient_from_box, timber_box, world_bounds, world_box
+    from kumiki.drawings.layout import layout_to_wire
 
     page = PageWire(**_SELECTION_DRAWING_PAGE)
     timber_entries, _ = _assign_member_keys(frame)
@@ -1971,7 +1979,8 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str],
     if len(entries) == 1:
         from kumiki.drawings.drawing import SHOP_DRAWING_IDS, shop_drawing_viewports
         if layout is None:
-            placed = _placed_by_role(shop_drawing_viewports(), SHOP_DRAWING_IDS, page)
+            layout = shop_drawing_viewports()
+            placed = _placed_by_role(layout, SHOP_DRAWING_IDS, page)
         viewports = _long_face_viewports(entries[0], page, placed)
         # One piece: oriented from its own box rather than the world box it
         # happens to occupy, and turned about its own length, so it can be
@@ -1985,7 +1994,8 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str],
         # before selecting anything gives you something rather than nothing.
         from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
         if layout is None:
-            placed = _placed_by_role(elevation_viewports(), ELEVATION_IDS, page)
+            layout = elevation_viewports()
+            placed = _placed_by_role(layout, ELEVATION_IDS, page)
         viewports = _world_elevation_viewports(entries or timber_entries, page, placed)
         # Several pieces have no length of their own to speak of, so the angle
         # is searched for -- and kept upright, since which way is up is part of
@@ -2011,6 +2021,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str],
         # A drawing shows no camera gizmos.
         "cameraControls": [],
         "viewports": viewports,
+        "layout": layout_to_wire(layout or ()),
     }
 
 
@@ -2413,10 +2424,27 @@ def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
     return keys
 
 
-def _drawing_from_code(frame: 'Frame', declared: Any) -> DrawingWire:
-    """Return a code Drawing as a viewer scene."""
+def _drawing_from_code(frame: 'Frame', declared: Any, saved_layout: Optional[Dict[str, Any]] = None) -> DrawingWire:
+    """Return a code Drawing as a viewer scene, laid out as the drawings file has it if it has edited it."""
+    from kumiki.drawings.layout import resolve_viewports
+    from kumiki.drawings.drawing import Page
+
     member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
-    scene = create_drawing_from_selection(frame, member_keys, declared.viewports)
+    page = _SELECTION_DRAWING_PAGE
+    code_tree = tuple(declared.viewports)
+    code_names = [str(placed.id) for placed in resolve_viewports(code_tree, Page(page["width"], page["height"]))]
+    tree, copy_of, placeholders = code_tree, {}, {}
+    if saved_layout:
+        try:
+            tree, copy_of, placeholders = _edited_layout(code_tree, saved_layout, page)
+        except (ValueError, TypeError, KeyError) as exc:
+            log_warning(f"drawing {declared.drawing_id!r}: the drawings file's layout can't be used ({exc}); "
+                        "showing the code's.")
+            tree, copy_of, placeholders, saved_layout = code_tree, {}, {}, None
+    scene = create_drawing_from_selection(frame, member_keys, tree)
+    _add_copied_viewports(scene, tree, placeholders, page)
+    scene["layout"] = _layout_for_viewer(tree, copy_of, code_names)
+    scene["layoutEdited"] = bool(saved_layout)
     scene["id"] = str(declared.drawing_id)
     scene["name"] = declared.name
     scene["members"] = member_keys
@@ -2508,7 +2536,7 @@ def _measurement_slot(
     if target is None:
         raise ValueError(f"No drawing {drawing_id!r} to measure on")
 
-    holder = _measurement_holder(existing, pending, target)
+    holder = _measurement_holder(example_path, pending, target)
     viewport = next(
         (v for v in holder.setdefault("viewports", []) if v.get("id") == viewport_id), None)
     if viewport is None:
@@ -2611,7 +2639,7 @@ def restore_measurement(
 
 
 def _measurement_holder(
-    existing: List[DrawingWire],
+    example_path: Optional[Path],
     pending: List[DrawingWire],
     target: DrawingWire,
 ) -> DrawingWire:
@@ -2619,22 +2647,193 @@ def _measurement_holder(
     if target.get("origin") == ORIGIN_FILE:
         held = next((d for d in pending if d["id"] == target["id"]), None)
         return held if held is not None else _savable_drawing(target)
+    # From the file, not the scenes: an override is merged into its code drawing's scene and is not
+    # one of them, so looking there started an empty one, and the saved measurements were lost.
+    return _override_entry(example_path, pending, target)
 
-    overriding = target.get("overriddenBy")
-    if overriding:
-        held = next((d for d in pending if d["id"] == overriding), None)
-        if held is not None:
-            return held
-        found = next((d for d in existing if d["id"] == overriding), None)
-        if found is not None:
-            return _savable_drawing(found)
 
-    return {
-        "id": f"{target['id']}-measurements",
-        "name": target.get("name", target["id"]),
-        OVERRIDES_KEY: target["id"],
-        "viewports": [],
-    }
+# --- editing a drawing's layout ----------------------------------------------
+#
+# The viewer edits the viewport tree (kumiki.drawings.layout's JSON) and sends the whole of it back.
+# For a code drawing it is kept in the drawing's override, laid over the code's tree by viewport name;
+# for a drawing of the file's own it is kept on the drawing.
+
+
+def _edited_layout(
+    code_tree: Sequence['Viewport'], saved: Dict[str, Any], page: PageWire,
+) -> Tuple[Tuple['Viewport', ...], Dict[str, str], Dict[str, str]]:
+    """Return the code's viewports laid out as `saved` has them, which views copy which, and the copies the runner draws.
+
+    A copy of a view with its own camera is that view again; a copy of one the runner points by its
+    label ("Front") is drawn by copying the original's (_add_copied_viewports). A view the code has
+    gained since the layout was saved floats where the code puts it.
+    """
+    from kumiki.drawings.drawing import Page, Viewport
+    from kumiki.drawings.layout import _on_page, layout_from_wire, resolve_viewports, wire_leaf_nodes
+
+    placed = resolve_viewports(code_tree, Page(page["width"], page["height"]))
+    leaves: Dict[str, 'Viewport'] = {str(view.id): view.viewport for view in placed}
+    code_names = list(leaves)
+    copy_of: Dict[str, str] = {}
+    placeholders: Dict[str, str] = {}
+    for node in wire_leaf_nodes(saved):
+        name, original = str(node["leaf"]), node.get("copyOf")
+        if name in code_names or not isinstance(original, str) or original not in code_names:
+            continue
+        copy_of[name] = original
+        base = leaves[original]
+        if base.camera is not None:
+            leaves[name] = replace(base, id=name)
+        else:
+            leaves[name] = Viewport(id=name)
+            placeholders[name] = original
+    tree = list(layout_from_wire(saved, leaves))
+    if not tree:
+        return tuple(code_tree), {}, {}
+    shown = {str(node["leaf"]) for node in wire_leaf_nodes(saved)}
+    known = set(saved.get("codeLeaves") or code_names)
+    top = max((root.z for root in tree), default=0)
+    for view in placed:
+        if str(view.id) not in known and str(view.id) not in shown:
+            top += 1
+            tree.append(replace(view.viewport, id=str(view.id), padding=0, rect=_on_page(view.rect), z=top))
+    return tuple(tree), copy_of, placeholders
+
+
+def _copied_viewport(base: ViewportWire, name: str, rect: List[float], page: PageWire) -> ViewportWire:
+    """Return `base` as the viewport `name` at `rect`, still showing all it showed: wide enough, and as tall."""
+    view = copy.deepcopy(base)
+    view["id"] = name
+    if name != base.get("id"):
+        view["name"] = name
+        view["measurements"] = []
+    camera = view.get("camera")
+    was = base.get("rect")
+    if camera and "extent" in camera and was and was[3] > 0 and rect[3] > 0:
+        narrowing = _viewport_aspect(list(was), page) / _viewport_aspect(list(rect), page)
+        camera["extent"] = float(camera["extent"]) * max(1.0, narrowing)
+    view["rect"] = list(rect)
+    return view
+
+
+def _add_copied_viewports(scene: DrawingWire, tree: Sequence['Viewport'], placeholders: Dict[str, str],
+                          page: PageWire) -> None:
+    """Draw each copy of a label-pointed view as its original, wherever the layout puts it."""
+    if not placeholders:
+        return
+    from kumiki.drawings.drawing import Page
+    from kumiki.drawings.layout import resolve_viewports
+
+    rects = {str(view.id): list(view.rect) for view in resolve_viewports(tree, Page(page["width"], page["height"]))}
+    by_id = {view.get("id"): view for view in scene.get("viewports") or []}
+    for name, original in placeholders.items():
+        if original in by_id and name in rects:
+            scene["viewports"].append(_copied_viewport(by_id[original], name, rects[name], page))
+
+
+def _layout_for_viewer(tree: Sequence['Viewport'], copy_of: Dict[str, str], code_names: List[str]) -> Dict[str, Any]:
+    """Return a code drawing's tree as the viewer edits it: copies say what they copy, and which views the code had."""
+    from kumiki.drawings.layout import layout_to_wire, wire_leaf_nodes
+
+    wire = layout_to_wire(tree)
+    for node in wire_leaf_nodes(wire):
+        if node["leaf"] in copy_of:
+            cast(Dict[str, Any], node)["copyOf"] = copy_of[node["leaf"]]
+    wire["codeLeaves"] = code_names
+    return wire
+
+
+def _lay_out_file_drawing(scene: DrawingWire) -> None:
+    """Lay a drawing of the file's own out by its layout, or give it one: each viewport floating where it is."""
+    from kumiki.drawings.drawing import Page, Viewport
+    from kumiki.drawings.layout import layout_from_wire, layout_to_wire, resolve_viewports
+
+    page = scene.get("page")
+    viewports = scene.get("viewports") or []
+    if not page:
+        return
+    layout = scene.get("layout")
+    if not isinstance(layout, dict):
+        scene["layout"] = {"roots": [{"rect": list(view["rect"]), "z": 0, "leaf": view["id"]}
+                                     for view in viewports if view.get("rect") and view.get("id")]}
+        return
+    leaves = {view["id"]: Viewport(id=view["id"]) for view in viewports if view.get("id")}
+    try:
+        tree = layout_from_wire(layout, leaves)
+        placed = resolve_viewports(tree, Page(page["width"], page["height"]))
+    except (ValueError, TypeError, KeyError) as exc:
+        log_warning(f"drawing {scene.get('id')!r}: its layout can't be used ({exc}); showing its viewports as saved.")
+        scene.pop("layout", None)
+        _lay_out_file_drawing(scene)
+        return
+    by_id = {view["id"]: view for view in viewports if view.get("id")}
+    scene["viewports"] = [_copied_viewport(by_id[str(view.id)], str(view.id), list(view.rect), page) for view in placed]
+    scene["hiddenViewports"] = sorted(set(by_id) - {str(view.id) for view in placed})
+    scene["layout"] = layout_to_wire(tree)
+
+
+def _override_entry(example_path: Optional[Path], pending: List[DrawingWire], target: DrawingWire) -> DrawingWire:
+    """Return the file override of a code drawing to change: the unsaved one, else the saved one, else a new one."""
+    overriding = target.get("overriddenBy") or f"{target['id']}-measurements"
+    held = next((entry for entry in pending if entry.get("id") == overriding), None)
+    if held is not None:
+        return held
+    saved = next((entry for entry in (_read_drawings_file(_drawings_file_path(example_path)) if example_path else [])
+                  if entry.get("id") == overriding), None)
+    if saved is not None:
+        return cast(DrawingWire, copy.deepcopy(saved))
+    return {"id": overriding, "name": target.get("name", target["id"]), OVERRIDES_KEY: target["id"], "viewports": []}
+
+
+def set_drawing_layout(
+    frame: 'Frame',
+    example_path: Optional[Path],
+    pending: List[DrawingWire],
+    drawing_id: str,
+    layout: Optional[Dict[str, Any]],
+) -> DrawingWire:
+    """Lay a drawing out as `layout` (None puts back the one it had before any edit); return the file entry that keeps it."""
+    from kumiki.drawings.layout import wire_leaf_nodes
+
+    if layout is not None and not (isinstance(layout, dict) and isinstance(layout.get("roots"), list)
+                                   and wire_leaf_nodes(layout)):
+        raise ValueError("A layout is {\"roots\": [...]} with at least one view")
+    existing = collect_drawings(frame, example_path, pending)
+    target = next((drawing for drawing in existing if drawing["id"] == drawing_id), None)
+    if target is None or not target.get("page"):
+        raise ValueError(f"No drawing {drawing_id!r} on a sheet to lay out")
+    if target.get("origin") == ORIGIN_FILE:
+        holder = next((entry for entry in pending if entry["id"] == target["id"]), None) or _savable_drawing(target)
+        holder.setdefault("page", target["page"])
+        if layout is None:
+            holder.pop("layout", None)
+        else:
+            holder["layout"] = _materialized_copies(holder, layout)
+    else:
+        holder = _override_entry(example_path, pending, target)
+        if layout is None:
+            holder.pop("layout", None)
+        else:
+            holder["layout"] = copy.deepcopy(layout)
+    if holder not in pending:
+        pending.append(holder)
+    return holder
+
+
+def _materialized_copies(entry: DrawingWire, layout: Dict[str, Any]) -> Dict[str, Any]:
+    """Return `layout` with each copy made a viewport of `entry`'s own, which a drawing of the file's own keeps."""
+    from kumiki.drawings.layout import wire_leaf_nodes
+
+    layout = copy.deepcopy(layout)
+    viewports = entry.setdefault("viewports", [])
+    by_id = {view.get("id"): view for view in viewports}
+    for node in wire_leaf_nodes(layout):
+        name, original = str(node["leaf"]), cast(Dict[str, Any], node).pop("copyOf", None)
+        if name not in by_id and original in by_id and by_id[original].get("rect"):
+            made = _copied_viewport(by_id[original], name, list(by_id[original]["rect"]), entry.get("page") or _SELECTION_DRAWING_PAGE)
+            viewports.append(made)
+            by_id[name] = made
+    return layout
 
 
 def collect_drawings(
@@ -2668,8 +2867,8 @@ def collect_drawings(
         # its own is a drawing of its own, which is what keeps adding one
         # dimension from taking a drawing's page and viewports with it.
         declared = _with_placed_dimensions(declared, frame)
-        scene = _drawing_from_code(frame, declared)
         override = overrides.get(str(declared.drawing_id))
+        scene = _drawing_from_code(frame, declared, (override or {}).get("layout"))
         if override is not None:
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
@@ -2693,6 +2892,7 @@ def collect_drawings(
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
+        _lay_out_file_drawing(scene)
         _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame)
         drawings.append(scene)
 
@@ -2852,7 +3052,10 @@ def _attach_measurements(
     unplaceable = {
         viewport: measures for viewport, measures in remaining.items() if measures
     }
+    hidden = set(scene.pop("hiddenViewports", None) or ())
     for viewport in unplaceable:
+        if viewport in hidden:
+            continue
         log_warning(
             f"drawing {drawing_name!r} has measurements for viewport "
             f"{viewport!r}, which it does not have. They are kept but not shown."
@@ -2863,18 +3066,21 @@ def _attach_measurements(
 def _savable_override(scene: DrawingWire) -> DrawingWire:
     """Return the file override for a code drawing: its measurements only, not the merged scene."""
     saved = _savable_drawing({**scene, OVERRIDES_KEY: scene["id"]})
-    return {
+    override: DrawingWire = {
         "id": scene.get("overriddenBy") or f"{scene['id']}-measurements",
         "name": scene.get("name", scene["id"]),
         OVERRIDES_KEY: scene["id"],
         "viewports": saved["viewports"],
     }
+    if scene.get("layoutEdited") and scene.get("layout"):
+        override["layout"] = scene["layout"]
+    return override
 
 
 def _savable_drawing(drawing: DrawingWire) -> DrawingWire:
     """Return a drawing as the file stores it, without code-generated measurements."""
     saved = DrawingWire(**drawing)
-    for transient in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling"):
+    for transient in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling", "layoutEdited"):
         saved.pop(transient, None)
 
     def keepers(measures: Optional[List[MeasureWire]]) -> List[MeasureWire]:
@@ -4032,6 +4238,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
             "update_measurement", "delete_measurement", "restore_measurement", "feature_highlights",
+            "set_drawing_layout",
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
@@ -5559,6 +5766,15 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             _requested_measure(payload),
             cast(MeasurementRequest, payload).get("changes") or MeasureWire(),
         )
+        return state, make_success_response(request_id, command, {
+            "scenes": _slot_drawings(ss),
+        }), False
+
+    if command == "set_drawing_layout":
+        ss = _resolve_slot(state, payload)
+        layout = payload.get("layout")
+        set_drawing_layout(ss.frame, ss.file_path, ss.pending_drawings, str(payload.get("drawingId") or ""),
+                           layout if isinstance(layout, dict) else None)
         return state, make_success_response(request_id, command, {
             "scenes": _slot_drawings(ss),
         }), False

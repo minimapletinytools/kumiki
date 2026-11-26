@@ -25,6 +25,7 @@ import { CameraMixin } from './viewer-camera.js';
 import { RenderingMixin } from './viewer-rendering.js';
 import { AssemblyMixin } from './viewer-assembly.js';
 import { DrawingsMixin } from './viewer-drawings.js';
+import { LayoutEditingMixin } from './viewer-layout-editing.js';
 import * as KigumiContextMenu from './context-menu.js';
 import * as KigumiDrawingOverlays from './drawing-overlays.js';
 import * as KigumiKiwariValues from './kiwari-values.js';
@@ -48,7 +49,7 @@ import './layers-panel.js';
 usePanelRuntime({ t, KigumiUnits: KigumiUnits, KigumiKiwariValues: KigumiKiwariValues });
 useSidebarRuntime({ html, t });
 
-class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraMixin(SelectionVisualsMixin(MenusMixin(MeasuringMixin(PickingMixin(LitElement)))))))) {
+class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(RenderingMixin(CameraMixin(SelectionVisualsMixin(MenusMixin(MeasuringMixin(PickingMixin(LitElement))))))))) {
     constructor() {
         super();
         // Members on screen, and the only thing that knows what draws them.
@@ -878,6 +879,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         const previous = sameScene
             ? new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]))
             : new Map();
+        // As built, not as a layout drag has since drawn them (viewer-layout-editing.js).
+        const previousRects = sameScene && this._builtRects ? this._builtRects : new Map();
         this._viewportsBuiltFor = sceneId;
         this.viewports = this.sceneStore.activeViewports().map((spec) => {
             const reused = previous.get(spec.id);
@@ -887,11 +890,14 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // skipped on reuse -- that would throw away where the reader had
             // got to.
             viewport.rememberDeclaredCamera();
-            if (!reused) {
+            // A view the layout has moved or resized is pointed afresh: its extent is for its new size.
+            const was = previousRects.get(spec.id);
+            if (!reused || (was && String(was) !== String(spec.rect))) {
                 viewport.applySpecCamera();
             }
             return viewport;
         });
+        this._builtRects = new Map(this.viewports.map((viewport) => [viewport.id, String(viewport.spec.rect)]));
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
@@ -1664,6 +1670,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 // whole reason these commands answer with the full set.
                 this.refreshActiveScene();
             }
+            this._layoutArrived();
             this._layersDrawingsChanged();
             this._applyPendingMeasurementFocus();
             return;
