@@ -213,7 +213,7 @@ A file may mark any number of frames. Kigumi builds them all and shows them toge
 
 Older files name their one frame `example` or `build_frame` instead of marking it. Kigumi still picks those up, with a warning; that will be removed, so write `@frame` in new files.
 
-## Generating drawings
+## Adding Drawings
 
 A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])`. 
 
@@ -231,13 +231,11 @@ shop = Drawing(
 
 A dimension's `placement` is `Auto()` (the default, placed clear of the work), `Beside(side, lane)` (a side of the work, lane 1 nearest), or `Offset(distance)`. `post.edge(a, b)` is the line where two faces meet. A view of your own is `Viewport(label="Detail", camera=View.of_face(post.timber, TimberFace.FRONT, scale=1/5))`. The `describe` tool with a timber lists the feature names there are to measure.
 
-Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet, so you prefer building your own drawings or modifying the auto generated one.
-
-To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
-
 ### Drawing by hand
 
-Hand-placed drawings read far better than generated ones. What has worked (see `patterns/structures/my_cute_frame.py` for a small frame, `hidden_structures/cat_corner_cot.py` for a large one with helpers):
+The best way to add drawings to to manually add them in code. Examples:
+- `patterns/structures/my_cute_frame.py` for a small frame
+- `hidden_structures/cat_corner_cot.py` for a large one with helpers):
 
 - **One drawing per distinct piece.** `match_timbers(frame.cut_timbers)` groups identical, turned and mirrored pieces; draw the representative and put the count in the drawing's name ("Rafter ×7"). Viewport labels are not printed on the sheet, so a count belongs in the drawing's name.
 - **An overview sheet**: `View.world("front")`, `"right"` and `"top"` of the members (leave boards out), with the overall sizes and the heights that matter, from the ground.
@@ -250,6 +248,10 @@ Hand-placed drawings read far better than generated ones. What has worked (see `
 - **Peg holes** are measured in the view that looks into them, to a round hole's `PEG_HOLE_AXIS` or a square hole's `PEG_HOLE_CENTERPLANE_LEFT_RIGHT` / `_FRONT_BACK`.
 - In an end view, `Beside(ABOVE)` and `Beside(LEFT)` currently land on the work; use `BELOW` and `RIGHT` there.
 - **Check every dimension resolves**, then look at the sheets: a dimension that can't be measured is listed in Kigumi rather than drawn.
+
+### Automatic Drawings
+
+Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet. Not recommended except for quick looks and research purposes. Prefer building your own drawings or modifying the auto generated one. To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
 
 ### Deferring drawing generation and other slow work.
 
