@@ -59,11 +59,14 @@ module.exports = {
         await inShell(frame);
         await capture('02-split');
 
-        // Drag the copy's grip to the middle of the page: it floats there.
+        // Drag the copy's grip to the middle of the preview, clear of any view's edge: it floats there.
         await inShell(`${app}.selectDrawingViewport(${JSON.stringify(first + ' 2')})`);
         await inShell(frame);
         const host = await inShell(`(() => { const a = ${app}; const h = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
-            const g = a.renderRoot.querySelector('.vp-grip').getBoundingClientRect(); return { cx: h.left + h.width * 0.55 - g.left, cy: h.top + h.height * 0.55 - g.top }; })()`);
+            const view = a.viewports.find(v => /preview/i.test(v.id)) || a.viewports[a.viewports.length - 1];
+            const r = view.pixelRect(a.pageScreenRect(h.width, h.height), h.height);
+            const g = a.renderRoot.querySelector('.vp-grip').getBoundingClientRect();
+            return { cx: h.left + r.x + r.width / 2 - (g.left + g.width / 2), cy: h.top + (h.height - r.y - r.height / 2) - (g.top + g.height / 2) }; })()`);
         await press('.vp-grip', 0, Math.round(host.cx), Math.round(host.cy));
         const floated = await waitFor(() => inShell(`(() => { const a = ${app}; const l = a.sceneStore.activeScene().layout;
             return !a._layoutDraft && l.roots.some(r => r.leaf === ${JSON.stringify(first + ' 2')}); })()`), { timeoutMs: 15000 }).catch(() => false);
@@ -102,7 +105,7 @@ module.exports = {
         await capture('07-docked');
 
         // Undo everything back to the code's layout.
-        for (let i = 0; i < 6; i += 1) {
+        for (let i = 0; i < 10 && await inShell(`${app}.sceneStore.activeScene().layoutEdited`); i += 1) {
             await inShell(`${app}.undoMeasurementChange()`);
             await inShell('new Promise(r => setTimeout(r, 700))');
         }
