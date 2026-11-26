@@ -2180,8 +2180,16 @@ def tenon_section(frame: Frame, label: str, timber: Timber, joint: Joint) -> Vie
     """The end a tenon leaves, at 1:2: the tenon's size, and where it sits from the reference faces."""
     cut = frame.cut_timber_of(timber)
     _, _, top = tenon_end(joint, timber)
-    tenon = {"RIGHT": MT.TENON_RIGHT, "LEFT": MT.TENON_LEFT, "FRONT": MT.TENON_FRONT, "BACK": MT.TENON_BACK}
     on = lambda name: joint.feature(name, on=timber)
+    walls = [on(name) for name in (MT.TENON_RIGHT, MT.TENON_LEFT, MT.TENON_FRONT, MT.TENON_BACK)]
+
+    def nearest_wall(face: TimberFace):
+        """The tenon's wall nearest `face`, so its offset doesn't cross the tenon. Found by place, not
+        name: a tenon's walls are named in the joint's frame, which needn't be the timber's."""
+        normal = _NORMALS[face]
+        facing = [wall for wall in walls if abs(sum(a * b for a, b in zip(_local(wall)[1], normal))) > 0.9]
+        return max(facing, key=lambda wall: sum(a * b for a, b in zip(_local(wall)[0], normal)))
+
     measurements = [
         Measure(on(MT.TENON_LEFT), on(MT.TENON_RIGHT), placement=Beside(BELOW)),
         Measure(on(MT.TENON_FRONT), on(MT.TENON_BACK), placement=Beside(RIGHT)),
@@ -2190,7 +2198,10 @@ def tenon_section(frame: Frame, label: str, timber: Timber, joint: Joint) -> Vie
     for face in rests_on[:2]:
         # Lane 2 of the same sides as the sizes: placed above or left, they land on the work in an end view.
         side = BELOW if face.name in ("RIGHT", "LEFT") else RIGHT
-        measurements.append(Measure(cut.face(TimberFace[face.name]), on(tenon[face.name]), placement=Beside(side, 2)))
+        wall = nearest_wall(TimberFace[face.name])
+        half = float(timber.size[0] if face.name in ("RIGHT", "LEFT") else timber.size[1]) / 2
+        if half - sum(a * b for a, b in zip(_local(wall)[0], _NORMALS[TimberFace[face.name]])) > 1e-6:  # not barefaced
+            measurements.append(Measure(cut.face(TimberFace[face.name]), wall, placement=Beside(side, 2)))
     end = TimberFace.TOP if top else TimberFace.BOTTOM
     return Viewport(label=label, camera=View.of_face(timber, end, scale=1 / 2), measurements=measurements)
 
