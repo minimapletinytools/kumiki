@@ -93,3 +93,18 @@ test('edits leave the tree they were given alone', () => {
     L.splitLeaf(GRID, 'B', 'columns');
     expect(JSON.stringify(GRID)).toBe(before);
 });
+
+test('a camera goes on a view, moves with it, and comes off', () => {
+    const aimed = L.setLeafCamera(GRID, 'B', { look: [0, 1, 0], up: [0, 0, 1] });
+    expect(L.leafCamera(aimed, 'B')).toEqual({ look: [0, 1, 0], up: [0, 0, 1] });
+    expect(L.leafCamera(GRID, 'B')).toBeNull();
+    const docked = L.dockLeaf(aimed, 'B', 'C', 'right');
+    expect(L.leafCamera(docked, 'B')).toEqual({ look: [0, 1, 0], up: [0, 0, 1] });
+    expect(L.leafCamera(L.setLeafCamera(aimed, 'B', null), 'B')).toBeNull();
+});
+
+test('the views a change moves are the ones whose rects changed', () => {
+    const moved = L.moveDivider(GRID, [0, 0], 0, 0.3, PAGE);
+    expect(L.movedLeaves(GRID, moved, PAGE).sort()).toEqual(['A', 'B']);
+    expect(L.movedLeaves(GRID, GRID, PAGE)).toEqual([]);
+});

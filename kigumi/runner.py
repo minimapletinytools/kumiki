@@ -2444,6 +2444,7 @@ def _drawing_from_code(frame: 'Frame', declared: Any, saved_layout: Optional[Dic
     scene = create_drawing_from_selection(frame, member_keys, tree)
     _add_copied_viewports(scene, tree, placeholders, page)
     scene["layout"] = _layout_for_viewer(tree, copy_of, code_names)
+    _keep_leaf_cameras(scene["layout"], saved_layout)
     scene["layoutEdited"] = bool(saved_layout)
     scene["id"] = str(declared.drawing_id)
     scene["name"] = declared.name
@@ -2769,7 +2770,64 @@ def _lay_out_file_drawing(scene: DrawingWire) -> None:
     by_id = {view["id"]: view for view in viewports if view.get("id")}
     scene["viewports"] = [_copied_viewport(by_id[str(view.id)], str(view.id), list(view.rect), page) for view in placed]
     scene["hiddenViewports"] = sorted(set(by_id) - {str(view.id) for view in placed})
-    scene["layout"] = layout_to_wire(tree)
+    rewired = layout_to_wire(tree)
+    _keep_leaf_cameras(rewired, layout)
+    scene["layout"] = rewired
+
+
+def _keep_leaf_cameras(wire: Dict[str, Any], saved: Optional[Dict[str, Any]]) -> None:
+    """Give `wire`'s leaves the cameras `saved`'s leaves of the same name had."""
+    from kumiki.drawings.layout import wire_leaf_nodes
+
+    cameras = {str(node["leaf"]): node["camera"] for node in wire_leaf_nodes(saved or {})
+               if isinstance(node.get("camera"), dict)}
+    for node in wire_leaf_nodes(wire):
+        if node["leaf"] in cameras:
+            cast(Dict[str, Any], node)["camera"] = copy.deepcopy(cameras[node["leaf"]])
+
+
+def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> None:
+    """Point each view its layout gives a camera: along its look and up, fitted to what it draws unless it says where.
+
+    A leaf's camera is {look, up, target?, extent?, projection?}; without target and extent the view
+    fits its members (all the drawing's, if it names none).
+    """
+    from kumiki.drawings.kigumi_drawing_view_helpers import frame_from_look_and_up, view_extent, world_bounds
+    from kumiki.drawings.layout import wire_leaf_nodes
+
+    cameras = {str(node["leaf"]): node["camera"] for node in wire_leaf_nodes(scene.get("layout") or {})
+               if isinstance(node.get("camera"), dict)}
+    page = scene.get("page")
+    if not cameras or not page:
+        return
+    by_key = {entry["memberKey"]: entry["cutTimber"] for entry in _assign_member_keys(frame)[0]}
+    for view in scene.get("viewports") or []:
+        wanted = cameras.get(str(view.get("id")))
+        if not wanted:
+            continue
+        try:
+            look = [float(v) for v in wanted["look"]]
+            up = [float(v) for v in wanted["up"]]
+            axes = frame_from_look_and_up(look, up)
+        except (KeyError, TypeError, ValueError, ZeroDivisionError):
+            log_warning(f"drawing {scene.get('id')!r}: view {view.get('id')!r} has a camera that can't be used: {wanted!r}")
+            continue
+        camera = cast(CameraWire, dict(view.get("camera") or {}))
+        camera.update(right=list(axes.right), up=list(axes.up), look=list(axes.look))
+        if isinstance(wanted.get("target"), list) and isinstance(wanted.get("extent"), (int, float)):
+            camera["target"] = [float(v) for v in wanted["target"]]
+            camera["extent"] = float(wanted["extent"])
+        else:
+            keys = view.get("members") or scene.get("members") or list(by_key)
+            centre, half_size = world_bounds([by_key[key] for key in keys if key in by_key])
+            camera["target"] = centre
+            camera["extent"] = view_extent(half_size, camera["right"], camera["up"],
+                                           _viewport_aspect(list(view.get("rect") or [0, 0, 1, 1]), page))
+        view["camera"] = camera
+        if wanted.get("projection") == "orthographic":
+            view["projection"] = "orthographic"
+            view["locked"] = True
+            view.pop("orbit", None)
 
 
 def _override_entry(example_path: Optional[Path], pending: List[DrawingWire], target: DrawingWire) -> DrawingWire:
@@ -2873,6 +2931,7 @@ def collect_drawings(
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
+        _aim_viewports(scene, frame)
         _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame)
         drawings.append(scene)
 
@@ -2893,6 +2952,7 @@ def collect_drawings(
             )
         scene["origin"] = ORIGIN_FILE
         _lay_out_file_drawing(scene)
+        _aim_viewports(scene, frame)
         _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame)
         drawings.append(scene)
 

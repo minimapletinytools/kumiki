@@ -198,3 +198,62 @@ def test_a_measurement_added_in_a_new_session_keeps_the_saved_ones(example):
     runner.add_measurement(frame, example, pending, "plan", "Front", {"a": ref("left"), "b": ref("right")})
     measured = [(m["a"]["feature"], m["b"]["feature"]) for m in _views(_plan(frame, example, pending))["Front"]["measurements"]]
     assert sorted(measured) == [("front", "back"), ("left", "right")]
+
+
+def _aimed(layout, name, camera):
+    edited = copy.deepcopy(layout)
+    _leaf_node(edited, name)["camera"] = camera
+    return edited
+
+
+def test_a_view_given_a_camera_looks_along_it_fitted_to_what_it_draws(example):
+    frame = _plan_frame()
+    pending = []
+    scene = _plan(frame, example)
+    name = next(n for n in _views(scene) if n != "Preview")
+    runner.set_drawing_layout(frame, example, pending, "plan",
+                              _aimed(scene["layout"], name, {"look": [0, 0, -1], "up": [0, 1, 0]}))
+    aimed = _plan(frame, example, pending)
+    camera = _views(aimed)[name]["camera"]
+    assert camera["look"] == pytest.approx([0, 0, -1]) and camera["up"] == pytest.approx([0, 1, 0])
+    assert camera["extent"] > 0
+    assert _leaf_node(aimed["layout"], name)["camera"] == {"look": [0, 0, -1], "up": [0, 1, 0]}
+
+
+def test_a_zoomed_view_keeps_where_it_was_put(example):
+    frame = _plan_frame()
+    pending = []
+    scene = _plan(frame, example)
+    name = next(n for n in _views(scene) if n != "Preview")
+    look = _views(scene)[name]["camera"]["look"]
+    up = _views(scene)[name]["camera"]["up"]
+    runner.set_drawing_layout(frame, example, pending, "plan", _aimed(
+        scene["layout"], name, {"look": look, "up": up, "target": [1.0, 2.0, 3.0], "extent": 0.25}))
+    camera = _views(_plan(frame, example, pending))[name]["camera"]
+    assert camera["target"] == [1.0, 2.0, 3.0] and camera["extent"] == 0.25
+
+
+def test_the_preview_turned_to_a_preset_is_drawn_square_on(example):
+    frame = _plan_frame()
+    pending = []
+    scene = _plan(frame, example)
+    runner.set_drawing_layout(frame, example, pending, "plan", _aimed(
+        scene["layout"], "Preview", {"look": [0, 1, 0], "up": [0, 0, 1], "projection": "orthographic"}))
+    preview = _views(_plan(frame, example, pending))["Preview"]
+    assert preview["projection"] == "orthographic" and preview["locked"] and "orbit" not in preview
+
+
+def test_a_drawing_of_the_files_own_keeps_its_views_cameras(example):
+    frame = _frame(paths=("posts/fl",))
+    pending = []
+    drawing = runner.create_drawing_from_selection(frame, ["posts/fl"])
+    drawing.update(id="mine", name="mine", origin=runner.ORIGIN_FILE)
+    pending.append(drawing)
+    mine = lambda: next(d for d in runner.collect_drawings(frame, example, pending) if d["id"] == "mine")
+    scene = mine()
+    name = next(n for n in _views(scene) if n != "Preview")
+    runner.set_drawing_layout(frame, example, pending, "mine",
+                              _aimed(scene["layout"], name, {"look": [1, 0, 0], "up": [0, 0, 1]}))
+    again = mine()
+    assert _views(again)[name]["camera"]["look"] == pytest.approx([1, 0, 0])
+    assert _leaf_node(again["layout"], name)["camera"]["look"] == [1, 0, 0]

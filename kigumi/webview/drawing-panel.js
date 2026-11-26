@@ -63,7 +63,7 @@ class DrawingPanel {
      * out here, because whether one can be drawn depends on how things lie
      * to that viewport's camera, which only the viewer knows.
      */
-    setDrawing({ drawing, viewports, members, slice }) {
+    setDrawing({ drawing, viewports, members, slice, layoutEditing = null }) {
         const nextDrawingId = (drawing && (drawing.id || drawing.name)) || null;
         const currentDrawingId = (this.drawing && (this.drawing.id || this.drawing.name)) || null;
         if (nextDrawingId !== currentDrawingId) {
@@ -72,6 +72,8 @@ class DrawingPanel {
         this.drawing = drawing || null;
         this.viewports = viewports || [];
         this.members = members || [];
+        /** Whether the layout is being edited; null where it can't be. */
+        this.layoutEditing = layoutEditing;
         /** What the members are a slice of, or null for all of them. */
         this.slice = slice || null;
         this._render();
@@ -136,9 +138,22 @@ class DrawingPanel {
         if (this.collapsed) {
             return;
         }
-        this.el.appendChild(this._section(
+        const viewports = this._section(
             'viewports', t('viewer.drawing.viewports'), () => this._viewportRows(),
-        ));
+        );
+        if (this.layoutEditing !== null) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'dp-action dp-edit-layout' + (this.layoutEditing ? ' dp-editing' : '');
+            edit.textContent = t(this.layoutEditing ? 'viewer.layout.done' : 'viewer.layout.edit');
+            edit.title = t(this.layoutEditing ? 'viewer.layout.done.title' : 'viewer.layout.edit.title');
+            edit.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit('kigumi-edit-layout', {});
+            });
+            viewports.querySelector('.dp-section-header').appendChild(edit);
+        }
+        this.el.appendChild(viewports);
         this.el.appendChild(this._section(
             'members', this._membersTitle(), () => this._memberRows(),
         ));

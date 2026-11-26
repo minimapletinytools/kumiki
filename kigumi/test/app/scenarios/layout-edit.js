@@ -1,5 +1,6 @@
-// Editing a drawing's layout on the sheet: a click on nothing picks out a view, then split, float,
-// resize, a divider moved, a dock (with where it will land shown first), and undo back to the code's.
+// Editing a drawing's layout on the sheet: the edit button starts it, a click picks out a view, then
+// split, float, resize, a divider moved, a dock (with where it will land shown first), a drag let go
+// of with Escape, a camera preset and a fit, undo back to the code's, and Escape ends it.
 module.exports = {
     name: 'layout-edit',
     async run({ check, inShell, waitFor, capture, runAppCommand, viewDoc, DRAWING_FRAME }) {
@@ -18,6 +19,10 @@ module.exports = {
         check('the drawing carries its layout', info.layout, JSON.stringify(info));
         const first = info.ids.find(id => !/preview/i.test(id)) || info.ids[0];
 
+        await inShell(`${app}.renderRoot.querySelector('.dp-edit-layout').click()`);
+        await inShell(frame);
+        check('the edit button starts editing the layout', await inShell(`${app}.layoutEditing === true`));
+
         // Click on a view's empty corner: the view is picked out.
         await inShell(`(() => { const a = ${app};
             const host = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
@@ -27,8 +32,8 @@ module.exports = {
             const x = host.left + r.x + 6, y = host.top + (host.height - r.y - r.height) + 6;
             a.handleCanvasClick({ clientX: x, clientY: y, shiftKey: false });
         })()`);
-        const picked = await waitFor(() => inShell(`(() => { const f = ${app}.selectionManager.viewportFocus; return f && f.viewportId; })()`), { timeoutMs: 10000 }).catch(() => null);
-        check('a click on nothing in a view picks it out', picked === first, String(picked));
+        const picked = await waitFor(() => inShell(`${app}.layoutSelection`), { timeoutMs: 10000 }).catch(() => null);
+        check('a click in a view picks it out', picked === first, String(picked));
         await inShell(frame);
         await capture('01-selected');
 
@@ -104,14 +109,39 @@ module.exports = {
         await inShell(frame);
         await capture('07-docked');
 
+        // Escape lets go of a drag and leaves the layout as it was.
+        await inShell(`${app}.selectDrawingViewport(${JSON.stringify(first)})`);
+        await inShell(frame);
+        const layoutBefore = await inShell(`JSON.stringify(${app}.sceneStore.activeScene().layout)`);
+        await press('.vp-grip', 0, 80, 60, { capturing: true });
+        await inShell(`(() => { const win = ${app}.ownerDocument.defaultView; win.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()`);
+        await release();
+        await inShell('new Promise(r => setTimeout(r, 500))');
+        const kept = await inShell(`(() => { const a = ${app}; return !a._layoutDraft && a.layoutEditing && JSON.stringify(a.sceneStore.activeScene().layout) === ${JSON.stringify(layoutBefore)}; })()`);
+        check('escape during a drag lets go of it, still editing', kept);
+
+        // Turn the view to look down from the top, then fit it.
+        await press('.vp-tool-camera', 0, 0, 0);
+        await inShell(`${app}.contextMenu.choose('top')`);
+        const turned = await waitFor(() => inShell(`(() => { const a = ${app}; const v = a.viewports.find(v => v.id === ${JSON.stringify(first)});
+            return !a._layoutDraft && v && Math.abs(v.spec.camera.look[2] + 1) < 1e-6; })()`), { timeoutMs: 15000 }).catch(() => false);
+        check('a camera preset turns the view', turned);
+        await inShell(frame);
+        await capture('08-top');
+        await press('.vp-tool-fit', 0, 0, 0);
+        await waitFor(() => inShell(`!${app}._layoutDraft`), { timeoutMs: 15000 }).catch(() => null);
+
         // Undo everything back to the code's layout.
-        for (let i = 0; i < 10 && await inShell(`${app}.sceneStore.activeScene().layoutEdited`); i += 1) {
+        for (let i = 0; i < 20 && await inShell(`${app}.sceneStore.activeScene().layoutEdited`); i += 1) {
             await inShell(`${app}.undoMeasurementChange()`);
             await inShell('new Promise(r => setTimeout(r, 700))');
         }
         const undone = await inShell(`(() => { const a = ${app}; return { edited: a.sceneStore.activeScene().layoutEdited, ids: a.viewports.map(v => v.id) }; })()`);
         check('undo puts the code layout back', !undone.edited && undone.ids.join() === info.ids.join(), JSON.stringify(undone));
         await inShell(frame);
-        await capture('08-undone');
+        await capture('09-undone');
+
+        await inShell(`(() => { const win = ${app}.ownerDocument.defaultView; win.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()`);
+        check('escape ends editing', await inShell(`${app}.layoutEditing === false`));
     },
 };

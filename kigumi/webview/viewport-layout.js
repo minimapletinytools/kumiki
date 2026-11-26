@@ -290,7 +290,36 @@ function restack(layout, name, toFront) {
     return next;
 }
 
+/** The camera the layout gives `name` ({look, up, target?, extent?, projection?}), or null. */
+function leafCamera(layout, name) {
+    const path = findLeaf(layout, name);
+    return (path && nodeAt(layout, path).camera) || null;
+}
+
+/** The tree with `name` given `camera`, or none with null. */
+function setLeafCamera(layout, name, camera) {
+    const next = clone(layout);
+    const path = findLeaf(next, name);
+    if (!path) return next;
+    const node = nodeAt(next, path);
+    if (camera) node.camera = clone(camera);
+    else delete node.camera;
+    return next;
+}
+
+/** The views whose rect differs between `before` and `after`, by name. */
+function movedLeaves(before, after, page) {
+    const was = resolveLayout(before, page);
+    const moved = [];
+    for (const [name, rect] of resolveLayout(after, page)) {
+        const old = was.get(name);
+        if (!old || old.some((value, index) => Math.abs(value - rect[index]) > 1e-9)) moved.push(name);
+    }
+    return moved;
+}
+
 export {
     leafNames, findLeaf, isFloating, layoutCells, resolveLayout, dividers, removeLeaf, floatLeaf,
     setFloatingRect, dockLeaf, splitLeaf, moveDivider, restack, clampRect, copyName,
+    leafCamera, setLeafCamera, movedLeaves,
 };

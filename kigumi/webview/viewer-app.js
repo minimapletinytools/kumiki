@@ -42,6 +42,8 @@ import { SHELL_UI, listenForForm } from './shell-ui.js';
 // A touchscreen is the main pointer: the hint describes touch gestures.
 // How long a scroll must stop before a tilted drawing view springs back.
 const WHEEL_TILT_RELEASE_MS = 250;
+// What a viewport is built at: a change to either points its camera afresh (rebuildViewports).
+const builtState = (spec) => `${String(spec.rect)}|${JSON.stringify(spec.camera || null)}`;
 const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
 // Defines <kigumi-layers-view>, which the tree page draws.
 import './layers-panel.js';
@@ -170,6 +172,8 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
         this._highlightObjects = new Map();
         /** Pointer gestures running now, by name. See _beginPointerGesture. */
         this._pointerGestures = new Map();
+        /** Editing the open drawing's layout (viewer-layout-editing.js). */
+        this.layoutEditing = false;
         /**
          * The geometry the runner sent for the current selection, kept so the
          * overlay can be re-derived rather than built once on arrival. Only
@@ -274,8 +278,9 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
             <div id="view-layout" class=${layoutClass}>
             ${this.sidebar.render(this.sidebarPages())}
-            <div id="viewport" class=${compact && this.pageZoomed ? 'page-zoomed' : ''}>
+            <div id="viewport" class=${[compact && this.pageZoomed ? 'page-zoomed' : '', this.layoutEditing ? 'layout-editing' : ''].join(' ')}>
                 ${compact ? this.compactChrome.render() : nothing}
+                ${this.layoutEditing ? this.renderLayoutEditBar() : nothing}
                 ${this.isInDrawing
                     ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
                         @click=${() => this.leaveDrawing()}>← ${t('viewer.drawing.backTo3d')}</button>`
@@ -595,6 +600,10 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             }
             event.preventDefault();
             const gesture = wheelGesture(event, { scrollOrbits: this.trackpadScrollOrbits });
+            if (this.layoutEditing && this.layoutWheel(event, event.shiftKey && gesture.kind === 'zoomStep'
+                ? { kind: 'pan', dx: -event.deltaX, dy: -event.deltaY } : gesture)) {
+                return;
+            }
             if (gesture.kind !== 'zoomStep') {
                 this.applyCameraGesture(gesture, event.clientX, event.clientY);
                 if (gesture.kind === 'orbit') {
@@ -890,14 +899,14 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             // skipped on reuse -- that would throw away where the reader had
             // got to.
             viewport.rememberDeclaredCamera();
-            // A view the layout has moved or resized is pointed afresh: its extent is for its new size.
+            // A view the layout has moved, resized or pointed anew is pointed afresh.
             const was = previousRects.get(spec.id);
-            if (!reused || (was && String(was) !== String(spec.rect))) {
+            if (!reused || (was && was !== builtState(spec))) {
                 viewport.applySpecCamera();
             }
             return viewport;
         });
-        this._builtRects = new Map(this.viewports.map((viewport) => [viewport.id, String(viewport.spec.rect)]));
+        this._builtRects = new Map(this.viewports.map((viewport) => [viewport.id, builtState(viewport.spec)]));
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
@@ -2232,6 +2241,8 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             event.preventDefault();
             if (action === 'undo') this.undoMeasurementChange();
             else this.redoMeasurementChange();
+            // The edit bar's buttons say what is left.
+            if (this.layoutEditing) this.requestUpdate();
         } else if (action === 'delete') {
             // Nothing to delete is not an error: a measurement the code asks
             // for is passed over, and the key simply does nothing.
@@ -2243,6 +2254,10 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             event.preventDefault();
             if (this.contextMenu.isOpen) {
                 this.closeMemberContextMenu();
+            } else if (this.cancelLayoutDrag()) {
+                // A drag let go of, the layout as it was.
+            } else if (this.layoutEditing) {
+                this.exitLayoutEditing();
             } else if (this.escapeMeasurement()) {
                 // One end at a time, so leaving a half-made measurement takes
                 // two presses: the second feature, then the first.

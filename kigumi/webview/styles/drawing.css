@@ -296,3 +296,82 @@
     stroke-dasharray: 5 4;
     pointer-events: none;
 }
+
+/* Every view's outline while editing, and the selected one's. */
+.vp-outline {
+    fill: none;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-opacity: 0.35;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+}
+
+.vp-selected {
+    fill: none;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 1.5;
+    pointer-events: none;
+}
+
+/* Measurements are left alone while the layout is edited. */
+#viewport.layout-editing .dim-group {
+    pointer-events: none;
+}
+
+.dp-edit-layout {
+    margin-left: auto;
+}
+
+.dp-edit-layout.dp-editing {
+    color: white;
+    background: var(--hv-accent, #4a7dbd);
+    border-color: var(--hv-accent, #4a7dbd);
+}
+
+/* Top right of the sheet while its layout is edited. */
+#layout-edit-bar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 10px;
+    border-radius: 6px;
+    background: var(--hv-panel-bg, #fff);
+    border: 1px solid var(--hv-panel-border, #ccc);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    font: 13px 'Segoe UI', sans-serif;
+    color: var(--hv-title, #333);
+}
+
+#layout-edit-bar .leb-title {
+    margin-right: 6px;
+    opacity: 0.8;
+}
+
+#layout-edit-bar button {
+    font: inherit;
+    min-width: 28px;
+    height: 26px;
+    border: 1px solid var(--hv-panel-border, #ccc);
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+#layout-edit-bar button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#layout-edit-bar .leb-done {
+    padding: 0 12px;
+    font-weight: 700;
+    color: white;
+    background: var(--hv-accent, #4a7dbd);
+    border-color: var(--hv-accent, #4a7dbd);
+}

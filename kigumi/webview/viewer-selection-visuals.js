@@ -25,7 +25,6 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             // A drawing's pick along the ray that found nothing on any member: a click on nothing.
             this._dropCsgFocus();
             this.selectionManager.clearTimberSelection();
-            this.selectViewportForClick();
             return;
         }
         // Kept so that "measure from this" has something to start from without
