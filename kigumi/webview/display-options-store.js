@@ -65,7 +65,7 @@ function optionSpecs(themeIds) {
         // What a drawing's views draw over the timbers: the perfect timber within's faces and
         // its centerplanes, dotted, and the reference features, lit.
         colorReferenceFaces: { value: false, normalize: bool },
-        drawingXray: { value: 'selection', normalize: oneOf(['off', 'selection', 'on'], 'selection') },
+        drawingXray: { value: 'on', normalize: oneOf(['off', 'selection', 'on'], 'on') },
         showDrawingPerfectFaces: { value: 'measured', normalize: lineMode },
         showDrawingCenterplanes: { value: 'measured', normalize: lineMode },
         highlightReferenceEdges: { value: true, normalize: bool },

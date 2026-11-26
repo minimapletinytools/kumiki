@@ -6,7 +6,7 @@ import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
 import { prepareTimberGrain, showTimberGrain } from './timber-grain.js';
-import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
+import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, lineWidthScale, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { isKey } from './key-match.js';
 import { viewerKeyAction } from './viewer-keys.js';
@@ -955,12 +955,19 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // canvas, which is the 3D scene and every session before drawings.
         const scissored = onPaper || this.viewports.length > 1;
         this.renderer.setScissorTest(scissored);
+        // A fat line's width is in pixels of the `resolution` it is given, read against the rect it
+        // is drawn into. Each viewport is its own rect, larger than the canvas on a zoomed sheet,
+        // so with the canvas's size every line grew with the zoom, and unevenly across and up.
+        // The resolution is shrunk by the sheet's line scale instead, which grows within bounds.
+        const lineMaterials = this._lineMaterials();
+        const lineScale = onPaper ? lineWidthScale(this.sceneStore.activeScene().page, pageRect) : 1;
         for (const viewport of this.viewports) {
             this._showHighlightsFor(viewport.id, viewport.camera.getWorldDirection(this._viewportLook));
             const anyDrawingLines = this.drawingOverlays.showFor(
                 this.sceneManager.bundles(), viewport.camera, { inDrawing: this.isInDrawing, options: this,
                     xrayMembers: this.xrayMembers(viewport), measured: this.measuredFeatures(viewport) });
             const rect = viewport.pixelRect(pageRect, size.y);
+            for (const material of lineMaterials) material.uniforms.resolution.value.set(rect.width / lineScale, rect.height / lineScale);
             if (anyDrawingLines && this.memberIds) {
                 // Who is in front where, for the dotted lines to clip themselves by.
                 const ratio = this.renderer.getPixelRatio();
@@ -982,9 +989,22 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.renderer.render(this.scene, viewport.camera);
             if (afterViewport) afterViewport(viewport, rect);
         }
+        for (const material of lineMaterials) material.uniforms.resolution.value.set(size.x, size.y);
         // After the scene, so dimensions sit over what they measure.
         this.renderMeasurements();
         this.updateScaleRuler(pageRect, size.y);
+    }
+
+    /** Every fat-line (LineMaterial) material in the scene, once each. */
+    _lineMaterials() {
+        const found = new Set();
+        this.scene.traverse((object) => {
+            const material = object.material;
+            if (material && material.isLineMaterial && material.uniforms && material.uniforms.resolution) {
+                found.add(material);
+            }
+        });
+        return found;
     }
 
     /**

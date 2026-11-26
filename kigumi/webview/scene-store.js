@@ -43,6 +43,21 @@ const PAGE_FIT_MARGIN = 0.94;
 const MIN_PAGE_ZOOM = 0.05;
 const MAX_PAGE_ZOOM = 40;
 
+// A sheet's lines have a weight on the paper, as a pen's would, so they thicken as it is zoomed,
+// but only between these multiples of their set width: thin enough to read whole, never fat.
+const LINE_WEIGHT_PX_PER_MM = 4;
+const MIN_LINE_SCALE = 0.6;
+const MAX_LINE_SCALE = 2;
+
+/** What a sheet's line widths are multiplied by at this size on screen. 1 off a sheet. */
+function lineWidthScale(page, pageRect) {
+    if (!page || !pageRect || !(pageRect.width > 0)) {
+        return 1;
+    }
+    const pixelsPerMm = pageRect.width / (page.width * 1000);
+    return Math.min(MAX_LINE_SCALE, Math.max(MIN_LINE_SCALE, pixelsPerMm / LINE_WEIGHT_PX_PER_MM));
+}
+
 /**
  * The sheet a drawing is laid out on, in metres, or null for "the canvas".
  *
@@ -537,6 +552,7 @@ const KigumiScenes = {
     normalizePage,
     normalizePageView,
     pageScreenRect,
+    lineWidthScale,
     panPage,
     zoomPageAt,
     MAX_TILT_RADIANS,
@@ -548,4 +564,4 @@ const KigumiScenes = {
     viewportAtPoint,
 };
 
-export { SceneStore, DEFAULT_SCENE_ID, CAMERA_CONTROLS, PROJECTIONS, defaultSceneSpec, normalizeScene, sceneMembers, ORIGINS, normalizeOrbit, ORBIT_MODES, isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, normalizePage, normalizePageView, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, viewportScale, extentForScale, PAGE_FIT_MARGIN, pixelRect, viewportAspect, viewportAtPoint };
+export { SceneStore, DEFAULT_SCENE_ID, CAMERA_CONTROLS, PROJECTIONS, defaultSceneSpec, normalizeScene, sceneMembers, ORIGINS, normalizeOrbit, ORBIT_MODES, isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, normalizePage, normalizePageView, pageScreenRect, lineWidthScale, panPage, zoomPageAt, MAX_TILT_RADIANS, viewportScale, extentForScale, PAGE_FIT_MARGIN, pixelRect, viewportAspect, viewportAtPoint };
