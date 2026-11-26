@@ -932,6 +932,35 @@ class TestPegStuff:
         assert offset_between_holes(scalar(0)) == pytest.approx(0)
         assert offset_between_holes(scalar(1, 4)) == pytest.approx(0.25)
 
+    def test_a_square_peg_holes_centre_planes_cross_on_its_axis(self, simple_T_configuration):
+        """A square peg hole has no axis to name, but its two centre planes cross where a round one's axis runs."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+            front_face_on_butt_timber=TimberLongFace.FRONT,
+        )
+
+        def joint(shape):
+            pegs = SimplePegParameters(shape=shape, peg_positions=[(scalar(2), scalar(0))],
+                                       depth=scalar(5), size=scalar(1, 2), tenon_hole_offset=scalar(1, 4))
+            return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement, tenon_width_relative_to_joint=scalar(2),
+                tenon_height_relative_to_joint=scalar(2), tenon_length=scalar(4), mortise_depth=scalar(4),
+                peg_parameters=pegs)
+
+        round_joint, square_joint = joint(PegShape.ROUND), joint(PegShape.SQUARE)
+        for timber in (tenon_timber, mortise_timber):
+            axis_handle = round_joint.feature(MortiseAndTenonFeatures.PEG_HOLE_AXIS, on=timber)
+            axis = axis_handle.feature.locate_simple_unbounded(axis_handle.hit.owner)
+            for name in (MortiseAndTenonFeatures.PEG_HOLE_CENTERPLANE_LEFT_RIGHT,
+                         MortiseAndTenonFeatures.PEG_HOLE_CENTERPLANE_FRONT_BACK):
+                plane_handle = square_joint.feature(name, on=timber)
+                plane = plane_handle.feature.locate_simple_unbounded(plane_handle.hit.owner)
+                assert float(safe_dot_product(axis.point - plane.point, plane.normal)) == pytest.approx(0, abs=1e-9)
+                assert float(safe_dot_product(axis.direction, plane.normal)) == pytest.approx(0, abs=1e-9)
+
     # 🐪
     def test_peg_orientation_mortise_space_face_aligned(self):
         """When peg_orientation uses MORTISE space the peg X and Y axes must be

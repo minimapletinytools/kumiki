@@ -213,7 +213,7 @@ A file may mark any number of frames. Kigumi builds them all and shows them toge
 
 Older files name their one frame `example` or `build_frame` instead of marking it. Kigumi still picks those up, with a warning; that will be removed, so write `@frame` in new files.
 
-## Generating drawings
+## Adding Drawings
 
 A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])`. 
 
@@ -231,9 +231,58 @@ shop = Drawing(
 
 A dimension's `placement` is `Auto()` (the default, placed clear of the work), `Beside(side, lane)` (a side of the work, lane 1 nearest), or `Offset(distance)`. `post.edge(a, b)` is the line where two faces meet. A view of your own is `Viewport(label="Detail", camera=View.of_face(post.timber, TimberFace.FRONT, scale=1/5))`. The `describe` tool with a timber lists the feature names there are to measure.
 
-Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet, so you prefer building your own drawings or modifying the auto generated one.
+### Drawing by hand
 
-To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
+The best way to add drawings to to manually add them in code. Examples:
+- `patterns/structures/my_cute_frame.py` for a small frame
+- `hidden_structures/cat_corner_cot.py` for a large one with helpers):
+
+#### What to draw
+
+- **One drawing per distinct piece.** `match_timbers(frame.cut_timbers)` groups identical, turned and mirrored pieces; draw the representative and put the count in the drawing's name ("Rafter ×7"). Viewport labels are not printed on the sheet, so a count belongs in the drawing's name.
+- **An overview sheet**: `View.world("front")`, `"right"` and `"top"` of the members (leave boards out), with the overall sizes and the heights that matter, from the ground.
+- **Only views that show something**: a long face for each face mortises open on, a face that peg holes open on if no other view looks into them, and an end view at 1:2 for a tenon's section. Not a fixed set of four.
+- **A scale that fits**: the largest standard scale that fits the piece's length in its column. On a long, slender piece the dimensions across a face get cramped; a detail view of the joint at a larger scale reads better.
+
+#### Picking dimensions
+
+- **One datum per piece**: its bottom end, or its bottom shoulder where a tenon takes the end. Every position along the piece is measured from it (baseline, not chained, so errors don't add up).
+- **Locate, then size.** A mortise gets its start from the datum and its length on its own; a tenon its length from its shoulder; the piece its overall length once.
+- **Along and across.** A mortise or peg hole needs where it is along the piece and where it is across the face: across from the reference face beside the viewed face, to the mortise's nearer long wall or the hole's centre.
+- **Measure to the near side**, so a dimension never crosses the feature: a reference face to the tenon's or mortise's wall nearest it. Find that wall by its geometry; a joint names its walls in its own frame, which can face either way on the timber.
+- **Say each value once.** A piece's second view leaves the overall and tenon sizes to the first, an offset two features share is given once, and a zero (a barefaced tenon, a feature flush with a face) isn't given.
+- **A row of like features chains** along one lane, each from the one before (rafter housings in a plate); the first one's size stands for all.
+- **Name features through the joint**: keep the joints the frame code makes (return them by name) so a drawing can say `joint.feature(MortiseAndTenonFeatures.MORTISE_LEFT, on=post)`. Where a joint only has positional names (`side.0`), pick the walls by their geometry, e.g. the two that cross the timber.
+- **A plane at a slope** has no distance from a square end. Measure where it meets the faces: in the view that sees the slope, its long and short points, `cut.edge(shoulder, cut.face(side))` with the faces either side; in a view that doesn't, its line across that face, `cut.edge(shoulder, cut.face(viewed_face))`. A sloped member's mortises are measured the same way, at their mouths.
+- **Peg holes** are measured in the view that looks into them, to a round hole's `PEG_HOLE_AXIS` or a square hole's `PEG_HOLE_CENTERPLANE_LEFT_RIGHT` / `_FRONT_BACK` (the one crossing the piece for along, the other for across).
+
+#### Placing dimensions
+
+- **A side for each kind**: positions from the datum below the work; sizes (a mortise's length, a tenon's) above; positions across the face on the left or right, whichever end of the piece the feature is nearer.
+- **Lanes nest**: the shortest on lane 1, each longer one a lane further out, so their lines never cross. Overall lengths go outermost.
+- **Short dimensions can share a lane** where they sit at different places along the piece (each mortise's length on lane 1 above). A long dimension never shares a lane with short ones on its side: it would run over them.
+- **A chain shares one lane.**
+- **End views**: the tenon's size below and right on lane 1, its offsets from the reference faces on lane 2. Offsets from a timber's long face currently land on the work in an end view, whichever side they're given.
+
+#### Checking a drawing
+
+- **Every dimension resolves.** Kigumi lists one that can't be measured (two features not parallel, a feature not on the piece) rather than drawing it.
+- **`unknown_features(frame, drawing)`** (`kumiki.drawings.auto_drawings`) asks the feature solver what a one-piece drawing leaves unknown. It solves from the piece's bottom end and its stock (long faces and centerplanes, which come to size from the cut list), keeps square what is square and what a view shows lined up, adds every dimension in each view, and returns each required feature that could still move: `free` is how many ways, `seen` whether one of the drawing's views can see it to dimension.
+
+  ```python
+  from kumiki.drawings.auto_drawings import unknown_features
+  for drawing in frame.drawings:
+      if len(drawing.timbers) == 1:
+          for gap in unknown_features(frame, drawing):
+              print(drawing.name, gap.handle.feature.name, gap.free, "" if gap.seen else "(not in a view)")
+  ```
+
+  Expect some left over: a mortise's depth (no face view shows it), a tenon centred by convention rather than dimensioned from a face, repeated features sized once. A peg hole's own walls are left out: it is bored to the peg's size.
+- **Then look at the sheets.**
+
+### Automatic Drawings
+
+Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet. Not recommended except for quick looks and research purposes. Prefer building your own drawings or modifying the auto generated one. To change the generated ones, `with_drawings(frame, edit, fixed_path="beam")` calls `edit(drawings)` once they are made: `drawings.piece("post").view("Front").measure(a, b)` adds a dimension, `.remove(a, b)` takes one away, and `drawings.add(drawing)` adds a drawing of your own.
 
 ### Deferring drawing generation and other slow work.
 

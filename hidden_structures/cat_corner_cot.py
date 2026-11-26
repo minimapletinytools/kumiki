@@ -10,9 +10,9 @@ Furniture and supporting models; multiple frames; non-rectangular context; slopi
 Concepts demonstrated — details
 ------------------------------
 Separate frame entries show the enclosure and its supporting context. Stepped members, stacked
-tenons, infill boards, and roof housings accommodate the corner and roof slope. Piece matching
-and generated drawings support fabrication references. Geometry is defined by source constants,
-not Kiwari controls.
+tenons, infill boards, and roof housings accommodate the corner and roof slope. Drawings placed
+by hand serve as fabrication references. Geometry is defined by source constants, not Kiwari
+controls.
 Recipe notes
 ------------
 Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
@@ -21,9 +21,9 @@ The file builds two frames, shown together where they stand:
 - `supporting_structure`: the corner walls and the sloped roof they carry.
 - `cat_corner_cot`: the cot itself, tucked into the corner under the roof.
 
-The cot frame carries generated drawings, dimensioned automatically (see AUTO DRAWINGS below):
-one plan drawing of the whole frame, and one shop drawing per distinct piece (identical,
-turned or mirrored members share one).
+The cot frame carries drawings dimensioned by hand (see DRAWINGS below): an overview of the
+frame, one shop drawing per distinct piece, and one per distinct board; a piece used more than
+once is drawn once, with its count in the drawing's name.
 
 Defines:
 1. house_footprint: The supporting "r"-shaped corner structure footprint.
@@ -101,10 +101,10 @@ Defines:
 """
 
 import math
+from dataclasses import replace
 from typing import Optional
 
 from kumiki import *
-from kumiki.drawings.auto_drawings import with_auto_drawings
 
 
 # ============================================================================
@@ -647,7 +647,7 @@ def create_cot_rim_joists() -> list[Timber]:
 def cut_rim_joist_corner_joints(
     posts: list[Timber],
     rim_joists: list[Timber],
-) -> tuple[dict[str, list[Cutting]], list[Accessory]]:
+) -> tuple[dict[str, list[Cutting]], list[Accessory], dict[str, Joint]]:
     """
     Connects each of the rim joists to the corner posts using mortise and tenon joints:
     - Tenon positions come from the receiving post's reference feature: the tenon's face
@@ -802,18 +802,27 @@ def cut_rim_joist_corner_joints(
         peg_parameters=peg_params,
     )
 
-    joints = [j_front_bl, j_left_bl, j_front_br, j_right_br, j_back_tr, j_right_tr, j_back_tl, j_left_tl]
+    joints = {
+        "front_bl": j_front_bl,
+        "left_bl": j_left_bl,
+        "front_br": j_front_br,
+        "right_br": j_right_br,
+        "back_tr": j_back_tr,
+        "right_tr": j_right_tr,
+        "back_tl": j_back_tl,
+        "left_tl": j_left_tl,
+    }
 
     cuts_by_path: dict[str, list[Cutting]] = {}
     accessories: list[Accessory] = []
 
-    for j in joints:
+    for j in joints.values():
         for cutting in j.cuttings.values():
             path = cutting.timber.ticket.path
             cuts_by_path.setdefault(path, []).append(cutting)
         accessories.extend(j.jointAccessories.values())
 
-    return cuts_by_path, accessories
+    return cuts_by_path, accessories, joints
 
 
 def create_cot_lower_rafter() -> Timber:
@@ -976,7 +985,7 @@ def cut_rail_and_post_joints(
     stepped_girts: list[Timber],
     upper_front_studs: list[Timber],
     floor_joists: list[Timber],
-) -> tuple[dict[str, list[Cutting]], list[Accessory]]:
+) -> tuple[dict[str, list[Cutting]], list[Accessory], dict[str, Joint]]:
     """
     Connects rails, posts, roof beams, lower rafter, stepped girts, upper front studs, floor joists, and rim joists:
     - Every tenon is positioned from the receiving timber's reference feature: the tenon's face
@@ -1510,51 +1519,51 @@ def cut_rail_and_post_joints(
         housing_depth=inches(3, 2),
     )
 
-    joints = [
-        j_front_rail_br,
-        j_right_rail_door,
-        j_front_rail_bl,
-        j_post_bl_beam,
-        j_post_tr_rail,
-        j_upper_right_rail,
-        j_post_tl_beam,
-        j_door_post_rim,
-        j_post_br_rafter,
-        j_door_post_rafter,
-        j_upper_back_rafter,
-        j_post_br_beam,
-        j_upper_back_beam,
-        j_house_front,
-        j_house_back,
-        j_girt_front_br,
-        j_girt_front_door,
-        j_girt_back_door,
-        j_girt_back_tr,
-        j_stud1_rail,
-        j_stud1_beam,
-        j_stud2_rail,
-        j_stud2_beam,
-        j_stud_rim,
-        j_stud_rail,
-        j_joist_mid_front,
-        j_joist_mid_back,
-        j_joist_1_front,
-        j_joist_1_back,
-        j_joist_3_front,
-        j_joist_3_back,
-    ]
+    joints = {
+        "front_rail_br": j_front_rail_br,
+        "right_rail_door": j_right_rail_door,
+        "front_rail_bl": j_front_rail_bl,
+        "post_bl_beam": j_post_bl_beam,
+        "post_tr_rail": j_post_tr_rail,
+        "upper_right_rail": j_upper_right_rail,
+        "post_tl_beam": j_post_tl_beam,
+        "door_post_rim": j_door_post_rim,
+        "post_br_rafter": j_post_br_rafter,
+        "door_post_rafter": j_door_post_rafter,
+        "upper_back_rafter": j_upper_back_rafter,
+        "post_br_beam": j_post_br_beam,
+        "upper_back_beam": j_upper_back_beam,
+        "house_front": j_house_front,
+        "house_back": j_house_back,
+        "girt_front_br": j_girt_front_br,
+        "girt_front_door": j_girt_front_door,
+        "girt_back_door": j_girt_back_door,
+        "girt_back_tr": j_girt_back_tr,
+        "stud1_rail": j_stud1_rail,
+        "stud1_beam": j_stud1_beam,
+        "stud2_rail": j_stud2_rail,
+        "stud2_beam": j_stud2_beam,
+        "stud_rim": j_stud_rim,
+        "stud_rail": j_stud_rail,
+        "joist_mid_front": j_joist_mid_front,
+        "joist_mid_back": j_joist_mid_back,
+        "joist_1_front": j_joist_1_front,
+        "joist_1_back": j_joist_1_back,
+        "joist_3_front": j_joist_3_front,
+        "joist_3_back": j_joist_3_back,
+    }
 
     cuts_by_path: dict[str, list[Cutting]] = {}
     accessories: list[Accessory] = []
 
-    for j in joints:
+    for j in joints.values():
         for cutting in j.cuttings.values():
             if cutting.negative_csg is not None:
                 path = cutting.timber.ticket.path
                 cuts_by_path.setdefault(path, []).append(cutting)
         accessories.extend(j.jointAccessories.values())
 
-    return cuts_by_path, accessories
+    return cuts_by_path, accessories, joints
 
 
 def create_cot_rafters() -> list[Timber]:
@@ -1611,7 +1620,7 @@ def create_cot_rafters() -> list[Timber]:
 def cut_rafter_housing_joints(
     roof_beams: list[Timber],
     rafters: list[Timber],
-) -> dict[str, list[Cutting]]:
+) -> tuple[dict[str, list[Cutting]], dict[str, Joint]]:
     """
     Cuts recessed housing notches (0.25" deep) in the front and back roof plates for the 7 rafters.
     """
@@ -1622,7 +1631,7 @@ def cut_rafter_housing_joints(
     return {
         front_beam.ticket.path: [j_front_housing.cuttings["housing_timber"]],
         back_beam.ticket.path: [j_back_housing.cuttings["housing_timber"]],
-    }
+    }, {"rafters_front": j_front_housing, "rafters_back": j_back_housing}
 
 
 def create_cot_floor_joists() -> list[Timber]:
@@ -1990,17 +1999,457 @@ def create_cot_roof_beams() -> list[Timber]:
 
 
 # ============================================================================
-# AUTO DRAWINGS
+# DRAWINGS
 # ============================================================================
+# Every dimension is placed by hand: Beside(side, lane) puts it on that side of the work,
+# lane 1 nearest. A piece is drawn once however many of it there are; the count is in its name.
+#
+# A shop drawing shows the long faces a piece's mortises open on, measured from its bottom end
+# (or its bottom shoulder, where a tenon takes the end): each mortise's start below the work, one
+# lane further out each, and its length above; peg holes in the view that looks into them. Tenons
+# are sized in an end view at 1:2.
 
-def _is_member(cut: CutTimber) -> bool:
-    """Whether the plan dimensions this timber: everything but the boards.
+MT = MortiseAndTenonFeatures
+BELOW, ABOVE, LEFT, RIGHT = DimensionSide.BELOW, DimensionSide.ABOVE, DimensionSide.LEFT, DimensionSide.RIGHT
 
-    Infill and floor boards are cut to fit between members, so they are left to their own shop
-    drawings. Dimensioning every board in the plan as well costs several times more and repeats
-    what those sheets already say.
+#: Imperial scales, largest first: 6" = 1', 3" = 1', 1 1/2" = 1', 1" = 1', 3/4" = 1', 1/2" = 1'.
+SCALES = (1 / 2, 1 / 4, 1 / 8, 1 / 12, 1 / 16, 1 / 24)
+
+
+def scale_to_fit(timber: Timber, room: float = 0.25) -> float:
+    """The largest scale that draws `timber`'s length within `room` metres of sheet."""
+    return next((s for s in SCALES if float(timber.length) * s <= room), SCALES[-1])
+
+
+#: Each long face's outward normal in a timber's own space, whose length runs along z.
+_NORMALS = {TimberFace.RIGHT: (1, 0, 0), TimberFace.LEFT: (-1, 0, 0), TimberFace.FRONT: (0, 1, 0), TimberFace.BACK: (0, -1, 0)}
+
+
+def _local(handle):
+    """A feature's plane or line, in its timber's own space, as floats: (point, direction or normal)."""
+    where = handle.feature.locate_simple_unbounded(handle.hit.owner)
+    point = [float(v) for v in where.point]
+    run = [float(v) for v in (where.normal if hasattr(where, "normal") else where.direction)]
+    size = math.sqrt(sum(v * v for v in run))
+    return point, [v / size for v in run]
+
+
+def _station(handle) -> float:
+    """Where a plane crosses its timber's centreline, or a line sits along it: from the timber's origin."""
+    point, run = _local(handle)
+    if abs(run[2]) < 1e-9:
+        return point[2]  # a line across the timber, or a plane along it
+    return sum(p * n for p, n in zip(point, run)) / run[2]
+
+
+def walls_across(joint: Joint, timber: Timber, names, index=None) -> tuple:
+    """The two of `joint`'s walls `names` on `timber` that cross its length, the one nearer its bottom end first.
+
+    `index` picks one of several housings the joint cuts, with walls of the same names.
     """
-    return not any(tag.name in {"board", "floor_board"} for tag in cut.timber.ticket.tags)
+    handles = [joint.feature(name, index=index, on=timber) for name in names]
+    crossing = sorted(handles, key=lambda h: -abs(_local(h)[1][2]))[:2]
+    return tuple(sorted(crossing, key=_station))
+
+
+MORTISE_WALLS = (MT.MORTISE_RIGHT, MT.MORTISE_LEFT, MT.MORTISE_FRONT, MT.MORTISE_BACK)
+
+
+def peg_holes(joint: Joint, timber: Timber, face: TimberFace) -> list:
+    """`joint`'s peg holes in `timber` that `face` looks into, each as what locates it along the timber:
+    a round hole's axis, or the centre plane of a square one that crosses the timber."""
+    def lookup(name, index):
+        try:
+            return joint.feature(name, index=index, on=timber)
+        except (KeyError, ValueError):  # no such feature, or no more of them
+            return None
+
+    found = []
+    for index in range(8):
+        axis = lookup(MT.PEG_HOLE_AXIS, index)
+        planes = [lookup(MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT, index), lookup(MT.PEG_HOLE_CENTERPLANE_FRONT_BACK, index)]
+        if axis is not None:
+            run, marker = _local(axis)[1], axis
+        elif None not in planes:
+            (_, a), (_, b) = (_local(plane) for plane in planes)
+            run = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+            marker = max(planes, key=lambda plane: abs(_local(plane)[1][2]))
+        else:
+            break
+        if abs(sum(r * n for r, n in zip(run, _NORMALS[face]))) > 0.9:
+            found.append(marker)
+    return found
+
+
+def marks(frame: Frame, timber: Timber, handle, face: TimberFace) -> list:
+    """What to measure along `timber` to reach `handle` in a view of `face`.
+
+    A plane square to the timber is measured as it is. One cut at a slope is measured where it meets
+    the faces: at its long and short points where this view sees the slope, else along its line
+    across this face.
+    """
+    _, normal = _local(handle)
+    if not hasattr(handle.feature.locate_simple_unbounded(handle.hit.owner), "normal") or abs(normal[2]) > 0.9999:
+        return [handle]
+    cut = frame.cut_timber_of(timber)
+    if abs(sum(a * b for a, b in zip(normal, _NORMALS[face]))) < 1e-6:
+        beside = (TimberFace.FRONT, TimberFace.BACK) if face in (TimberFace.RIGHT, TimberFace.LEFT) else (TimberFace.RIGHT, TimberFace.LEFT)
+        return [cut.edge(handle, cut.face(side)) for side in beside]
+    return [cut.edge(handle, cut.face(face))]
+
+
+def _is_bottom_tenon(joint: Joint, timber: Timber) -> bool:
+    """Whether `joint` cuts a tenon on `timber`'s bottom end, which then measures from its shoulder."""
+    try:
+        return not tenon_end(joint, timber)[2]
+    except (KeyError, ValueError):
+        return False
+
+
+def tenon_end(joint: Joint, timber: Timber) -> tuple:
+    """`joint`'s tenon on `timber`: its shoulder and its tip, and whether it is at the top end."""
+    shoulder = joint.feature(MT.SHOULDER, on=timber)
+    top = _station(shoulder) > float(timber.length) / 2
+    return shoulder, joint.feature(MT.TENON_TOP if top else MT.TENON_BOTTOM, on=timber), top
+
+
+def face_view(frame: Frame, label: str, timber: Timber, face: TimberFace, mortises=(), housings=(), tenons=(),
+              sizes: bool = True, extra=(), pegged=(), notches=None) -> Viewport:
+    """A long face of `timber`: the mortises and housings opening on it, its peg holes, and its tenons.
+
+    Below, from the datum (the bottom end, or the bottom shoulder): where each mortise and housing
+    starts and each peg hole this face looks into, one lane further out each. Above: each mortise's
+    and housing's length on lane 1; with `sizes`, each tenon's length too, then the top shoulder and
+    the whole piece further out. A piece's second view leaves `sizes` to its first.
+
+    `notches` is a row of like housings, (joint, wall names, count): chained along lane 1 below,
+    each from the one before, with the first one's width above.
+    """
+    cut = frame.cut_timber_of(timber)
+    ends = {}
+    for joint in tenons:
+        shoulder, tip, top = tenon_end(joint, timber)
+        ends[top] = (shoulder, tip)
+    bottom = ends[False][1] if False in ends else cut.face(TimberFace.BOTTOM)
+    top = ends[True][1] if True in ends else cut.face(TimberFace.TOP)
+    datum = ends[False][0] if False in ends else bottom
+    mark = lambda handle: marks(frame, timber, handle, face)
+
+    openings = [walls_across(joint, timber, MORTISE_WALLS) for joint in mortises]
+    openings += [walls_across(joint, timber, names) for joint, names in housings]
+    stops = [(_station(near), near) for near, _ in openings]
+    # A peg crosses its tenon, so its hole opens on a face beside the mortise: look in every joint.
+    stops += [(_station(peg), peg) for joint in pegged for peg in peg_holes(joint, timber, face)]
+    measurements = []
+    lane = 1
+    if notches is not None:
+        joint, names, count = notches
+        row = sorted((walls_across(joint, timber, names, i) for i in range(count)), key=lambda w: _station(w[0]))
+        previous = datum
+        for near, _ in row:
+            if previous is not datum or _station(near) > 1e-4:  # a housing flush with the end starts the chain
+                measurements.append(Measure(previous, near, placement=Beside(BELOW, lane)))
+            previous = near
+        measurements.append(Measure(*row[0], placement=Beside(ABOVE)))
+        lane += 1
+    for _, handle in sorted(stops, key=lambda stop: stop[0]):
+        for target in mark(handle):
+            measurements.append(Measure(datum, target, placement=Beside(BELOW, lane)))
+            lane += 1
+    on_piece = lambda handle: 0 <= _station(handle) <= float(timber.length)
+    for near, far in openings:
+        if on_piece(far):  # a housing can run out past the end
+            measurements.append(Measure(mark(near)[0], mark(far)[0], placement=Beside(ABOVE)))
+    if sizes:
+        lane = 2
+        for shoulder, tip in ends.values():
+            if len(mark(shoulder)) == 1 and len(mark(tip)) == 1:
+                measurements.append(Measure(mark(shoulder)[0], mark(tip)[0], placement=Beside(ABOVE)))
+        if True in ends:
+            for target in mark(ends[True][0]):
+                measurements.append(Measure(datum, target, placement=Beside(ABOVE, lane)))
+                lane += 1
+        for target in mark(top):
+            measurements.append(Measure(bottom, target, placement=Beside(ABOVE, lane if ends or openings else 1)))
+            lane += 1
+    measurements += across_face(frame, timber, face, mortises, pegged)
+    return Viewport(label=label, camera=View.of_face(timber, face, scale=scale_to_fit(timber)),
+                    measurements=[*measurements, *extra])
+
+
+def across_face(frame: Frame, timber: Timber, face: TimberFace, mortises, pegged) -> list:
+    """Where each mortise and peg hole sits across `face`: from the reference face beside it (else the
+    first face beside it) to the mortise's nearer long wall and the hole's centre. Each on the side of
+    the work nearer it, one lane further out each; an offset already given isn't given again."""
+    cut = frame.cut_timber_of(timber)
+    beside = (TimberFace.FRONT, TimberFace.BACK) if face in (TimberFace.RIGHT, TimberFace.LEFT) else (TimberFace.RIGHT, TimberFace.LEFT)
+    references = [TimberFace[f.name] for feature in timber.ticket.reference_features for f in feature.long_faces_it_rests_on()]
+    side_face = next((f for f in beside if f in references), beside[0])
+    normal = _NORMALS[side_face]
+    half = float(timber.size[0] if side_face in (TimberFace.RIGHT, TimberFace.LEFT) else timber.size[1]) / 2
+    along_normal = lambda handle: abs(sum(a * b for a, b in zip(_local(handle)[1], normal))) > 0.9
+    depth_from_face = lambda handle: half - sum(a * b for a, b in zip(_local(handle)[0], normal))
+
+    targets = []
+    for joint in mortises:
+        long_walls = [joint.feature(name, on=timber) for name in MORTISE_WALLS]
+        long_walls = [wall for wall in long_walls if along_normal(wall)]
+        if long_walls:
+            targets.append(min(long_walls, key=depth_from_face))
+    for joint in pegged:
+        for crossing in peg_holes(joint, timber, face):
+            if crossing.feature.name == MT.PEG_HOLE_AXIS:
+                continue  # a round hole's axis is a line: seen end-on here, it is placed by its one dimension
+            other = (MT.PEG_HOLE_CENTERPLANE_FRONT_BACK if crossing.feature.name == MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT
+                     else MT.PEG_HOLE_CENTERPLANE_LEFT_RIGHT)
+            index = [_station(h) for h in _all_named(joint, crossing.feature.name, timber)].index(_station(crossing))
+            targets.append(joint.feature(other, index=index, on=timber))
+
+    measurements, given, lanes = [], set(), {LEFT: 1, RIGHT: 1}
+    for target in sorted(targets, key=_station):
+        offset = round(depth_from_face(target), 5)
+        if offset < 1e-6 or offset in given:
+            continue  # flush with the face, or the same offset as one already given
+        given.add(offset)
+        side = RIGHT if _station(target) > float(timber.length) / 2 else LEFT
+        measurements.append(Measure(cut.face(side_face), target, placement=Beside(side, lanes[side])))
+        lanes[side] += 1
+    return measurements
+
+
+def _all_named(joint: Joint, name: str, timber: Timber) -> list:
+    """Every feature `name` of `joint` on `timber`, in the joint's order."""
+    found = []
+    for index in range(16):
+        try:
+            found.append(joint.feature(name, index=index, on=timber))
+        except (KeyError, ValueError):
+            break
+    return found
+
+
+def tenon_section(frame: Frame, label: str, timber: Timber, joint: Joint) -> Viewport:
+    """The end a tenon leaves, at 1:2: the tenon's size, and where it sits from the reference faces."""
+    cut = frame.cut_timber_of(timber)
+    _, _, top = tenon_end(joint, timber)
+    on = lambda name: joint.feature(name, on=timber)
+    walls = [on(name) for name in (MT.TENON_RIGHT, MT.TENON_LEFT, MT.TENON_FRONT, MT.TENON_BACK)]
+
+    def nearest_wall(face: TimberFace):
+        """The tenon's wall nearest `face`, so its offset doesn't cross the tenon. Found by place, not
+        name: a tenon's walls are named in the joint's frame, which needn't be the timber's."""
+        normal = _NORMALS[face]
+        facing = [wall for wall in walls if abs(sum(a * b for a, b in zip(_local(wall)[1], normal))) > 0.9]
+        return max(facing, key=lambda wall: sum(a * b for a, b in zip(_local(wall)[0], normal)))
+
+    measurements = [
+        Measure(on(MT.TENON_LEFT), on(MT.TENON_RIGHT), placement=Beside(BELOW)),
+        Measure(on(MT.TENON_FRONT), on(MT.TENON_BACK), placement=Beside(RIGHT)),
+    ]
+    rests_on = [face for feature in timber.ticket.reference_features for face in feature.long_faces_it_rests_on()]
+    for face in rests_on[:2]:
+        # Lane 2 of the same sides as the sizes: placed above or left, they land on the work in an end view.
+        side = BELOW if face.name in ("RIGHT", "LEFT") else RIGHT
+        wall = nearest_wall(TimberFace[face.name])
+        half = float(timber.size[0] if face.name in ("RIGHT", "LEFT") else timber.size[1]) / 2
+        if half - sum(a * b for a, b in zip(_local(wall)[0], _NORMALS[TimberFace[face.name]])) > 1e-6:  # not barefaced
+            measurements.append(Measure(cut.face(TimberFace[face.name]), wall, placement=Beside(side, 2)))
+    end = TimberFace.TOP if top else TimberFace.BOTTOM
+    return Viewport(label=label, camera=View.of_face(timber, end, scale=1 / 2), measurements=measurements)
+
+
+def shop_drawing(name: str, timber: Timber, views: list) -> Drawing:
+    """A piece's sheet: its views stacked down the left, a preview beside them."""
+    return Drawing(name=name, timbers=[timber],
+                   viewports=[covering_page(columns(rows(*views).taking(Share(3)), Viewport(label="Preview")))])
+
+
+def cot_drawings(frame: Frame, members: dict, joints: dict) -> list:
+    """The cot's drawings: an overview, a shop drawing per distinct piece, and the boards."""
+    t, j = members, joints
+    F = TimberFace
+    LAP = ("crossing_left", "crossing_right", "crossing_front", "crossing_back")
+
+    shown = {}  # each face view's (timber, face)
+
+    def pegged(timber):
+        return [joint for joint in j.values()
+                if any(c.timber is timber and c.negative_csg is not None for c in joint.cuttings.values())]
+
+    def piece(name, timber, *views):
+        """The views given, and one more for each pair of faces with peg holes that none looks into."""
+        faces = [shown[id(v)][1] for v in views if id(v) in shown]
+        extra_views = []
+        for face, opposite in ((F.RIGHT, F.LEFT), (F.FRONT, F.BACK)):
+            if face in faces or opposite in faces:
+                continue
+            if any(peg_holes(joint, timber, face) for joint in pegged(timber)):
+                datum_tenons = [joint for joint in pegged(timber) if _is_bottom_tenon(joint, timber)]
+                extra_views.append(face_view(frame, f"{face.name.title()} face: peg holes", timber, face,
+                                             tenons=datum_tenons, sizes=False, pegged=pegged(timber)))
+        face_views = [v for v in views if id(v) in shown]
+        return shop_drawing(name, timber, [*face_views, *extra_views, *[v for v in views if id(v) not in shown]])
+
+    def view(label, timber, face, mortises=(), tenons=(), housings=(), sizes=True, extra=(), notches=None):
+        made = face_view(frame, label, timber, face, [j[n] for n in mortises], [(j[n], names) for n, names in housings],
+                         [j[n] for n in tenons], sizes, extra, pegged(timber),
+                         None if notches is None else (j[notches[0]], notches[1], notches[2]))
+        shown[id(made)] = (timber, face)
+        return made
+
+    def section(label, timber, joint):
+        return tenon_section(frame, label, timber, j[joint])
+
+    joist_shoulders = [j[n].feature(MT.SHOULDER, on=t["joist_outer"]) for n in ("joist_1_front", "joist_1_back")]
+    return [
+        overview_drawing(frame, t),
+        # Posts: each long face with mortises in it; sizes and the top tenon on the first.
+        piece("Post BL", t["post_bl"],
+              view("Right face", t["post_bl"], F.RIGHT, ["front_bl", "front_rail_bl"], ["post_bl_beam"]),
+              view("Front face", t["post_bl"], F.FRONT, ["left_bl"], sizes=False),
+              section("Top", t["post_bl"], "post_bl_beam")),
+        piece("Post BR", t["post_br"],
+              view("Front face", t["post_br"], F.FRONT, ["front_br", "front_rail_br"], ["post_br_rafter"]),
+              view("Right face", t["post_br"], F.RIGHT, ["right_br", "girt_front_br"], ["post_br_beam"]),
+              section("Top", t["post_br"], "post_br_rafter")),
+        piece("Post TR", t["post_tr"],
+              view("Right face", t["post_tr"], F.RIGHT, ["back_tr"], ["post_tr_rail"]),
+              view("Front face", t["post_tr"], F.FRONT, ["right_tr"], sizes=False),
+              section("Top", t["post_tr"], "post_tr_rail")),
+        piece("Post TL", t["post_tl"],
+              view("Front face", t["post_tl"], F.FRONT, ["back_tl"], ["post_tl_beam"]),
+              view("Right face", t["post_tl"], F.RIGHT, ["left_tl"], sizes=False),
+              section("Top", t["post_tl"], "post_tl_beam")),
+        piece("Upper back-right post", t["post_upper"],
+              view("Back face", t["post_upper"], F.BACK, ["girt_back_tr"], ["upper_right_rail", "upper_back_rafter"]),
+              view("Left face", t["post_upper"], F.LEFT, [], ["upper_right_rail", "upper_back_beam"]),
+              section("Top", t["post_upper"], "upper_back_rafter")),
+        piece("Door post", t["door_post"],
+              view("Right face", t["door_post"], F.RIGHT, ["right_rail_door", "girt_back_door"], ["door_post_rim", "door_post_rafter"]),
+              view("Left face", t["door_post"], F.LEFT, ["girt_front_door"], ["door_post_rim"], sizes=False),
+              section("Bottom", t["door_post"], "door_post_rim")),
+        # Rim joists: tenons at both ends; the floor joists drop into the inner face.
+        piece("Front rim joist", t["rim_front"],
+              view("Back face", t["rim_front"], F.BACK, ["joist_mid_front"], ["front_bl", "front_br"],
+                   housings=[("joist_1_front", SIDES), ("joist_3_front", SIDES)]),
+              view("Right face", t["rim_front"], F.RIGHT, ["stud_rim"], ["front_bl", "front_br"], sizes=False),
+              section("End", t["rim_front"], "front_bl")),
+        piece("Back rim joist", t["rim_back"],
+              view("Front face", t["rim_back"], F.FRONT, ["joist_mid_back"], ["back_tl", "back_tr"],
+                   housings=[("joist_1_back", SIDES), ("joist_3_back", SIDES)]),
+              section("End", t["rim_back"], "back_tl")),
+        piece("Right rim joist", t["rim_right"],
+              view("Right face", t["rim_right"], F.RIGHT, ["door_post_rim"], ["right_br", "right_tr"]),
+              section("End", t["rim_right"], "right_br")),
+        piece("Left rim joist", t["rim_left"],
+              view("Right face", t["rim_left"], F.RIGHT, [], ["left_bl", "left_tl"]),
+              section("End", t["rim_left"], "left_bl")),
+        # Rails, girts and studs.
+        piece("Front rail", t["rail_front"],
+              view("Left face", t["rail_front"], F.LEFT, ["stud_rail"], ["front_rail_bl", "front_rail_br"]),
+              view("Right face", t["rail_front"], F.RIGHT, ["stud1_rail", "stud2_rail"], ["front_rail_bl", "front_rail_br"], sizes=False),
+              section("End", t["rail_front"], "front_rail_bl")),
+        piece("Right rail", t["rail_right"],
+              view("Right face", t["rail_right"], F.RIGHT, ["upper_right_rail"], ["right_rail_door"]),
+              view("Left face", t["rail_right"], F.LEFT, ["post_tr_rail"], ["right_rail_door"], sizes=False),
+              section("End", t["rail_right"], "right_rail_door")),
+        piece("Front girt", t["girt_front"],
+              view("Left face", t["girt_front"], F.LEFT, [], ["girt_front_br", "girt_front_door"]),
+              section("End", t["girt_front"], "girt_front_br")),
+        piece("Back girt", t["girt_back"],
+              view("Left face", t["girt_back"], F.LEFT, [], ["girt_back_door", "girt_back_tr"]),
+              section("End", t["girt_back"], "girt_back_door")),
+        piece("Front mid stud", t["stud_mid"],
+              view("Right face", t["stud_mid"], F.RIGHT, [], ["stud_rim", "stud_rail"]),
+              section("Bottom", t["stud_mid"], "stud_rim")),
+        piece("Upper front stud ×2", t["stud_upper"],
+              view("Right face", t["stud_upper"], F.RIGHT, [], ["stud1_rail", "stud1_beam"]),
+              section("Bottom", t["stud_upper"], "stud1_rail")),
+        # Plates and rafters.
+        piece("Front beam", t["beam_front"],
+              view("Left face", t["beam_front"], F.LEFT, ["post_bl_beam", "stud1_beam", "stud2_beam", "post_br_beam"]),
+              view("Top face: rafter housings", t["beam_front"], top_of(t["beam_front"]), sizes=False,
+                   notches=("rafters_front", RAFTER_HOUSING, cot_num_rafters))),
+        piece("Back beam", t["beam_back"],
+              view("Left face", t["beam_back"], F.LEFT, ["post_tl_beam", "upper_back_beam"]),
+              view("Top face: rafter housings", t["beam_back"], top_of(t["beam_back"]), sizes=False,
+                   notches=("rafters_back", RAFTER_HOUSING, cot_num_rafters))),
+        piece("Lower rafter", t["lower_rafter"],
+              view("Front face", t["lower_rafter"], F.FRONT, ["post_br_rafter", "door_post_rafter", "upper_back_rafter"]),
+              view("Back face", t["lower_rafter"], F.BACK, housings=[("house_front", LAP), ("house_back", LAP)], sizes=False)),
+        piece(f"Rafter ×{cot_num_rafters}", t["rafter"], view("Side", t["rafter"], F.RIGHT)),
+        # Floor joists.
+        piece("Middle floor joist", t["joist_mid"],
+              view("Right face", t["joist_mid"], F.RIGHT, [], ["joist_mid_front", "joist_mid_back"]),
+              section("End", t["joist_mid"], "joist_mid_front")),
+        piece("Outer floor joist ×2", t["joist_outer"], view("Side", t["joist_outer"], F.RIGHT, sizes=False, extra=[
+            Measure(*joist_shoulders, placement=Beside(ABOVE))])),
+        *boards_drawings(frame),
+    ]
+
+
+def top_of(timber: Timber) -> TimberFace:
+    """The long face of `timber` that faces up."""
+    return TimberFace[timber.get_closest_oriented_long_face_from_global_direction(create_v3(0, 0, 1)).name]
+
+
+#: A drop-in housing's walls, positional: which two cross the rim is found from their geometry.
+SIDES = ("side.0", "side.1", "side.2", "side.3")
+#: A rafter's housing in a beam: its two walls across the beam.
+RAFTER_HOUSING = ("side.0", "side.2")
+
+
+def boards_drawings(frame: Frame) -> list:
+    """A sheet for each distinct board: its length and width, and in its name how many there are."""
+    from kumiki.csg.symmetry import match_timbers
+
+    kinds = {"infill": "Wall board", "floor_board": "Floor board"}
+    boards = [cut for cut in frame.cut_timbers if any(tag.name in kinds for tag in cut.timber.ticket.tags)]
+    drawings, numbered = [], {}
+    for group in sorted(match_timbers(boards), key=lambda g: float(g.representative.timber.length)):
+        board = group.representative.timber
+        cut = frame.cut_timber_of(board)
+        kind = next(kinds[tag.name] for tag in board.ticket.tags if tag.name in kinds)
+        numbered[kind] = numbered.get(kind, 0) + 1
+        # The show face is the wide one: seen square, its width runs across the sheet.
+        wide_across_x = board.size[0] > board.size[1]
+        face, sides = ((TimberFace.FRONT, (TimberFace.RIGHT, TimberFace.LEFT)) if wide_across_x
+                       else (TimberFace.RIGHT, (TimberFace.FRONT, TimberFace.BACK)))
+        show = Viewport(label="Show face", camera=View.of_face(board, face, scale=scale_to_fit(board)), measurements=[
+            Measure(cut.face(TimberFace.BOTTOM), cut.face(TimberFace.TOP), placement=Beside(ABOVE)),
+            Measure(cut.face(sides[0]), cut.face(sides[1]), placement=Beside(LEFT))])
+        drawings.append(shop_drawing(f"{kind} {chr(64 + numbered[kind])} ×{1 + len(group.matches)}", board, [show]))
+    return drawings
+
+
+def overview_drawing(frame: Frame, t: dict) -> Drawing:
+    """The cot's members seen from the front, the right and above: its overall size and heights."""
+    def facing(timber, x, y, z):
+        return frame.cut_timber_of(timber).face(timber.get_closest_oriented_long_face_from_global_direction(create_v3(x, y, z)))
+
+    def end(timber, face):
+        return frame.cut_timber_of(timber).face(face)
+
+    ground = end(t["post_bl"], TimberFace.BOTTOM)
+    front = Viewport(label="Front", camera=View.world("front", scale=1 / 32), measurements=[
+        Measure(facing(t["post_bl"], -1, 0, 0), facing(t["post_br"], 1, 0, 0), placement=Beside(BELOW)),
+        Measure(ground, facing(t["rim_front"], 0, 0, 1), placement=Beside(LEFT)),
+        Measure(ground, facing(t["rail_front"], 0, 0, 1), placement=Beside(LEFT, 2)),
+        Measure(ground, facing(t["beam_front"], 0, 0, 1), placement=Beside(LEFT, 3)),
+    ])
+    side = Viewport(label="Right", camera=View.world("right", scale=1 / 32), measurements=[
+        Measure(facing(t["post_br"], 0, -1, 0), facing(t["post_tr"], 0, 1, 0), placement=Beside(BELOW, 2)),
+        Measure(facing(t["post_br"], 0, 1, 0), facing(t["door_post"], 0, -1, 0), placement=Beside(BELOW)),
+        Measure(ground, facing(t["beam_back"], 0, 0, 1), placement=Beside(RIGHT)),
+    ])
+    plan = Viewport(label="Plan", camera=View.world("top", scale=1 / 32), measurements=[
+        Measure(facing(t["rim_left"], -1, 0, 0), facing(t["rim_right"], 1, 0, 0), placement=Beside(BELOW)),
+        Measure(facing(t["rim_front"], 0, -1, 0), facing(t["rim_back"], 0, 1, 0), placement=Beside(LEFT)),
+    ])
+    timbers = [cut.timber for cut in frame.cut_timbers
+               if not any(tag.name in {"board", "floor_board"} for tag in cut.timber.ticket.tags)]
+    return Drawing(name="Cat corner cot", timbers=timbers,
+                   viewports=[covering_page(columns(rows(front, side), rows(plan, Viewport(label="Preview"))))])
 
 
 # ============================================================================
@@ -2052,8 +2501,8 @@ def cat_corner_cot(k: Optional[Kiwari] = None) -> Frame:
     cot_floor_boards = create_cot_floor_boards()
 
     # 2. Cut mortise and tenon joints and housing joints
-    rim_cuts_by_path, rim_pegs = cut_rim_joist_corner_joints(cot_posts, cot_rim_joists)
-    rail_cuts_by_path, rail_pegs = cut_rail_and_post_joints(
+    rim_cuts_by_path, rim_pegs, rim_joints = cut_rim_joist_corner_joints(cot_posts, cot_rim_joists)
+    rail_cuts_by_path, rail_pegs, rail_joints = cut_rail_and_post_joints(
         posts=cot_posts,
         rails_and_studs=cot_rails_and_studs,
         roof_beams=cot_roof_beams,
@@ -2063,7 +2512,7 @@ def cat_corner_cot(k: Optional[Kiwari] = None) -> Frame:
         upper_front_studs=cot_upper_front_studs,
         floor_joists=cot_floor_joists,
     )
-    rafter_housing_cuts = cut_rafter_housing_joints(cot_roof_beams, cot_rafters)
+    rafter_housing_cuts, rafter_joints = cut_rafter_housing_joints(cot_roof_beams, cot_rafters)
 
     all_cuts: dict[str, list[Cutting]] = {}
     for path, cuts in rim_cuts_by_path.items():
@@ -2107,4 +2556,12 @@ def cat_corner_cot(k: Optional[Kiwari] = None) -> Frame:
         name="Cat Corner Cot",
         footprints=[cot_footprint],
     )
-    return with_auto_drawings(frame, fixed_path="cot_post_BL", dimensioned=_is_member)
+    joints = {**rim_joints, **rail_joints, **rafter_joints}
+    members = dict(zip(["post_bl", "post_br", "post_tr", "post_tl", "post_upper"], cot_posts))
+    members.update(zip(["rim_front", "rim_right", "rim_back", "rim_left"], cot_rim_joists))
+    members.update(zip(["rail_front", "stud_mid", "door_post", "rail_right"], cot_rails_and_studs))
+    members.update(zip(["beam_back", "beam_front"], cot_roof_beams))
+    members.update(zip(["girt_front", "girt_back"], cot_stepped_girts))
+    members.update(lower_rafter=cot_lower_rafter, stud_upper=cot_upper_front_studs[0], rafter=cot_rafters[0],
+                   joist_outer=cot_floor_joists[0], joist_mid=cot_floor_joists[1])
+    return replace(frame, drawings=cot_drawings(frame, members, joints))

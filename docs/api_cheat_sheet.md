@@ -215,6 +215,8 @@ To add measurements by manually, make a `Drawing` whose `measurements` are `Meas
 - `Joint.feature`, `CutTimber.feature` / `face` / `edge` / `corner` (kumiki/timber.py), and the names in `kumiki/joints/workshop/feature_names.py`, name the features to measure between; the `describe` tool lists them for a timber
 - `kumiki/finishing.py`: `Finishing`
 - an example: `patterns/structures/dovetailed_sawhorse.py`; and "Generating drawings" in `agent_usage_instructions.md`
+- drawn by hand, no generation: `patterns/structures/my_cute_frame.py` (small), `hidden_structures/cat_corner_cot.py` (a whole frame, with helpers); and "Drawing by hand" in `agent_usage_instructions.md`
+- `unknown_features(frame, drawing)` (kumiki/drawings/auto_drawings.py): what a one-piece drawing's dimensions leave unknown, from the feature solver
 
 
 ## Examples

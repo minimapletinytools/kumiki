@@ -17,7 +17,7 @@ from kumiki.csg.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Matrix, Orientation, Transform, create_v2, create_v3, scalar
 from tests.testing_shavings import present
-from kumiki.csg.carriers import BarrelCoord, CarrierRef, PlaneCoord
+from kumiki.csg.carriers import BarrelCoord, CarrierMap, CarrierPlane, CarrierRef, PlaneCoord
 from kumiki.csg.solve_recipe import (
     combine, feature_dof_rows, locate_recipe,
     direction_motion, motion_along, moved_by, perturbed,
@@ -583,6 +583,27 @@ class TestMidplane:
 
         _assert_rows_match(_measure(carriers, anchors, _v(0.2, 1, 0.5)),
                            _finite_difference_row(carriers, anchors, _v(0.2, 1, 0.5)))
+
+    def test_a_face_merged_into_a_carrier_facing_the_other_way_still_makes_the_midplane(self):
+        # A face flush with another is solved through their merged carrier, which can face either way.
+        prism = self._prism(turn=0.4)
+        _, recipe = self._centerplane(prism)
+        carriers = carrier_map(prism)
+        back = recipe[0].back
+
+        class Flipped(CarrierMap):
+            def carrier(self, ref):
+                found = super().carrier(ref)
+                if self.canonical(ref) != self.canonical(back):
+                    return found
+                assert isinstance(found, CarrierPlane)
+                return CarrierPlane(Plane(normal=-found.plane.normal, point=found.plane.point))
+
+        flipped = Flipped(carriers._carriers, carriers._canonical)
+        where, moved = _plane(locate_recipe(recipe)), _plane(locate_recipe(recipe, flipped.carrier))
+        assert abs(float(_np(where.normal) @ _np(moved.normal))) == pytest.approx(1)
+        assert float(_np(moved.normal) @ (_np(moved.point) - _np(where.point))) == pytest.approx(0, abs=1e-9)
+        assert len(feature_dof_rows(recipe, flipped)) == 3
 
     def test_two_faces_that_are_not_parallel_have_no_midplane(self):
         prism = replace(self._prism(), extra_features=(
