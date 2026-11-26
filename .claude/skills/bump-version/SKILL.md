@@ -38,7 +38,9 @@ kigumi enforces this at runtime and will refuse to start if they diverge.
 
 1. Ensure clean working tree before bumping:
    - `git status --porcelain`
-   - If dirty, stop and ask user how to proceed.
+   - If dirty, stop and ask user how to proceed. One way that leaves their checkout alone:
+     release from a clean worktree of `origin/main` (`git worktree add --detach <dir> origin/main`),
+     then push its commit with `git push origin HEAD:main`.
 2. Sync local `main`:
    - `git checkout main`
    - `git pull --ff-only`
@@ -164,10 +166,13 @@ Each of these has let a broken release out before.
    done
    ```
 4. **Patch bumps: the new kigumi must run on every kumiki it accepts.** A patch release of
-   kigumi still accepts `kumiki~=X.Y.0`, so its `runner.py` must not import anything the
-   oldest `X.Y` kumiki lacks. Check every `from kumiki... import` in `kigumi/runner.py` against
-   `git archive kumiki-vX.Y.0 kumiki`. If names are missing, the release needs a minor bump
-   instead -- tell the user before going on.
+   kigumi accepts `kumiki~=X.Y.0`, upgrading to `kumikiMinimum` when it is set, so its
+   `runner.py` must not import anything the oldest kumiki it runs on lacks: `kumikiMinimum`'s
+   tag if set, else `kumiki-vX.Y.0`. Check every `from kumiki... import` in `kigumi/runner.py`,
+   including the ones inside functions, against `git archive <that tag> kumiki`. If names are
+   missing, release kumiki too (a patch, if what's missing was added in this `X.Y`) and set
+   `kumikiMinimum` to it; tell the user why kumiki is in the release. kigumi 0.9.13 needed this:
+   its runner imported `kumiki.drawings.xray` and others not yet in any kumiki release.
 5. **CI on `main` is green** for the commit being released: `gh run list --branch main --limit 5`.
    Name any failure that already existed before this release rather than blocking on it.
 
@@ -252,14 +257,6 @@ subsections (omit whichever project wasn't part of this release).
    - Insert a fresh, empty `## [Unreleased]` section above it (just the heading, no subheadings —
      add those only when something is actually added there).
 
-## Pre-commit: Regenerate agent context bundle
-
-Before committing, always regenerate the bundled usage instructions:
-
-```bash
-cat docs/agent_usage_instructions.md > kigumi/.generated/bundled-usage-instructions.md
-```
-
 ## Commit and tag
 
 Single commit message when both are bumped:
@@ -274,7 +271,7 @@ Single-target messages:
 Commands:
 
 ```bash
-git add pyproject.toml kumiki/__init__.py kigumi/package.json kigumi/.generated/bundled-usage-instructions.md CHANGELOG.md
+git add pyproject.toml kumiki/__init__.py kigumi/package.json CHANGELOG.md
 # also add kigumi/__tests__/project-initializer.test.js (or wherever fixtures were updated) if this was a minor/major bump
 git commit -m "<message>"
 git tag -a "kumiki-vX.Y.Z" -m "Release kumiki vX.Y.Z"
