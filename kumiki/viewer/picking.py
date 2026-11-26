@@ -253,8 +253,9 @@ def features_near_ray(
             place = (local_pt if _hit_key(hit) in at_surface
                      else _place_off_surface(hit, root, timber, origin, direction))
         depth = _along_ray(origin, direction, place) if place is not None else math.inf
-        candidates.append(PointerCandidate(hit, place, depth, 0.0))
-    return candidates
+        candidates.append(PointerCandidate(hit, place, depth, 0.0,
+                                           pointer_score(hit, place, origin, direction, tolerances)))
+    return sorted(candidates, key=pick_order)
 
 
 def _place_off_surface(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: Optional['PerfectTimberWithin'],
@@ -358,11 +359,72 @@ def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> 
 
 
 class PointerCandidate(NamedTuple):
-    """A feature under the pointer in a drawing view: its depth along the ray, and its depth group (order_along_ray)."""
+    """A feature under the pointer: its depth along the ray, its depth group (order_along_ray), and how
+    near the pointer it is (pointer_score)."""
     hit: 'OwnedFeatureHit'
     place: Optional[Float3]
     depth: float
     group: float
+    score: float = 0.0
+
+
+def pointer_score(hit: 'OwnedFeatureHit', place: Optional[Float3], origin: Float3, direction: Float3,
+                  tolerances: 'FeatureTestTolerances') -> float:
+    """Return how near the pointer a feature is, across the view: lower is nearer.
+
+    A line or point by its distance from the ray, a corner (or a line seen end-on) given half the edge
+    slack (it is smaller to aim at), a face seen edge-on by its distance plus a sixth of the slack (an edge drawn on the
+    same line wins), and a face seen at an angle last: it is the surface the pointer is on.
+    Ordering by this before feature priority is what lets a short edge be picked between its
+    corners: by priority alone a corner within its slack always won, and on a short edge the two
+    corners' slack covered all of it.
+    """
+    from kumiki.geometry import Plane, Point
+
+    slack = float(tolerances.edge)
+    located = hit.feature.locate_simple_unbounded(hit.owner)
+
+    def across(point: Float3) -> float:
+        offset = point - origin
+        flat = offset - direction * offset.dot(direction)
+        return math.sqrt(flat.dot(flat))
+
+    if isinstance(located, Plane):
+        normal = Float3.of(located.normal).unit()
+        if normal is None or abs(normal.dot(direction)) > 1e-6:
+            return math.inf
+        return abs(normal.dot(origin - Float3.of(located.point))) + slack / 6
+    if isinstance(located, Point):
+        return across(Float3.of(located.position)) - slack / 2
+    if isinstance(located, Line):
+        run = Float3.of(located.direction).unit()
+        point = Float3.of(located.point)
+        if run is None:
+            return 0.0
+        skew = direction.cross(run)
+        size = math.sqrt(skew.dot(skew))
+        if size < 1e-9:  # along the ray: drawn as a point, and aimed at as one
+            return across(point) - slack / 2
+        return abs((point - origin).dot(skew)) / size
+    return across(place) if place is not None else 0.0
+
+
+def pick_tier(hit: 'OwnedFeatureHit') -> int:
+    """Return 1 for a reference plane (a centerplane, a perfect-timber face), which comes after every
+    line and point; else 0. Lines and points compete on how near the pointer they are, axes and
+    reference edges included: a reference edge usually lies on a real arris."""
+    from kumiki.csg.cutcsg import CSGFeatureType
+
+    return int(not hit.feature.real and hit.feature.feature_type() is CSGFeatureType.FACE)
+
+
+def pick_order(candidate: 'PointerCandidate') -> Tuple:
+    """Return a candidate's place in the pick order: its tier (pick_tier), how near the pointer
+    (pointer_score), its depth group (nearer the camera first, among features drawn on one line),
+    then the library's priority."""
+    from kumiki.csg.cutcsg import feature_hit_sort_key
+
+    return (pick_tier(candidate.hit), round(candidate.score, 9), candidate.group, feature_hit_sort_key(candidate.hit))
 
 
 def candidates_under_pointer(
@@ -380,8 +442,9 @@ def candidates_under_pointer(
              for candidate in features_near_ray(root, local_pt, tolerances, local_ray, timber)}
     separation = float(tolerances.edge)
     depths = {key: candidate.depth for key, candidate in found.items()}
+    scores = {key: candidate.score for key, candidate in found.items()}
     ordered = order_along_ray(measurable_in_view([candidate.hit for candidate in found.values()], direction, separation),
-                              depths, separation)
+                              depths, separation, scores)
     groups = _depth_groups(ordered, depths, separation)
     return [found[_hit_key(hit)]._replace(group=groups[_hit_key(hit)]) for hit in ordered]
 
@@ -450,12 +513,18 @@ def _along_ray(origin: Float3, direction: Float3, point) -> float:
 
 def order_along_ray(
     hits: List['OwnedFeatureHit'], depth_of: Dict[Tuple[str, int], float], separation: float,
+    score_of: Optional[Dict[Tuple[str, int], float]] = None,
 ) -> List['OwnedFeatureHit']:
-    """Return `hits` sorted by depth group along the ray, then by the library's order. Groups start `separation` apart."""
+    """Return `hits` sorted by depth group along the ray, then as pick_order puts them (by `score_of`,
+    pointer_score; without it by the library's order). Groups start `separation` apart."""
     from kumiki.csg.cutcsg import feature_hit_sort_key
 
     starts = _depth_groups(hits, depth_of, separation)
-    return sorted(hits, key=lambda hit: (starts[_hit_key(hit)], feature_hit_sort_key(hit)))
+    scores = score_of or {}
+
+    def key(hit):
+        return (pick_tier(hit), round(scores.get(_hit_key(hit), 0.0), 9), starts[_hit_key(hit)], feature_hit_sort_key(hit))
+    return sorted(hits, key=key)
 
 
 def _depth_groups(
@@ -1114,6 +1183,7 @@ def drawing_candidates(
         if start is None or depth - start > separation:
             start = depth
         group_of[index] = start
+    # Depth order first: what is hidden is found by what a nearer feature draws over.
     ordered = sorted(range(len(found)), key=lambda index: (group_of[index], feature_hit_sort_key(found[index].candidate.hit)))
     found = [found[index]._replace(candidate=found[index].candidate._replace(group=group_of[index])) for index in ordered]
 
@@ -1146,4 +1216,6 @@ def drawing_candidates(
             hidden.append(one)
         else:
             visible.append(one)
-    return visible + revealed + hidden, len(visible) + len(revealed)
+    # Then, within each, nearest the pointer first.
+    by_pointer = lambda some: sorted(some, key=lambda one: pick_order(one.candidate))
+    return by_pointer(visible) + by_pointer(revealed) + by_pointer(hidden), len(visible) + len(revealed)

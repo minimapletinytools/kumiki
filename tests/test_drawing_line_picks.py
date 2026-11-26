@@ -19,6 +19,8 @@ from tests.module_isolation import restore_modules
 REPO = Path(__file__).resolve().parent.parent
 PIXEL = 0.001  # metres a pixel is worth at the zoom these tolerances stand for
 TOLERANCES = {"face": 5e-4, "edge": 6 * PIXEL, "point": 10 * PIXEL}
+#: How far along a line to click: not its middle, where a peg's axis or a centreline often crosses it.
+AIM = 0.3
 LOOKS = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
 
 
@@ -38,7 +40,7 @@ def frame():
     restore_modules(saved_modules)
 
 
-def _click(frame, member, origin, look):
+def _click(frame, member, origin, look, tolerances=TOLERANCES):
     """What a click takes along the ray from `origin`, with only `member` drawn: the runner's reply."""
     runner, slot = frame
     a, b, c = runner._world_triangles(slot.mesh_cache[member])
@@ -51,7 +53,7 @@ def _click(frame, member, origin, look):
     u, q = (s * p).sum(1) * inv, np.cross(s, e1)
     w, t = (look * q).sum(1) * inv, (e2 * q).sum(1) * inv
     struck = ok & (u >= 0) & (w >= 0) & (u + w <= 1) & (t > 0)
-    payload = {"currentPath": [], "ctrlClick": False, "space": "projected", "tolerances": TOLERANCES,
+    payload = {"currentPath": [], "ctrlClick": False, "space": "projected", "tolerances": tolerances,
                "look": [float(x) for x in look], "drawnMembers": [member],
                "ray": {"origin": [float(x) for x in origin], "direction": [float(x) for x in look]}}
     if struck.any():
@@ -89,12 +91,19 @@ def _nearest_line(starts, runs, origin, look):
     return np.linalg.norm(flat_starts + flat_runs * t[:, None], axis=1)
 
 
+def _nearest_corner(starts, runs, origin, look):
+    """How far the nearest end of a drawn segment is from the ray, across the view."""
+    ends = np.concatenate([starts, starts + runs])
+    return float(_across(ends, origin, look).min())
+
+
 def test_the_mortise_mouth_is_taken_from_either_side(frame):
     # Looking at Left Side's inner face: the mouth's top edge, from the face above it and from
-    # inside the mortise below it, where the ray strikes the mortise's back.
+    # inside the mortise below it, where the ray strikes the mortise's back. Clear of the middle,
+    # where the peg's axis crosses it.
     look = np.array([-1.0, 0, 0])
     for dz in (-2 * PIXEL, 2 * PIXEL):
-        reply = _click(frame, "Left Side#0", np.array([0.5, 0.2, 0.02 + dz]), look)
+        reply = _click(frame, "Left Side#0", np.array([0.5, 0.22, 0.02 + dz]), look)
         assert reply.get("featureLabel") == "arris.7", dz
 
 
@@ -109,7 +118,7 @@ def test_a_click_beside_a_drawn_line_takes_it(frame, member):
             length = float(np.linalg.norm(run))
             if length < 0.01 or abs(run @ look) / length > 0.01:
                 continue  # too short to aim at the middle of, or seen end-on
-            middle = start + run / 2
+            middle = start + run * AIM  # clear of the axes and centrelines through a line's middle
             # The same stretch of sheet, drawn again deeper: one click there tells for both.
             sheet = tuple(np.round(np.concatenate([middle - look * (middle @ look), np.abs(run) / length]), 4))
             if sheet in tested:
@@ -120,8 +129,11 @@ def test_a_click_beside_a_drawn_line_takes_it(frame, member):
             across = np.cross(look, run / length)
             for pixels in (-2, 2):
                 origin = middle + across * pixels * PIXEL - look * 5
-                if _nearest_line(starts, runs, origin, look).min() < _nearest_line(start[None], run[None], origin, look)[0] - 1e-6:
+                own = _nearest_line(start[None], run[None], origin, look)[0]
+                if _nearest_line(starts, runs, origin, look).min() < own - 1e-6:
                     continue  # another drawn line is nearer the pointer
+                if _nearest_corner(starts, runs, origin, look) - 3 * PIXEL < own:
+                    continue  # a corner is, given the slack a corner gets
                 if not _on_line(_click(frame, member, origin, look), start, run, look):
                     misses.append((tuple(look), tuple(np.round(middle, 3)), pixels))
     assert not misses
@@ -149,3 +161,27 @@ def test_a_faces_triangulation_is_no_drawn_line(frame):
             assert runner._mesh_point_near_ray(entry, Float3.of(origin), Float3.of(look), reach) is None
             aimed += 1
     assert aimed
+
+
+@pytest.mark.parametrize("member", ["Left Side#0", "Back Cross#0"])
+def test_a_short_line_is_taken_between_its_corners(frame, member):
+    # Zoomed out, a corner's slack (10 px) can reach past the middle of a short line. A click on its
+    # middle is still nearer the line than either corner, and takes the line.
+    pixel = 0.004
+    coarse = {"face": 5e-4, "edge": 6 * pixel, "point": 10 * pixel}
+    runner, slot = frame
+    starts, runs = runner._world_creases(slot.mesh_cache[member])
+    tried, misses = 0, []
+    for look in (np.array(one, float) for one in LOOKS):
+        for start, run in zip(starts, runs):
+            length = float(np.linalg.norm(run))
+            if not 0.01 < length < 2 * coarse["point"] or abs(run @ look) / length > 0.01:
+                continue
+            middle = start + run / 2
+            if not _on_line(_click(frame, member, middle - look * 5, look), start, run, look):
+                continue  # hidden, or not a line a click takes here even up close
+            tried += 1
+            if not _on_line(_click(frame, member, middle - look * 5, look, coarse), start, run, look):
+                misses.append((tuple(look), tuple(np.round(middle, 3)), round(length, 3)))
+    assert tried
+    assert not misses
