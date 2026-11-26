@@ -78,29 +78,41 @@ def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) 
     return [(radial, row)]
 
 
-def _midplane_normal(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, float]:
-    """Return the midplane's unit normal and |n_front - n_back|."""
+def _midplane_normals(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, np.ndarray]:
     normals = []
     for ref in (part.front, part.back):
         carrier = carriers.carrier(ref)
         if not isinstance(carrier, CarrierPlane):
             raise ValueError("a midplane is between two planes")
         normals.append(unit_ndarray(as_ndarray(carrier.plane.normal)))
-    difference = normals[0] - normals[1]
-    length = float(np.linalg.norm(difference))
+    return normals[0], normals[1]
+
+
+def _back_sign(part: Midplane, carriers: CarrierMap) -> float:
+    """Return how the back plane enters the midplane: -1 if it faces away from the front, as two faces
+    of a solid do, else +1. A carrier merged from coinciding planes can face either way."""
+    front, back = _midplane_normals(part, carriers)
+    return -1.0 if float(front @ back) < 0 else 1.0
+
+
+def _midplane_normal(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, float]:
+    """Return the midplane's unit normal and |n_front ± n_back| (see _back_sign)."""
+    front, back = _midplane_normals(part, carriers)
+    combined = front + _back_sign(part, carriers) * back
+    length = float(np.linalg.norm(combined))
     if length < 1e-12:
-        raise ValueError("a midplane's two planes face the same way")
-    return difference / length, length
+        raise ValueError("a midplane's two planes are not parallel")
+    return combined / length, length
 
 
 def _part_constraints(part: RecipePart, carriers: CarrierMap, at: np.ndarray) -> List[Constraint]:
     if isinstance(part, CarrierRef):
         return _carrier_constraints(part, carriers, at)
-    # d((n_f - n_b) . x - (d_f - d_b)) = 0, so (n_f - n_b) . dx is the front's form less the back's.
+    # d((n_f ± n_b) . x - (d_f ± d_b)) = 0, so (n_f ± n_b) . dx is the front's form with the back's.
     normal, length = _midplane_normal(part, carriers)
     [(_, front)] = _carrier_constraints(part.front, carriers, at)
     [(_, back)] = _carrier_constraints(part.back, carriers, at)
-    return [(normal, _scale_row(combine(front, back, -1.0), 1.0 / length))]
+    return [(normal, _scale_row(combine(front, back, _back_sign(part, carriers)), 1.0 / length))]
 
 
 def motion_along(recipe: Recipe, carriers: CarrierMap, at: V3, along: V3) -> Row:
@@ -196,7 +208,7 @@ def _part_direction(part: RecipePart, carriers: CarrierMap) -> Tuple[np.ndarray,
     normal, length = _midplane_normal(part, carriers)
     (_, front), (_, back) = _carrier_direction(part.front, carriers), _carrier_direction(part.back, carriers)
     across = np.eye(3) - np.outer(normal, normal)
-    change = _sum_vector_rows(front, _scale_vector_row(back, -1.0))
+    change = _sum_vector_rows(front, _scale_vector_row(back, _back_sign(part, carriers)))
     return normal, _scale_vector_row(transform_vector_row(change, across), 1.0 / length)
 
 
@@ -266,7 +278,8 @@ def _part_geometry(part: RecipePart,
         return None
     normals = [unit_ndarray(as_ndarray(plane.normal)) for plane in planes]
     offsets = [float(n @ as_ndarray(plane.point)) for n, plane in zip(normals, planes)]
-    normal, offset = normals[0] - normals[1], offsets[0] - offsets[1]
+    sign = -1.0 if float(normals[0] @ normals[1]) < 0 else 1.0  # as _back_sign
+    normal, offset = normals[0] + sign * normals[1], offsets[0] + sign * offsets[1]
     if float(normal @ normal) < 1e-24:
         return None
     return Plane(normal=Matrix(unit_ndarray(normal)), point=Matrix(normal * offset / float(normal @ normal)))
