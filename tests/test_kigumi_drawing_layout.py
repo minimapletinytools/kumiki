@@ -282,3 +282,15 @@ def test_a_turned_view_keeps_its_measurements_on_the_plane_they_were_made_in(exa
     behind["layout"] = _aimed(scene["layout"], name, {"look": [-v for v in look], "up": _views(scene)[name]["camera"]["up"]})
     assert name in runner._aim_viewports(behind, frame)
     assert "plane" not in runner._resolve_in_view(frame, zoomed, name, {"a": None, "b": None}, None)
+
+
+def test_a_measurement_made_in_the_viewer_is_behind_a_view_that_looks_at_its_back():
+    made = {"plane": {"at": [0, 0, 0], "normal": [0, 1, 0]}, "origin": runner.ORIGIN_FILE}
+    assert not runner._seen_from_behind(made, [0, 1, 0], None)
+    assert runner._seen_from_behind(made, [0, -1, 0], None)
+    # Turned back to the way it was made: in front again, whatever the code's camera is.
+    assert not runner._seen_from_behind(made, [0, 1, 0], {"look": [0, -1, 0]})
+    # A plane from code faces either way: behind only once the view is turned round.
+    coded = {**made, "origin": runner.ORIGIN_CODE}
+    assert not runner._seen_from_behind(coded, [0, -1, 0], None)
+    assert runner._seen_from_behind(coded, [0, -1, 0], {"look": [0, 1, 0]})

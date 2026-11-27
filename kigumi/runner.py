@@ -3101,17 +3101,43 @@ def _resolve_in_view(
 ) -> MeasureWire:
     """Resolve a measurement in its view; in a turned view, one without a plane as the view was, and
     marked as not matching it -- turned round, the same plane is seen from the other side, where what it
-    measures may be hidden."""
+    measures may be hidden. One with a plane is marked so when the view looks at its back."""
     from kumiki.drawings.measure import ViewAxes
 
     if was is None or measure.get("plane"):
-        return _resolve_measurement(frame, measure, _viewport_axes(scene, viewport))
+        axes = _viewport_axes(scene, viewport)
+        resolved = _resolve_measurement(frame, measure, axes)
+        if axes is not None and _seen_from_behind(measure, axes.look, was):
+            _mark_plane_mismatch(resolved)
+        return resolved
     resolved = _resolve_measurement(frame, measure, ViewAxes.from_wire(was))
     resolved["plane"] = {"at": list(was.get("target") or [0.0, 0.0, 0.0]), "normal": list(was["look"])}
+    _mark_plane_mismatch(resolved)
+    return resolved
+
+
+def _mark_plane_mismatch(resolved: MeasureWire) -> None:
     settled = resolved.get("settled")
     if settled is not None:
         resolved["settled"] = {**settled, "reason": "plane-mismatch"}
-    return resolved
+
+
+def _seen_from_behind(measure: MeasureWire, look: 'VectorLike', was: Optional[CameraWire]) -> bool:
+    """Whether a view looks at the back of a measurement's plane.
+
+    One made in the viewer faces the view it was made in. A plane written in code may face either way,
+    so it only counts as behind once its view has been turned to look the other way.
+    """
+    normal = (measure.get("plane") or {}).get("normal")
+    if not normal:
+        return False
+    if measure.get("origin") == ORIGIN_FILE:
+        facing = normal
+    elif was is not None:
+        facing = was["look"]
+    else:
+        return False
+    return sum(float(a) * float(b) for a, b in zip(facing, look)) < 0
 
 
 def _attach_measurements(
