@@ -292,7 +292,7 @@
 
 .vp-tool-disabled { cursor: not-allowed; opacity: 0.4; }
 
-/* The two ways a drop on this edge can go: the band nearer the edge, and the one further in. */
+/* The ways a drop on this edge can go, a strip each, outermost nearest the edge. */
 .vp-zone {
     fill: var(--hv-accent, #4a7dbd);
     fill-opacity: 0.08;
@@ -303,8 +303,9 @@
 
 .vp-zone-active { fill-opacity: 0.3; }
 
-/* A new row or column of the grid: dashed, so it reads apart from a split of one view. */
-.vp-drop-outer { stroke-dasharray: 8 4; }
+/* A new row or column of the grid, and one more in a row or column: dashed apart from a split of one view. */
+.vp-drop-outer { stroke-dasharray: 10 4; }
+.vp-drop-sibling { stroke-dasharray: 3 3; }
 
 .vp-drop-label {
     fill: var(--hv-accent, #4a7dbd);

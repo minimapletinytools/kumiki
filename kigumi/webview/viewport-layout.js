@@ -223,60 +223,101 @@ function placeBesidePath(layout, node, path, side) {
     return next;
 }
 
+const directionOf = (side) => (side === 'left' || side === 'right' ? 'columns' : 'rows');
+
+/** Whether the node at `path` sits in a split running `direction`. */
+function inSplitRunning(layout, path, direction) {
+    return path.length > 1 && nodeAt(layout, path.slice(0, -1)).split.direction === direction;
+}
+
 /**
- * Where else a view dropped on `target`'s `side` edge could go: beside the largest group around
- * the target whose edge that is too -- a new row or column of the grid rather than a split of the
- * one view. Its path, or null when that is the target's own place (placeBeside's).
+ * The group around `target` a new row or column on its `side` edge would go beside: the nearest
+ * enclosing node, above the target's own list, that sits in a split running that way (or the
+ * root), and whose edge that is too. Its path, or null.
  */
 function outerPlace(layout, target, side, page) {
     const path = findLeaf(layout, target);
     if (!path) return null;
-    const direction = side === 'left' || side === 'right' ? 'columns' : 'rows';
-    const runs = (at) => at.length > 1 && nodeAt(layout, at.slice(0, -1)).split.direction === direction;
-    let at = runs(path) ? path.slice(0, -1) : path;
-    while (at.length > 1 && !runs(at)) at = at.slice(0, -1);
+    const direction = directionOf(side);
+    let at = inSplitRunning(layout, path, direction) ? path.slice(0, -1) : path;
+    while (at.length > 1 && !inSplitRunning(layout, at, direction)) at = at.slice(0, -1);
     if (at.join('.') === path.join('.')) return null;
     const cells = new Map(layoutCells(layout, page).map((cell) => [cell.path.join('.'), cell.inner]));
-    const mine = cells.get(path.join('.'));
-    const outer = cells.get(at.join('.'));
     const edge = (rect) => ({ left: rect[0], right: rect[0] + rect[2], top: rect[1], bottom: rect[1] + rect[3] }[side]);
-    return Math.abs(edge(mine) - edge(outer)) < 1e-6 ? at : null;
-}
-
-/** `rect`'s half on `side`: where a view put beside it lands. */
-function halfOn(rect, side) {
-    const [x, y, width, height] = rect;
-    return { left: [x, y, width / 2, height], right: [x + width / 2, y, width / 2, height],
-        top: [x, y, width, height / 2], bottom: [x, y + height / 2, width, height / 2] }[side];
+    return Math.abs(edge(cells.get(path.join('.'))) - edge(cells.get(at.join('.')))) < 1e-6 ? at : null;
 }
 
 /**
- * What a view dropped on `target`'s `side` edge can do, nearest the edge first: join the group
- * whose edge it also is ('outer', see outerPlace), and split the target's own place ('inner').
- * Each with the rect it would take.
+ * Put `node` into the list the node at `path` is in, beside it on `side`, as big as it is: the
+ * list's others give up the room. A node in no list running that way is put in a new one with it.
+ */
+function insertBesidePath(layout, node, path, side) {
+    const next = clone(layout);
+    const before = side === 'left' || side === 'top';
+    if (inSplitRunning(next, path, directionOf(side))) {
+        const index = path[path.length - 1];
+        const portions = nodeAt(next, path.slice(0, -1)).split.portions;
+        const { node: _node, ...size } = portions[index];
+        portions.splice(before ? index : index + 1, 0, { ...size, node });
+        return next;
+    }
+    return wrapPath(next, node, path, side);
+}
+
+/** Split the node at `path` in two with `node`, on `side`, whatever list it is in. */
+function wrapPath(layout, node, path, side) {
+    const next = clone(layout);
+    const before = side === 'left' || side === 'top';
+    const targetNode = bare(nodeAt(next, path));
+    const pair = before ? [node, targetNode] : [targetNode, node];
+    replaceAt(next, path, { split: { direction: directionOf(side), gap: 0, portions: pair.map((one) => ({ share: 1, node: one })) } });
+    return next;
+}
+
+/**
+ * `node` put beside `target` on `side`, one of three ways (`level`): 'outer', a new row or column
+ * of the group around it (outerPlace); 'sibling', one more in the target's own list; 'split', the
+ * target's cell split in two. One that can't be done here falls back to the next.
+ */
+function placeAt(layout, node, target, side, level, page) {
+    const path = findLeaf(layout, target);
+    if (!path) return clone(layout);
+    const outer = level === 'outer' && page ? outerPlace(layout, target, side, page) : null;
+    if (outer) return insertBesidePath(layout, node, outer, side);
+    if (level !== 'split' && inSplitRunning(layout, path, directionOf(side))) return insertBesidePath(layout, node, path, side);
+    return wrapPath(layout, node, path, side);
+}
+
+/**
+ * What a view dropped on `target`'s `side` edge can do, nearest the edge first: 'outer', 'sibling'
+ * and 'split' (placeAt), those that can be done here and come out differently, each with the rect
+ * the view would take.
  */
 function dropChoices(layout, target, side, page) {
-    const cells = new Map(layoutCells(layout, page).map((cell) => [cell.path.join('.'), cell.inner]));
     const path = findLeaf(layout, target);
     if (!path) return [];
-    const outer = outerPlace(layout, target, side, page);
-    return [
-        ...(outer ? [{ level: 'outer', rect: halfOn(cells.get(outer.join('.')), side) }] : []),
-        { level: 'inner', rect: halfOn(cells.get(path.join('.')), side) },
+    const probe = '\u0000drop';
+    const choices = [];
+    const levels = [
+        ...(outerPlace(layout, target, side, page) ? ['outer'] : []),
+        ...(inSplitRunning(layout, path, directionOf(side)) ? ['sibling'] : []),
+        'split',
     ];
+    for (const level of levels) {
+        const rect = resolveLayout(placeAt(layout, { leaf: probe }, target, side, level, page), page).get(probe);
+        if (rect && !choices.some((one) => one.rect.every((value, index) => Math.abs(value - rect[index]) < 1e-9))) {
+            choices.push({ level, rect });
+        }
+    }
+    return choices;
 }
 
-/**
- * The tree with `name` moved beside `target`: into the target's own place (placeBeside), or with
- * `level` 'outer' beside the group around it (dropChoices).
- */
-function dockLeaf(layout, name, target, side, level = 'inner', page = null) {
+/** The tree with `name` moved beside `target`, `level` of the ways placeAt has. */
+function dockLeaf(layout, name, target, side, level = 'split', page = null) {
     const path = findLeaf(layout, name);
     if (!path || name === target || !findLeaf(layout, target)) return clone(layout);
     const node = bare(clone(nodeAt(layout, path)));
-    const rest = removeLeaf(layout, name);
-    const outer = level === 'outer' && page ? outerPlace(rest, target, side, page) : null;
-    return outer ? placeBesidePath(rest, node, outer, side) : placeBeside(rest, node, target, side);
+    return placeAt(removeLeaf(layout, name), node, target, side, level, page);
 }
 
 /** A name for a copy of `name` that no view has: "Front 2", "Front 3", ... */

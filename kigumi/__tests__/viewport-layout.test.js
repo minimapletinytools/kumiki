@@ -109,20 +109,29 @@ test('the views a change moves are the ones whose rects changed', () => {
     expect(L.movedLeaves(GRID, GRID, PAGE)).toEqual([]);
 });
 
-test('a drop on an edge the group around the view shares can join that group or split the view', () => {
-    // A's bottom is only A's; its right edge is the left column's too, which C is beside.
-    expect(L.dropChoices(GRID, 'A', 'bottom', PAGE).map((one) => one.level)).toEqual(['inner']);
-    const right = L.dropChoices(GRID, 'A', 'right', PAGE);
-    expect(right.map((one) => one.level)).toEqual(['outer', 'inner']);
-    near(right[0].rect, [0.375, 0, 0.375, 1]);  // half the left column
-    near(right[1].rect, [0.375, 0, 0.375, 0.483164983]);  // half of A
+test('a drop on an edge goes one of up to three ways, nearest the edge first', () => {
+    const levels = (target, side) => L.dropChoices(GRID, target, side, PAGE).map((one) => one.level);
+    // A's bottom is only A's, and A is in a list running down: one more in it, or a split of A.
+    expect(levels('A', 'bottom')).toEqual(['sibling', 'split']);
+    // A's right is its column's too, and C is beside that column.
+    expect(levels('A', 'right')).toEqual(['outer', 'split']);
+    // B's bottom is the page's too: a new row across the whole page as well.
+    expect(levels('B', 'bottom')).toEqual(['outer', 'sibling', 'split']);
 
+    const [outer, sibling, split] = L.dropChoices(GRID, 'B', 'bottom', PAGE).map((one) => one.rect);
+    expect(outer[2]).toBeCloseTo(1, 6);  // across the page
+    expect(sibling[3]).toBeLessThan(split[3] * 1.5);  // a third of the column, against half of B
+    expect(sibling[3]).toBeGreaterThan(split[3] * 1.2);
+});
+
+test('docked one more in a list, it is as big as the view it went beside', () => {
     const floated = L.floatLeaf(GRID, 'C', [0.5, 0.5, 0.3, 0.3]);
-    const outer = L.dockLeaf(floated, 'C', 'A', 'right', 'outer', PAGE);
-    const inner = L.dockLeaf(floated, 'C', 'A', 'right', 'inner', PAGE);
-    // A new column, the whole height; and a split of A alone.
-    expect(rects(outer).get('C')[3]).toBeCloseTo(1, 6);
-    expect(rects(outer).get('B')[2]).toBeCloseTo(rects(outer).get('A')[2], 6);
-    expect(rects(inner).get('C')[3]).toBeCloseTo(rects(inner).get('A')[3], 6);
-    expect(rects(inner).get('B')[2]).toBeGreaterThan(rects(inner).get('A')[2] * 1.5);
+    const sibling = rects(L.dockLeaf(floated, 'C', 'A', 'bottom', 'sibling', PAGE));
+    expect(sibling.get('C')[3]).toBeCloseTo(sibling.get('A')[3], 6);
+    expect(sibling.get('C')[3]).toBeCloseTo(sibling.get('B')[3], 6);
+    const split = rects(L.dockLeaf(floated, 'C', 'A', 'bottom', 'split', PAGE));
+    expect(split.get('C')[3]).toBeCloseTo(split.get('A')[3], 6);
+    expect(split.get('B')[3]).toBeGreaterThan(split.get('A')[3] * 1.5);
+    const outer = rects(L.dockLeaf(floated, 'C', 'A', 'right', 'outer', PAGE));
+    expect(outer.get('C')[3]).toBeCloseTo(1, 6);
 });

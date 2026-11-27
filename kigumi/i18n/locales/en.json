@@ -650,7 +650,7 @@
   "message.publishedDone": "Done",
   "editor.readOnly.shared": "Read only. Make a copy to make changes.",
   "editor.readOnly.makeCopy": "Make a Copy",
-  "viewer.layout.move": "Move: let go on another view's edge to put it beside that view (right at the edge for a new row or column of the grid, just inside to split the view), anywhere else to float it",
+  "viewer.layout.move": "Move: let go on another view's edge to put it beside that view (from the edge in: a new row or column, one more in its row or column, a split of the view), anywhere else to float it",
   "viewer.layout.splitAcross": "Split side by side (the new half shows the same view)",
   "viewer.layout.splitDown": "Split top and bottom (the new half shows the same view)",
   "viewer.layout.toFront": "Bring to front",
@@ -681,5 +681,7 @@
   "viewer.layout.rollRight": "Roll the view 90° clockwise",
   "viewer.layout.dropSplit": "Split this view",
   "viewer.layout.dropRow": "New row",
-  "viewer.layout.dropColumn": "New column"
+  "viewer.layout.dropColumn": "New column",
+  "viewer.layout.dropSiblingRow": "Add to this row",
+  "viewer.layout.dropSiblingColumn": "Add to this column"
 }
