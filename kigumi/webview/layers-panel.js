@@ -242,6 +242,7 @@ class LayersPanel {
             frames.forEach((frame, index) => this._renderSection(
                 this._treeEl, this._frameSectionId(index), '\u{1F3E0} ' + frame.name,
                 () => this._buildFrameSections(frame, index),
+                () => this._makeFrameStateActions(index),
             ));
         } else {
             this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
@@ -327,6 +328,59 @@ class LayersPanel {
         return frames.findIndex((frame) => (jointId !== undefined && jointId !== null
             ? frame.jointIds.includes(String(jointId))
             : frame.timberKeys.includes(timberKey)));
+    }
+
+    /** Every member of a frame: its timbers, and the accessories of its joints. */
+    _frameMemberKeys(index) {
+        const frame = this._frames()[index];
+        const jointIds = new Set(frame.jointIds);
+        const accessories = ((this.hierarchy && this.hierarchy.joints) || [])
+            .filter((joint) => jointIds.has(joint.id))
+            .flatMap((joint) => joint.accessoryKeys || []);
+        return Array.from(new Set([...frame.timberKeys, ...accessories]));
+    }
+
+    /** Lock and hide for a whole frame: on when every member is, and a click sets them all. */
+    _makeFrameStateActions(index) {
+        const icons = document.createElement('span');
+        icons.className = 'lp-icons lp-frame-icons';
+        icons.dataset.frameIndex = String(index);
+        for (const [action, glyph, prop] of [['lock', '🔒', 'locked'], ['hide', '👁', 'hidden']]) {
+            const button = document.createElement('button');
+            button.className = 'lp-icon-btn lp-btn-' + action;
+            button.dataset.action = action;
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const keys = this._frameMemberKeys(index);
+                const value = !this._frameStateOn(keys, prop);
+                for (const key of keys) {
+                    if (prop === 'locked') {
+                        this.layerStateStore.setLocked(key, value);
+                    } else {
+                        this.layerStateStore.setHidden(key, value);
+                    }
+                }
+            });
+            icons.appendChild(button);
+        }
+        this._syncFrameIcons(icons);
+        return icons;
+    }
+
+    _frameStateOn(keys, prop) {
+        return keys.length > 0 && keys.every((key) => this.layerStateStore.getState(key)[prop]);
+    }
+
+    _syncFrameIcons(icons) {
+        const keys = this._frameMemberKeys(Number(icons.dataset.frameIndex));
+        const locked = this._frameStateOn(keys, 'locked');
+        const hidden = this._frameStateOn(keys, 'hidden');
+        const lock = icons.querySelector('[data-action="lock"]');
+        const hide = icons.querySelector('[data-action="hide"]');
+        lock.classList.toggle('lp-active', locked);
+        lock.title = locked ? t('viewer.layers.unlockFrame.title') : t('viewer.layers.lockFrame.title');
+        hide.classList.toggle('lp-active', hidden);
+        hide.title = hidden ? t('viewer.layers.showFrame.title') : t('viewer.layers.hideFrame.title');
     }
 
     /** The sections inside one frame's, as rows of its body. */
@@ -1230,6 +1284,11 @@ class LayersPanel {
             if (hideBtn) {
                 hideBtn.classList.toggle('lp-active', state.hidden);
                 hideBtn.title = state.hidden ? t('viewer.layers.show.title') : t('viewer.layers.hide.title');
+            }
+        }
+        if (this._frames()) {
+            for (const icons of this.el.querySelectorAll('.lp-frame-icons')) {
+                this._syncFrameIcons(icons);
             }
         }
         this._renderFooter();

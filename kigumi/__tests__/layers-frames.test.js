@@ -181,6 +181,45 @@ describe('a file with several frames', () => {
     });
 });
 
+describe('a frame\'s own lock and hide', () => {
+    const PEGGED = [{ ...JOINTS[0], accessoryKeys: ['peg'] }, JOINTS[1]];
+    const pegged = () => {
+        const panel = new LayersPanel(new SelectionStore(), new LayerStateStore());
+        panel.mount(fakeElement());
+        panel.setHierarchy({ timbers: TIMBERS, joints: PEGGED, frames: FRAMES });
+        return panel;
+    };
+    const button = (panel, name, action) => fakeQuery(frameSection(panel, name).children[0], 'lp-btn-' + action)[0];
+    const click = (target) => target.dispatch('click', { stopPropagation() {} });
+
+    test('hiding a frame hides its timbers and its joints\' accessories, and no other frame\'s', () => {
+        const panel = pegged();
+        click(button(panel, 'Pavilion', 'hide'));
+        const store = panel.layerStateStore;
+        expect(['post', 'sill', 'peg'].map((key) => store.isHidden(key))).toEqual([true, true, true]);
+        expect(store.isHidden('roof')).toBe(false);
+        expect(button(panel, 'Pavilion', 'hide').classList.contains('lp-active')).toBe(true);
+        click(button(panel, 'Pavilion', 'hide'));
+        expect(['post', 'sill', 'peg'].some((key) => store.isHidden(key))).toBe(false);
+    });
+
+    test('locking a frame with one member already locked locks the rest; it reads as on only once all are', () => {
+        const panel = pegged();
+        panel.layerStateStore.setLocked('post', true);
+        expect(button(panel, 'Pavilion', 'lock').classList.contains('lp-active')).toBe(false);
+        click(button(panel, 'Pavilion', 'lock'));
+        expect(['post', 'sill', 'peg'].every((key) => panel.layerStateStore.isLocked(key))).toBe(true);
+        expect(button(panel, 'Pavilion', 'lock').classList.contains('lp-active')).toBe(true);
+    });
+
+    test('a click on a frame\'s button does not open or close the frame', () => {
+        const panel = pegged();
+        const open = panel.expandedNodes.has('section:' + panel._frameSectionId(0));
+        click(button(panel, 'Pavilion', 'lock'));
+        expect(panel.expandedNodes.has('section:' + panel._frameSectionId(0))).toBe(open);
+    });
+});
+
 describe('an empty section', () => {
     test('is greyed, has no chevron and does not open', () => {
         const panel = openPanel(null);
