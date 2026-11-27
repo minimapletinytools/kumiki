@@ -25,6 +25,7 @@ import { CameraMixin } from './viewer-camera.js';
 import { RenderingMixin } from './viewer-rendering.js';
 import { AssemblyMixin } from './viewer-assembly.js';
 import { DrawingsMixin } from './viewer-drawings.js';
+import { LayoutEditingMixin } from './viewer-layout-editing.js';
 import * as KigumiContextMenu from './context-menu.js';
 import * as KigumiDrawingOverlays from './drawing-overlays.js';
 import * as KigumiKiwariValues from './kiwari-values.js';
@@ -41,6 +42,8 @@ import { SHELL_UI, listenForForm } from './shell-ui.js';
 // A touchscreen is the main pointer: the hint describes touch gestures.
 // How long a scroll must stop before a tilted drawing view springs back.
 const WHEEL_TILT_RELEASE_MS = 250;
+// What a viewport is built at: a change to either points its camera afresh (rebuildViewports).
+const builtState = (spec) => `${String(spec.rect)}|${JSON.stringify(spec.camera || null)}`;
 const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
 // Defines <kigumi-layers-view>, which the tree page draws.
 import './layers-panel.js';
@@ -48,7 +51,7 @@ import './layers-panel.js';
 usePanelRuntime({ t, KigumiUnits: KigumiUnits, KigumiKiwariValues: KigumiKiwariValues });
 useSidebarRuntime({ html, t });
 
-class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraMixin(SelectionVisualsMixin(MenusMixin(MeasuringMixin(PickingMixin(LitElement)))))))) {
+class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(RenderingMixin(CameraMixin(SelectionVisualsMixin(MenusMixin(MeasuringMixin(PickingMixin(LitElement))))))))) {
     constructor() {
         super();
         // Members on screen, and the only thing that knows what draws them.
@@ -169,6 +172,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this._highlightObjects = new Map();
         /** Pointer gestures running now, by name. See _beginPointerGesture. */
         this._pointerGestures = new Map();
+        /** Editing the open drawing's layout (viewer-layout-editing.js). */
+        this.layoutEditing = false;
         /**
          * The geometry the runner sent for the current selection, kept so the
          * overlay can be re-derived rather than built once on arrival. Only
@@ -273,8 +278,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
             <div id="view-layout" class=${layoutClass}>
             ${this.sidebar.render(this.sidebarPages())}
-            <div id="viewport" class=${compact && this.pageZoomed ? 'page-zoomed' : ''}>
+            <div id="viewport" class=${[compact && this.pageZoomed ? 'page-zoomed' : '', this.layoutEditing ? 'layout-editing' : ''].join(' ')}>
                 ${compact ? this.compactChrome.render() : nothing}
+                ${this.layoutEditing ? this.renderLayoutEditBar() : this.renderLayoutEditButton()}
                 ${this.isInDrawing
                     ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
                         @click=${() => this.leaveDrawing()}>← ${t('viewer.drawing.backTo3d')}</button>`
@@ -570,6 +576,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // Dragging acts on the viewport it started in, so a press makes
             // that one active before the camera moves.
             this.focusViewportAt(event.clientX, event.clientY);
+            // While editing a layout, a pan started on the selected view pans that view.
+            this._layoutGestureView = this.layoutEditing && action === 'pan'
+                ? this.layoutViewAt(event.clientX, event.clientY) : null;
             if (action === 'orbit') {
                 this.cameraController.captureOrbitDragFrame();
             }
@@ -594,6 +603,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             }
             event.preventDefault();
             const gesture = wheelGesture(event, { scrollOrbits: this.trackpadScrollOrbits });
+            // While editing a layout, the wheel over the selected view moves its camera.
+            const editingView = this.layoutEditing && this.layoutViewAt(event.clientX, event.clientY);
+            if (editingView && this.layoutViewGesture(editingView, event.clientX, event.clientY,
+                event.shiftKey && gesture.kind === 'zoomStep' ? { kind: 'pan', dx: -event.deltaX, dy: -event.deltaY } : gesture)) {
+                return;
+            }
             if (gesture.kind !== 'zoomStep') {
                 this.applyCameraGesture(gesture, event.clientX, event.clientY);
                 if (gesture.kind === 'orbit') {
@@ -878,6 +893,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         const previous = sameScene
             ? new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]))
             : new Map();
+        // As built, not as a layout drag has since drawn them (viewer-layout-editing.js).
+        const previousRects = sameScene && this._builtRects ? this._builtRects : new Map();
         this._viewportsBuiltFor = sceneId;
         this.viewports = this.sceneStore.activeViewports().map((spec) => {
             const reused = previous.get(spec.id);
@@ -887,11 +904,14 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // skipped on reuse -- that would throw away where the reader had
             // got to.
             viewport.rememberDeclaredCamera();
-            if (!reused) {
+            // A view the layout has moved, resized or pointed anew is pointed afresh.
+            const was = previousRects.get(spec.id);
+            if (!reused || (was && was !== builtState(spec))) {
                 viewport.applySpecCamera();
             }
             return viewport;
         });
+        this._builtRects = new Map(this.viewports.map((viewport) => [viewport.id, builtState(viewport.spec)]));
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
@@ -1664,6 +1684,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 // whole reason these commands answer with the full set.
                 this.refreshActiveScene();
             }
+            this._layoutArrived();
             this._layersDrawingsChanged();
             this._applyPendingMeasurementFocus();
             return;
@@ -2003,6 +2024,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
     onWindowMouseUp(event) {
         const finished = this.pointerDrag.end();
+        this._layoutGestureView = null;
         const activeMouseAction = finished.action;
         const mouseDownButton = finished.button;
         const mouseDownTarget = finished.target;
@@ -2035,6 +2057,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             && mouseDownButton === 2
             && mouseDownTarget === canvas
             && !mouseActionMoved
+            // Only faces can be taken while editing a layout: no feature menu.
+            && !this.layoutEditing
         ) {
             // The timber's menu, listing the features under the pointer too.
             const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
@@ -2073,11 +2097,14 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
         this.focusViewportAt(event.clientX, event.clientY);
+        // While editing a layout, a touch that starts on the selected view moves that view.
+        this._layoutGestureView = this.layoutEditing ? this.layoutViewAt(event.clientX, event.clientY) : null;
         this.cameraController.captureOrbitDragFrame();
         this.cameraController.cancelAnimation();
         const { clientX, clientY } = event;
         this.longPressTimer = setTimeout(() => {
-            if (!this.touchGestures.stillHeld()) {
+            // Nothing but faces can be taken while editing a layout, so there is no feature menu.
+            if (!this.touchGestures.stillHeld() || this.layoutEditing) {
                 return;
             }
             this.touchGestures.cancel();
@@ -2094,6 +2121,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
         clearTimeout(this.longPressTimer);
+        if (this._layoutGestureView && this.layoutViewGesture(this._layoutGestureView, event.clientX, event.clientY, gesture)) {
+            return;
+        }
         this.applyCameraGesture(gesture, event.clientX, event.clientY);
     }
 
@@ -2103,7 +2133,11 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
         clearTimeout(this.longPressTimer);
         const orbited = this.touchGestures.moved;
-        if (this.touchGestures.up(event.pointerId)) {
+        const tapped = this.touchGestures.up(event.pointerId);
+        if (!this.touchGestures.active) {
+            this._layoutGestureView = null;
+        }
+        if (tapped) {
             this.handleCanvasClick(event);
         } else if (!this.touchGestures.active && orbited) {
             this.releaseTilt();
@@ -2150,6 +2184,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     onWindowMouseMove(event) {
         const drag = this.pointerDrag.move({ x: event.clientX, y: event.clientY });
         if (!drag) {
+            return;
+        }
+        if (drag.action === 'pan' && this._layoutGestureView
+            && this.layoutViewGesture(this._layoutGestureView, drag.toX, drag.toY, { kind: 'pan', dx: drag.dx, dy: drag.dy })) {
             return;
         }
         if (drag.action === 'orbit') {
@@ -2225,6 +2263,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             event.preventDefault();
             if (action === 'undo') this.undoMeasurementChange();
             else this.redoMeasurementChange();
+            // The edit bar's buttons say what is left.
+            if (this.layoutEditing) this.requestUpdate();
         } else if (action === 'delete') {
             // Nothing to delete is not an error: a measurement the code asks
             // for is passed over, and the key simply does nothing.
@@ -2236,6 +2276,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             event.preventDefault();
             if (this.contextMenu.isOpen) {
                 this.closeMemberContextMenu();
+            } else if (this.cancelLayoutDrag()) {
+                // A drag let go of, the layout as it was.
+            } else if (this.layoutEditing) {
+                this.exitLayoutEditing();
             } else if (this.escapeMeasurement()) {
                 // One end at a time, so leaving a half-made measurement takes
                 // two presses: the second feature, then the first.
@@ -2794,7 +2838,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
 
         // Parented like the silhouette, so they follow the member's visibility and offset.
-        const drawingLines = this.drawingOverlays.linesFor(mesh, key);
+        const drawingLines = [
+            ...this.drawingOverlays.linesFor(mesh, key),
+            ...this.drawingOverlays.referenceOutlinesFor(vertexSource, indexSource, mesh.referenceFacePlanes, key),
+        ];
         const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
         for (const line of drawingLines) {
             edgeMesh.add(line.object);

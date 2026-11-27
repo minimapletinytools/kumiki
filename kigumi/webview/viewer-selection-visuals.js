@@ -38,6 +38,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             nodeDisplayName: message.nodeDisplayName || null,
             nodeLabel: message.nodeLabel || null,
             outwardNormal: Array.isArray(message.outwardNormal) ? message.outwardNormal : null,
+            worldNormal: Array.isArray(message.worldNormal) ? message.worldNormal : null,
             derivation: message.derivation || null,
         };
         const hlMesh = message.highlightMesh;

@@ -313,6 +313,11 @@ function normalizeScene(spec) {
             ? source.cameraControls.filter((name) => CAMERA_CONTROLS.includes(name))
             : [],
         viewports: viewports.map((viewport, index) => normalizeViewport(viewport, index, page)),
+        // The viewport tree the sheet edits (viewport-layout.js), and whether the file has changed
+        // it from the code's.
+        layout: source.layout && typeof source.layout === 'object' && Array.isArray(source.layout.roots)
+            ? source.layout : null,
+        layoutEdited: source.layoutEdited === true,
     };
 }
 

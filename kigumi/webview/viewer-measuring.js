@@ -10,7 +10,7 @@ import * as KigumiFeatureStates from './feature-states.js';
 export const MeasuringMixin = (Base) => class extends Base {
 
     get canStartMeasurement() {
-        return Boolean(this.selectionManager.csgFocus
+        return Boolean(!this.layoutEditing && this.selectionManager.csgFocus
             && this._lastPickAnchor
             && this._lastPickAnchor.reference
             && this._lastPickAnchor.geometry);
@@ -794,6 +794,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         }
         this.activeViewportId = viewportId;
         this.selectionManager.setViewportFocus(viewportId);
+        this.selectLayoutView(viewportId);
         this._syncDrawingPanel();
         this.selectionPanel.updateInfo(this.currentFrameData);
         this.renderMeasurements();
@@ -902,6 +903,7 @@ export const MeasuringMixin = (Base) => class extends Base {
             : { x: 0, y: 0, width: element.offsetWidth, height: element.offsetHeight };
 
         this._drawWorkingViewportOutline(overlay, pageRect, element.offsetHeight);
+        this._drawLayoutEditing(overlay, pageRect);
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
                 if (!KigumiMeasurements.isDeleted(measure) && this.showsXrayMeasure(viewport, measure)) {

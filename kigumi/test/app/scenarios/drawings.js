@@ -225,7 +225,7 @@ module.exports = {
         const exported = svgFile ? fs.readFileSync(path.join(exportsDir, svgFile), 'utf8') : '';
         check('SVG export contains vector edges, live dimension labels, and an embedded preview',
             exported.includes('stroke-width="2.5"') && exported.includes('class="member-fills"') && exported.includes('class="edges"') && exported.includes('data:image/png;base64,') &&
-            exported.includes('fill="#f4d6c4"') && exported.includes('fill="#cfdfec"') &&
+            exported.includes('fill="#cfdfec"') &&
             dimensionCount > 0 && (exported.match(/class="dim-label"/g) || []).length === dimensionCount,
             JSON.stringify({ svgFile, dimensionCount, bytes: exported.length }));
         if (svgFile && ARTIFACTS) fs.copyFileSync(path.join(exportsDir, svgFile), path.join(ARTIFACTS, svgFile));

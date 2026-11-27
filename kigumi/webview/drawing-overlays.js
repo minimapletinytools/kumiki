@@ -6,6 +6,9 @@
 // timber's own, gets none. They lie inside their timber, so each is clipped to it with the member
 // id pass (member-id-buffer.js): hidden by another timber in front, never by its own faces.
 //
+// And each reference face's outline, solid light blue, so a reference face seen edge-on still
+// shows which edges are its (with the reference edges' option).
+//
 // Hovering or selecting one of those planes lights it through the usual highlight, from the
 // outline the runner sends for it (highlightEdgeSegments); nothing here.
 
@@ -16,6 +19,8 @@ const DASH = 4;
 const GAP = 2;
 const PERFECT_FACE_COLOR = 0x2f6fd0;
 const CENTERPLANE_COLOR = 0xd0582f;
+// Every reference face's outline: lighter than a reference edge's blue, to tell the two apart.
+const REFERENCE_FACE_COLOR = 0x8dbde3;
 // How square to the view a plane may be and still be drawn: seen face-on, it is not.
 const FACE_ON_DOT = 1 - 1e-3;
 
@@ -120,6 +125,8 @@ class DrawingOverlays {
         xray.transparent = true;
         xray.depthWrite = false;
         this.materials.xray = xray;
+        this.materials.reference = new THREE.LineMaterial({
+            color: REFERENCE_FACE_COLOR, linewidth: LINE_WIDTH_PX, resolution, depthTest: false });
         this._look = new THREE.Vector3();
     }
 
@@ -156,6 +163,46 @@ class DrawingOverlays {
     }
 
     /**
+     * The outline of each of a member's reference faces, as lines like linesFor's: the edges of
+     * the triangles lying on the face's plane that only one of them has. `vertices` and `indices`
+     * are the member's mesh, in the world; `planes` its referenceFacePlanes.
+     */
+    referenceOutlinesFor(vertices, indices, planes, memberKey) {
+        const THREE = this.THREE;
+        const lines = [];
+        const key = (vertex) => [0, 1, 2].map((axis) => vertices[3 * vertex + axis].toFixed(6)).join(',');
+        for (const { normal, offset } of planes || []) {
+            const onFace = (vertex) => Math.abs(vertices[3 * vertex] * normal[0] + vertices[3 * vertex + 1] * normal[1]
+                + vertices[3 * vertex + 2] * normal[2] - offset) < 1e-7;
+            const edges = new Map();
+            for (let i = 0; i < indices.length; i += 3) {
+                const corners = [indices[i], indices[i + 1], indices[i + 2]];
+                if (!corners.every(onFace)) continue;
+                for (let side = 0; side < 3; side++) {
+                    const ends = [corners[side], corners[(side + 1) % 3]];
+                    const id = ends.map(key).sort().join('|');
+                    const seen = edges.get(id);
+                    edges.set(id, seen ? { ends, count: seen.count + 1 } : { ends, count: 1 });
+                }
+            }
+            const positions = [];
+            for (const { ends, count } of edges.values()) {
+                if (count !== 1) continue;
+                for (const vertex of ends) positions.push(vertices[3 * vertex], vertices[3 * vertex + 1], vertices[3 * vertex + 2]);
+            }
+            if (!positions.length) continue;
+            const geometry = new THREE.LineSegmentsGeometry();
+            geometry.setPositions(positions);
+            const object = new THREE.LineSegments2(geometry, this._memberMaterial(this.materials.reference, memberKey));
+            object.renderOrder = 11;
+            object.visible = false;
+            lines.push({ object, normal: new THREE.Vector3(...normal), option: 'highlightReferenceEdges', memberKey,
+                measuredAs: null, anyFacing: true });
+        }
+        return lines;
+    }
+
+    /**
      * Show or hide every member's lines for one viewport, before it is drawn. `options` answers
      * each line's display option by name: 'off', 'on', or 'measured' to show only the lines whose
      * `memberKey|feature` is in `measured`, what the viewport's dimensions go to. Returns whether any
@@ -173,7 +220,7 @@ class DrawingOverlays {
                 line.object.visible = inDrawing && (line.option === 'drawingXray'
                     ? Boolean(camera.isOrthographicCamera && xrayMembers?.has(line.memberKey)
                         && line.normal.dot(look) < -1 + 1e-8)
-                    : wanted(line) && drawnFacing(line.normal, look));
+                    : wanted(line) && (line.anyFacing || drawnFacing(line.normal, look)));
                 any = any || line.object.visible;
             }
         }
@@ -200,4 +247,4 @@ class DrawingOverlays {
 
 const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, FACE_ON_DOT };
 
-export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, FACE_ON_DOT };
+export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, REFERENCE_FACE_COLOR, FACE_ON_DOT };
