@@ -171,6 +171,11 @@ module.exports = {
         const quarter = await waitFor(() => inShell(`(() => { const a = ${app}; const v = a.viewports.find(v => v.id === ${JSON.stringify(first)});
             return !a._layoutDraft && v && Math.abs(v.spec.camera.look[0] + 1) < 1e-6; })()`), { timeoutMs: 15000 }).catch(() => false);
         check('the turning buttons turn the camera a quarter turn', quarter);
+        // Its measurements were made looking the other way: kept on that plane, so not drawn here.
+        const stale = await inShell(`(() => { const v = ${app}.viewports.find(v => v.id === ${JSON.stringify(first)});
+            const look = v.spec.camera.look; const ms = v.spec.measurements || [];
+            return { count: ms.length, offPlane: ms.filter(m => m.plane && Math.abs(m.plane.normal.reduce((sum, c, i) => sum + c * look[i], 0)) < 0.5).length }; })()`);
+        check('a turned view\'s old measurements no longer match it', stale.count > 0 && stale.offPlane === stale.count, JSON.stringify(stale));
         await inShell(frame);
         await capture('10-turned');
 

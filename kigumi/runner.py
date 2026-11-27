@@ -2788,20 +2788,22 @@ def _keep_leaf_cameras(wire: Dict[str, Any], saved: Optional[Dict[str, Any]]) ->
             cast(Dict[str, Any], node)["camera"] = copy.deepcopy(cameras[node["leaf"]])
 
 
-def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> None:
+def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> Dict[str, CameraWire]:
     """Point each view its layout gives a camera: along its look and up, fitted to what it draws unless it says where.
 
     A leaf's camera is {look, up, target?, extent?, projection?}; without target and extent the view
-    fits its members (all the drawing's, if it names none).
+    fits its members (all the drawing's, if it names none). Returns the camera each view had before,
+    for the views now looking another way.
     """
-    from kumiki.drawings.kigumi_drawing_view_helpers import frame_from_look_and_up, view_extent, world_bounds
+    from kumiki.drawings.kigumi_drawing_view_helpers import frame_from_look_and_up, normalize, view_extent, world_bounds
     from kumiki.drawings.layout import wire_leaf_nodes
 
     cameras = {str(node["leaf"]): node["camera"] for node in wire_leaf_nodes(scene.get("layout") or {})
                if isinstance(node.get("camera"), dict)}
     page = scene.get("page")
+    turned: Dict[str, CameraWire] = {}
     if not cameras or not page:
-        return
+        return turned
     by_key = {entry["memberKey"]: entry["cutTimber"] for entry in _assign_member_keys(frame)[0]}
     for view in scene.get("viewports") or []:
         wanted = cameras.get(str(view.get("id")))
@@ -2815,6 +2817,9 @@ def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> None:
             log_warning(f"drawing {scene.get('id')!r}: view {view.get('id')!r} has a camera that can't be used: {wanted!r}")
             continue
         camera = cast(CameraWire, dict(view.get("camera") or {}))
+        was = camera.get("look")
+        if was is not None and abs(abs(sum(a * b for a, b in zip(normalize([float(v) for v in was]), axes.look))) - 1) > 1e-6:
+            turned[str(view.get("id"))] = cast(CameraWire, dict(camera))
         camera.update(right=list(axes.right), up=list(axes.up), look=list(axes.look))
         if isinstance(wanted.get("target"), list) and isinstance(wanted.get("extent"), (int, float)):
             camera["target"] = [float(v) for v in wanted["target"]]
@@ -2830,6 +2835,7 @@ def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> None:
             view["projection"] = "orthographic"
             view["locked"] = True
             view.pop("orbit", None)
+    return turned
 
 
 def _override_entry(example_path: Optional[Path], pending: List[DrawingWire], target: DrawingWire) -> DrawingWire:
@@ -2933,8 +2939,8 @@ def collect_drawings(
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
-        _aim_viewports(scene, frame)
-        _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame)
+        turned = _aim_viewports(scene, frame)
+        _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame, turned)
         drawings.append(scene)
 
     for entry in from_file:
@@ -2954,8 +2960,8 @@ def collect_drawings(
             )
         scene["origin"] = ORIGIN_FILE
         _lay_out_file_drawing(scene)
-        _aim_viewports(scene, frame)
-        _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame)
+        turned = _aim_viewports(scene, frame)
+        _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame, turned)
         drawings.append(scene)
 
     # Not in the file yet: either the drawing itself is unsaved, or the override
@@ -3089,24 +3095,37 @@ def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']
     return None
 
 
+def _resolve_in_view(
+    frame: 'Frame', scene: DrawingWire, viewport: str, measure: MeasureWire, was: Optional[CameraWire],
+) -> MeasureWire:
+    """Resolve a measurement in its view; in a turned view, one without a plane as the view was."""
+    from kumiki.drawings.measure import ViewAxes
+
+    if was is None or measure.get("plane"):
+        return _resolve_measurement(frame, measure, _viewport_axes(scene, viewport))
+    resolved = _resolve_measurement(frame, measure, ViewAxes.from_wire(was))
+    resolved["plane"] = {"at": list(was.get("target") or [0.0, 0.0, 0.0]), "normal": list(was["look"])}
+    return resolved
+
+
 def _attach_measurements(
     scene: DrawingWire,
     by_viewport: Dict[str, List[MeasureWire]],
     drawing_name: str,
     frame: 'Frame',
+    turned: Optional[Dict[str, CameraWire]] = None,
 ) -> None:
     """Attach each viewport's measurements to it, resolved against `frame`.
 
-    Measurements for viewports the layout lacks are warned about and kept, not drawn.
+    Measurements for viewports the layout lacks are warned about and kept, not drawn. One without a
+    plane in a view that has been turned (`turned`, from _aim_viewports) keeps the plane of the way
+    the view looked, so it shows as not matching the view rather than being measured anew.
     """
     # Each viewport's own camera frame goes with its measurements: the sheet's
     # across and up are what a horizontal or vertical distance is measured
     # along, and its look is the plane of any measurement that did not write one.
     remaining = {
-        viewport: [
-            _resolve_measurement(frame, measure, _viewport_axes(scene, viewport))
-            for measure in measures
-        ]
+        viewport: [_resolve_in_view(frame, scene, viewport, measure, (turned or {}).get(viewport)) for measure in measures]
         for viewport, measures in by_viewport.items()
     }
     for viewport in scene.get("viewports") or []:

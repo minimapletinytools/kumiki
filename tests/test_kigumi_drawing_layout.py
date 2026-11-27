@@ -257,3 +257,23 @@ def test_a_drawing_of_the_files_own_keeps_its_views_cameras(example):
     again = mine()
     assert _views(again)[name]["camera"]["look"] == pytest.approx([1, 0, 0])
     assert _leaf_node(again["layout"], name)["camera"]["look"] == [1, 0, 0]
+
+
+def test_a_turned_view_keeps_its_measurements_on_the_plane_they_were_made_in(example):
+    frame = _plan_frame()
+    scene = _plan(frame, example)
+    name = next(n for n in _views(scene) if n != "Preview")
+    look = _views(scene)[name]["camera"]["look"]
+    turned_to = [0, 0, -1] if abs(look[2]) < 0.9 else [0, 1, 0]
+    turned = copy.deepcopy(scene)
+    turned["layout"] = _aimed(scene["layout"], name, {"look": turned_to, "up": [0, 1, 0] if turned_to[2] else [0, 0, 1]})
+    zoomed = copy.deepcopy(scene)
+    zoomed["layout"] = _aimed(scene["layout"], name, {"look": look, "up": _views(scene)[name]["camera"]["up"]})
+
+    was = runner._aim_viewports(turned, frame)
+    assert runner._aim_viewports(zoomed, frame) == {}
+    assert was[name]["look"] == look
+    # Without a plane of its own: given the one it was made in, which the turned view no longer shows.
+    resolved = runner._resolve_in_view(frame, turned, name, {"a": None, "b": None}, was[name])
+    assert resolved["plane"]["normal"] == look
+    assert "plane" not in runner._resolve_in_view(frame, zoomed, name, {"a": None, "b": None}, None)
