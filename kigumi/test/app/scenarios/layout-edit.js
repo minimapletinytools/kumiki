@@ -204,9 +204,11 @@ module.exports = {
         await waitFor(() => inShell(`!${app}._layoutDraft`), { timeoutMs: 15000 }).catch(() => null);
 
         // Undo everything back to the code's layout.
-        for (let i = 0; i < 20 && await inShell(`${app}.sceneStore.activeScene().layoutEdited`); i += 1) {
+        // Each undo waits for the runner's answer, which is slower on CI.
+        for (let i = 0; i < 40 && await inShell(`${app}.sceneStore.activeScene().layoutEdited`); i += 1) {
+            const was = await inShell(`JSON.stringify(${app}.sceneStore.activeScene().layout)`);
             await inShell(`${app}.undoMeasurementChange()`);
-            await inShell('new Promise(r => setTimeout(r, 700))');
+            await waitFor(() => inShell(`JSON.stringify(${app}.sceneStore.activeScene().layout) !== ${JSON.stringify(was)}`), { timeoutMs: 15000 }).catch(() => null);
         }
         const undone = await inShell(`(() => { const a = ${app}; return { edited: a.sceneStore.activeScene().layoutEdited, ids: a.viewports.map(v => v.id) }; })()`);
         check('undo puts the code layout back', !undone.edited && undone.ids.join() === info.ids.join(), JSON.stringify(undone));
