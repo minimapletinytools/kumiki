@@ -186,12 +186,26 @@ In part 2 of this video, I'll make this same pair of sawhorses using design I ma
   -mudsill corners 
   -etc
   
+-test viewports one more time and pulish
 -do tagging for 3d printer mode allowing you to offset tenons (for eaxmple) so they fit
 -save options button should say "option saved" next ot it when you click it, greyed out if no chages, maybe add reset option?
 WEBSITE CRAP
-  -make joints page
+  -make joints page not suck
+    -consistent visual tsyle
+    -labelsa re good enough I guess
   -ask steven or youjin not both D:
 
+-add sensibility checks to arrangement (so basically they intersect at least a little bit)
+  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
+-better way to do tapered legs, round and square
+-you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
+  -maybe a singel pattern that shows the main members of a buliding
+  -different king post queen post etc styles
+  -bracing 
+  -nuki
+  -mudsill corners 
+  -etc
+  
 
 DRAWING NEXT TODO
   DONE-XRAY feature
@@ -212,7 +226,7 @@ DRAWING NEXT TODO
     -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
 
   -centerlines/PTW should mayb enot be selectable when they are hidden from drawing view?
-  -do viewport customization UI it won't be hard, make sure it can be saved
+  DONE-do viewport customization UI it won't be hard, make sure it can be saved
   -add option to color refreences arris/face differently maybe,  (should match the svg export colors I guess)
   -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
   -angle anchor dragging (You sholud be able to flip sides by dragging as well)
@@ -224,6 +238,7 @@ DRAWING NEXT TODO
 
 
 
+  
 SKILLS PASS
   -do review rule pass
   -do test update pass
@@ -421,6 +436,21 @@ DONE-DRAWING DOCS EXPREMIENT
     -attempt to measure anything that has a 1-1 correspondence with a dfunction argument
     -some stuff amy not, in which case you can put a formula in the label instead
     -better missing a parameter than an incorrectly labeled one
+DONE-VIEWPORT BRANCH CHANGES
+  -edicated viewport modificatino mode,
+  -there is an "edit" button next to "Viewports" to enter viewport edit mode, and there is a button in the upper right hand corner of the drawings view to exit viewport edti mode.
+    -escape also exits this mode
+  -measurirng and highlight is disabled in this mode
+  -modifying viewports keeps the UI per viewport you have right now
+    -get rid of the undo button, instead undo/redo can go in upper right with the xit button and als obind to ctrl z 
+    -pressing escape while doing the move exits the moving mode.
+  -resizing viewports: after selecting a viewport there is a "fit" buton you can clikc sizes the viewport to fit its content
+    -mosewheel to pan and zoom viewport, but in most cases a "fit" button should do whaty ou want
+  -to change camear angle of the viewport, you can actually select faces. THere is a button that lets you change the camera angle froma list of orthographic presets. but if you have a face selected it willsay "selected face" otherwise it's greyed out. option.
+  -when dragging viewport to an ew spot, it should automaticallyfit to its contents.
+DONE-UI fro dragging viewport makes it unclear wher eto drag to insert into list or add as child, so make that more distinct somehow (maybe have 2 zones if both choices present itself, the one ad the edge is insert as sibling, the one inwardf rom the edge is insert as child)
+DONE-the "edit" button next to viewport is not responsive to clicks visually since the row also highlights it's kind aweird maybm ejust mov ethe dit button elsewhere?
+DONE-in drawings view, refrence face edges should aso be highlighted, matching the lighter blue of the refrenec faces catually. this way when you look at a face wher ethe refreecn edege is still hidden, you can still see which edges are parts of refrenece faces
 DONE-do mega testing pass
   -decide which ones to run alawys which ones to runo nyl on CI
   -check coverage, decide which featuersa are final enough to need more extensive coverage
