@@ -9,14 +9,17 @@ from ..timber import PerfectTimberWithin
 from ..timber_features import TimberFeature, TimberLongFace
 
 
+REFERENCE_FACE_TINT = '#cfdfec'
+
+
 def reference_face_colors(timber: PerfectTimberWithin) -> dict[TimberLongFace, str]:
-    """Return the tint of each long face adjoining a ticket reference arris."""
+    """Return the tint of each long face adjoining a ticket reference arris: one light blue for all."""
     colors = {}
     for feature in timber.ticket.reference_features:
         adjacent = feature.long_faces_it_rests_on()
         if len(adjacent) == 2:
             for face in adjacent:
-                colors[face] = '#f4d6c4' if face in (TimberLongFace.RIGHT, TimberLongFace.LEFT) else '#cfdfec'
+                colors[face] = REFERENCE_FACE_TINT
     return colors
 
 

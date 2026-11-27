@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { DrawingOverlays, anchoredLineDistances, drawnFacing, outlineShade, roundDashShader } = require('../webview/drawing-overlays');
+const { DrawingOverlays, anchoredLineDistances, drawnFacing, roundDashShader } = require('../webview/drawing-overlays');
 
 const vector = (x, y, z) => ({ x, y, z, dot: (o) => x * o.x + y * o.y + z * o.z });
 
@@ -104,7 +104,6 @@ describe('a reference face\'s outline', () => {
     const THREE = {
         LineSegmentsGeometry: Geometry,
         LineSegments2: Line,
-        Color: class { constructor(value) { this.value = value; } },
         Vector3: class { constructor(x, y, z) { Object.assign(this, vector(x, y, z)); } },
     };
     const overlays = Object.create(DrawingOverlays.prototype);
@@ -116,12 +115,11 @@ describe('a reference face\'s outline', () => {
     const vertices = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1];
     const indices = [0, 1, 2, 0, 2, 3, 0, 1, 4];
 
-    test('is its edges that only one of its triangles has, in its colour', () => {
+    test('is its edges that only one of its triangles has', () => {
         const [line, ...rest] = overlays.referenceOutlinesFor(vertices, indices, [{ normal: [0, 0, 1], offset: 0, color: '#cfdfec' }], 'post#0');
 
         expect(rest).toEqual([]);
         expect(line.object.geometry.positions.length).toBe(4 * 6);  // the square's sides, not its diagonal
-        expect(line.object.material.uniforms.diffuse.value.value).toBe(outlineShade('#cfdfec'));
         expect(line.option).toBe('highlightReferenceEdges');
     });
 
@@ -136,14 +134,3 @@ describe('a reference face\'s outline', () => {
     });
 });
 
-test('a reference face\'s outline is its tint deepened, keeping its hue', () => {
-    const hue = (hex) => {
-        const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
-        return Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b);
-    };
-    for (const tint of ['#cfdfec', '#f4d6c4']) {
-        const shade = outlineShade(tint);
-        expect(hue(shade)).toBeCloseTo(hue(tint), 1);
-        expect(parseInt(shade.slice(1), 16)).toBeLessThan(parseInt(tint.slice(1), 16));
-    }
-});

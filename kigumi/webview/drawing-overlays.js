@@ -6,8 +6,8 @@
 // timber's own, gets none. They lie inside their timber, so each is clipped to it with the member
 // id pass (member-id-buffer.js): hidden by another timber in front, never by its own faces.
 //
-// And each reference face's outline, solid in the face's own tint, so a reference face seen
-// edge-on still shows which edges are its (with the reference edges' option), in a deeper shade.
+// And each reference face's outline, solid light blue, so a reference face seen edge-on still
+// shows which edges are its (with the reference edges' option).
 //
 // Hovering or selecting one of those planes lights it through the usual highlight, from the
 // outline the runner sends for it (highlightEdgeSegments); nothing here.
@@ -19,6 +19,8 @@ const DASH = 4;
 const GAP = 2;
 const PERFECT_FACE_COLOR = 0x2f6fd0;
 const CENTERPLANE_COLOR = 0xd0582f;
+// Every reference face's outline: lighter than a reference edge's blue, to tell the two apart.
+const REFERENCE_FACE_COLOR = 0x8dbde3;
 // How square to the view a plane may be and still be drawn: seen face-on, it is not.
 const FACE_ON_DOT = 1 - 1e-3;
 
@@ -81,31 +83,6 @@ function anchoredLineDistances(positions) {
 }
 
 /**
- * A reference face's tint deepened enough to read as a line: the same hue, a middle lightness.
- * The tints themselves are pastels for filling a face, and as lines they all but vanish.
- *
- * @param {string} hex '#rrggbb'
- * @returns {string} '#rrggbb'
- */
-function outlineShade(hex) {
-    const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    const chroma = max - min;
-    let hue = 0;
-    if (chroma > 0) {
-        hue = max === r ? ((g - b) / chroma) % 6 : max === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4;
-    }
-    hue = (hue * 60 + 360) % 360;
-    const saturation = 0.55, lightness = 0.6;
-    const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
-    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-    const m = lightness - c / 2;
-    const [r1, g1, b1] = hue < 60 ? [c, x, 0] : hue < 120 ? [x, c, 0] : hue < 180 ? [0, c, x]
-        : hue < 240 ? [0, x, c] : hue < 300 ? [x, 0, c] : [c, 0, x];
-    return '#' + [r1, g1, b1].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
-}
-
-/**
  * Whether a plane's outline is drawn, looking along `look`: never seen face-on, where it would
  * only retrace the faces around it. Seen edge-on it is a line; in a view turned off square, the
  * planes draw as a wireframe of the perfect timber within. (Edge-on only, they all vanished at the
@@ -148,8 +125,8 @@ class DrawingOverlays {
         xray.transparent = true;
         xray.depthWrite = false;
         this.materials.xray = xray;
-        // Coloured per face, the reference face's tint (referenceOutlinesFor).
-        this.materials.reference = new THREE.LineMaterial({ linewidth: LINE_WIDTH_PX, resolution, depthTest: false });
+        this.materials.reference = new THREE.LineMaterial({
+            color: REFERENCE_FACE_COLOR, linewidth: LINE_WIDTH_PX, resolution, depthTest: false });
         this._look = new THREE.Vector3();
     }
 
@@ -194,7 +171,7 @@ class DrawingOverlays {
         const THREE = this.THREE;
         const lines = [];
         const key = (vertex) => [0, 1, 2].map((axis) => vertices[3 * vertex + axis].toFixed(6)).join(',');
-        for (const { normal, offset, color } of planes || []) {
+        for (const { normal, offset } of planes || []) {
             const onFace = (vertex) => Math.abs(vertices[3 * vertex] * normal[0] + vertices[3 * vertex + 1] * normal[1]
                 + vertices[3 * vertex + 2] * normal[2] - offset) < 1e-7;
             const edges = new Map();
@@ -216,9 +193,7 @@ class DrawingOverlays {
             if (!positions.length) continue;
             const geometry = new THREE.LineSegmentsGeometry();
             geometry.setPositions(positions);
-            const material = this._memberMaterial(this.materials.reference, memberKey);
-            material.uniforms.diffuse.value = new THREE.Color(outlineShade(color));
-            const object = new THREE.LineSegments2(geometry, material);
+            const object = new THREE.LineSegments2(geometry, this._memberMaterial(this.materials.reference, memberKey));
             object.renderOrder = 11;
             object.visible = false;
             lines.push({ object, normal: new THREE.Vector3(...normal), option: 'highlightReferenceEdges', memberKey,
@@ -272,4 +247,4 @@ class DrawingOverlays {
 
 const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, FACE_ON_DOT };
 
-export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, outlineShade, FACE_ON_DOT };
+export { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDashShader, REFERENCE_FACE_COLOR, FACE_ON_DOT };
