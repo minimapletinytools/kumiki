@@ -233,6 +233,9 @@ export const PAPER_COLOR = 0xfbfbf8;
 // How big the arc of an angle is, in page pixels.
 export const MEASUREMENT_ANGLE_RADIUS_PX = 34;
 
+// The smallest an angle's arc is drawn or dragged to, in page pixels, so it never shrinks into its corner.
+export const MEASUREMENT_ANGLE_MIN_RADIUS_PX = 16;
+
 // How much of a timber a drawing is not about still shows. Enough to place the
 // piece among its neighbours, not enough to be mistaken for part of the sheet.
 export const DRAWING_CONTEXT_OPACITY = 0.05;

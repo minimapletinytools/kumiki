@@ -279,6 +279,55 @@ module.exports = {
             outline.focus?.kind === 'measurement' && outline.clicked.join() === outline.focus.viewportId);
         await waitFor(() => inShell(`${viewerApp}.querySelectorAll('.drawing-view-outline').length === 1`), { timeoutMs: 5000 });
 
+        // An angle's arc is dragged nearer or further from its corner, and no nearer than its least radius.
+        const angleDrag = await inShell(`(() => {
+            const app = ${viewerApp};
+            const view = app.viewports.find((one) => one.spec.camera && one.spec.camera.look);
+            if (!view) return { error: 'no aimed view' };
+            const axes = app.viewportAxes(view);
+            const vertex = view.spec.camera.target || [0, 0, 0];
+            const measure = { measureId: 'angle-drag', a: { at: vertex }, b: { at: vertex },
+                plane: { at: vertex, normal: axes.look }, settled: { value: { unit: 'angle', value: 90 } },
+                angle: { vertex, from: axes.right, to: axes.up, normal: axes.look, phantoms: [] } };
+            view.spec.measurements = [...(view.spec.measurements || []), measure];
+            const written = [];
+            const write = app._writeMeasurementPlacement;
+            app._writeMeasurementPlacement = (...args) => written.push(args[2]);
+            try {
+                app.renderMeasurements();
+                const arc = () => Array.from(app.querySelectorAll('.dim-group')).find((group) => group._angleRun);
+                const run = arc()._angleRun;
+                const rect = app.querySelector('#viewport').getBoundingClientRect();
+                const reach = Math.hypot(run.outward.x, run.outward.y);
+                const at = (pixels) => ({ clientX: rect.left + run.vertex.x + run.outward.x / reach * pixels,
+                    clientY: rect.top + run.vertex.y + run.outward.y / reach * pixels, bubbles: true });
+                const drawnPixels = () => {
+                    const [x, y] = arc().querySelector('path').getAttribute('d').split(' ').slice(1, 3).map(Number);
+                    return Math.hypot(x - run.vertex.x, y - run.vertex.y);
+                };
+                const before = drawnPixels();
+                const viewer = app.ownerDocument.defaultView;
+                const Pointer = viewer.PointerEvent;
+                arc().querySelector('path').dispatchEvent(new Pointer('pointerdown', at(34)));
+                viewer.dispatchEvent(new Pointer('pointermove', at(90)));
+                const further = drawnPixels();
+                viewer.dispatchEvent(new Pointer('pointermove', at(2)));
+                const nearest = drawnPixels();
+                viewer.dispatchEvent(new Pointer('pointerup', at(2)));
+                return { before, further, nearest, written, perWorld: reach };
+            } finally {
+                app._writeMeasurementPlacement = write;
+                view.spec.measurements = view.spec.measurements.filter((one) => one !== measure);
+                app._draggingMeasurement = null;
+                app.renderMeasurements();
+            }
+        })()`);
+        check('dragging an angle out from its corner draws its arc further out',
+            Math.abs(angleDrag.before - 34) < 1 && Math.abs(angleDrag.further - 90) < 1, JSON.stringify(angleDrag));
+        check('an angle dragged into its corner stops at its least radius, and saves that radius',
+            Math.abs(angleDrag.nearest - 16) < 1 && angleDrag.written.length === 1
+            && Math.abs(angleDrag.written[0].offset * angleDrag.perWorld - 16) < 1, JSON.stringify(angleDrag));
+
         // A trackpad scroll that orbits has no release, so a locked view springs back once it stops.
         const tiltStart = await inShell(`(() => {
             const app = ${viewerApp};

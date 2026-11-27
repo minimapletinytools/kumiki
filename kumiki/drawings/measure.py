@@ -964,6 +964,7 @@ class Offset(Placement):
 
     `offset` is in world units. Positive is to the right of the run from the measure's `anchor_a` to its
     `anchor_b`, as it is seen on screen. None uses the viewport's default (in pixels).
+    For an angle, `offset` is the arc's radius (its size; the sign is ignored).
     """
 
     offset: Optional[float] = None

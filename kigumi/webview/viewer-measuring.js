@@ -4,7 +4,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
-import { KigumiMeasurements, MEASUREMENT_ANGLE_RADIUS_PX, MEASUREMENT_CODE_ORIGIN, MEASUREMENT_DRAG_SLOP_PX, MEASUREMENT_OFFSET_PX, MEASUREMENT_SETTLE_MS, THREE_D_MEASUREMENTS_ID, anchorName, describeAnchor, measurementKey, t, vscode } from './viewer-shared.js';
+import { KigumiMeasurements, MEASUREMENT_ANGLE_MIN_RADIUS_PX, MEASUREMENT_ANGLE_RADIUS_PX, MEASUREMENT_CODE_ORIGIN, MEASUREMENT_DRAG_SLOP_PX, MEASUREMENT_OFFSET_PX, MEASUREMENT_SETTLE_MS, THREE_D_MEASUREMENTS_ID, anchorName, describeAnchor, measurementKey, t, vscode } from './viewer-shared.js';
 import * as KigumiFeatureStates from './feature-states.js';
 
 export const MeasuringMixin = (Base) => class extends Base {
@@ -527,6 +527,20 @@ export const MeasuringMixin = (Base) => class extends Base {
         return typeof offset === 'number' ? offset : null;
     }
 
+    /**
+     * An angle's arc radius in world units, or null for the default: the drag's while one is held,
+     * else its placement's offset (unsigned, as swapping the anchors negates an offset).
+     */
+    _angleRadius(measure, viewportId) {
+        const dragging = this._draggingMeasurement;
+        if (dragging && dragging.viewportId === viewportId && dragging.measureKey === measurementKey(measure)
+            && typeof dragging.radius === 'number') {
+            return dragging.radius;
+        }
+        const offset = this._measurementOffset(measure);
+        return offset === null || offset === 0 ? null : Math.abs(offset);
+    }
+
     /** How far a dimension has been slid along its two lines, in world units; 0 for not at all. */
     _measurementAlong(measure) {
         const placement = measure && measure.placement;
@@ -645,6 +659,11 @@ export const MeasuringMixin = (Base) => class extends Base {
      * So nothing happens until it has travelled far enough to be a gesture.
      */
     _beginMeasurementDrag(event, group, viewportId, measureKey, measure) {
+        const angle = group._angleRun;
+        if (angle) {
+            this._beginAngleDrag(event, angle, viewportId, measureKey, measure);
+            return;
+        }
         const run = group._dimensionRun;
         if (!run) {
             return;
@@ -709,6 +728,42 @@ export const MeasuringMixin = (Base) => class extends Base {
             this._writeMeasurementPlacement(viewportId, measureKey, placement, wasPlacement);
         };
 
+        this._beginPointerGesture('measurement-drag', { onMove, onEnd: onUp });
+    }
+
+    /** Drag an angle's arc toward or away from its corner: the radius, no smaller than the least drawn. */
+    _beginAngleDrag(event, run, viewportId, measureKey, measure) {
+        const wasPlacement = measure.placement || { offset: null };
+        const start = { x: event.clientX, y: event.clientY };
+        const reach = run.outward.x * run.outward.x + run.outward.y * run.outward.y;
+        if (!(reach > 1e-12)) {
+            return;
+        }
+        let moved = false;
+        const onMove = (moveEvent) => {
+            if (!moved
+                && Math.abs(moveEvent.clientX - start.x)
+                   + Math.abs(moveEvent.clientY - start.y) < MEASUREMENT_DRAG_SLOP_PX) {
+                return;
+            }
+            moved = true;
+            const rect = this.renderRoot.querySelector('#viewport').getBoundingClientRect();
+            const out = { x: moveEvent.clientX - rect.left - run.vertex.x, y: moveEvent.clientY - rect.top - run.vertex.y };
+            // Along the arc's middle, so a foreshortened arc follows the pointer.
+            const radius = Math.max((out.x * run.outward.x + out.y * run.outward.y) / reach, run.smallest);
+            this._draggingMeasurement = { viewportId, measureKey, radius };
+            this.renderMeasurements();
+        };
+        const onUp = () => {
+            const dragged = this._draggingMeasurement;
+            if (!moved || !dragged) {
+                this._draggingMeasurement = null;
+                return;
+            }
+            this._settleMeasurementDrag(dragged);
+            this._writeMeasurementPlacement(viewportId, measureKey,
+                { ...wasPlacement, offset: dragged.radius }, wasPlacement);
+        };
         this._beginPointerGesture('measurement-drag', { onMove, onEnd: onUp });
     }
 
@@ -1135,7 +1190,8 @@ export const MeasuringMixin = (Base) => class extends Base {
             this._drawAngle(into, viewport, pageRect, from, to,
                             status.formA, status.formB, KigumiMeasurements.formatMeasureLabel(
                                 measure.label, `${value.value.toFixed(1)}\u00b0`),
-                            { ...options, rays: measure.angle || null });
+                            { ...options, rays: measure.angle || null,
+                              radius: this._angleRadius(measure, viewport.id) });
             return;
         }
 
@@ -1253,12 +1309,15 @@ export const MeasuringMixin = (Base) => class extends Base {
      */
     _drawAngle(into, viewport, pageRect, from, to, formA, formB, label, options = {}) {
         const rays = options.rays || null;
+        const radius = options.radius === undefined ? null : options.radius;
         const drawn = rays
-            ? this._angleArcInItsOwnPlane(viewport, pageRect, rays)
-            : this._angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB);
+            ? this._angleArcInItsOwnPlane(viewport, pageRect, rays, radius)
+            : this._angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB, radius);
         if (!drawn) {
             return;
         }
+        // What a drag measures against: the corner, and a world unit out along the arc's middle.
+        into._angleRun = drawn.run;
 
         const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         arc.setAttribute('d', drawn.path);
@@ -1296,7 +1355,7 @@ export const MeasuringMixin = (Base) => class extends Base {
      * direction -- from anywhere else a right angle reads as twenty degrees and
      * the arc floats free of the work.
      */
-    _angleArcInItsOwnPlane(viewport, pageRect, rays) {
+    _angleArcInItsOwnPlane(viewport, pageRect, rays, inWorld = null) {
         const at = this._projectToPage(rays.vertex, viewport, pageRect);
         // A radius in world units that comes out near the pixels a dimension
         // wants, so the arc is legible at any zoom without being drawn flat.
@@ -1311,7 +1370,8 @@ export const MeasuringMixin = (Base) => class extends Base {
             // there is no scale to take and nothing worth drawing.
             return null;
         }
-        const radius = MEASUREMENT_ANGLE_RADIUS_PX / perWorld;
+        const smallest = MEASUREMENT_ANGLE_MIN_RADIUS_PX / perWorld;
+        const radius = inWorld === null ? MEASUREMENT_ANGLE_RADIUS_PX / perWorld : Math.max(inWorld, smallest);
         const points = KigumiMeasurements.angleArcPoints(rays, radius)
             .map((point) => this._projectToPage(point, viewport, pageRect));
         if (points.length < 2) {
@@ -1320,10 +1380,12 @@ export const MeasuringMixin = (Base) => class extends Base {
         const path = points
             .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
             .join(' ');
+        const middle = this._projectToPage(KigumiMeasurements.angleArcPoints(rays, 1, 2)[1], viewport, pageRect);
         return {
             path,
             label: this._projectToPage(
                 KigumiMeasurements.angleLabelPoint(rays, radius), viewport, pageRect),
+            run: { vertex: at, outward: { x: middle.x - at.x, y: middle.y - at.y }, smallest },
         };
     }
 
@@ -1335,7 +1397,7 @@ export const MeasuringMixin = (Base) => class extends Base {
      * place -- it is better than drawing nothing, and it is what every angle
      * used to get.
      */
-    _angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB) {
+    _angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB, inWorld = null) {
         const screenDirection = (point, direction) => {
             const here = this._projectToPage(point, viewport, pageRect);
             const step = 0.01;
@@ -1361,15 +1423,31 @@ export const MeasuringMixin = (Base) => class extends Base {
         if (!fromDirection || !toDirection) {
             return null;
         }
+        // Pixels a world unit is worth along the first feature, which a radius in world units is read by.
+        const here = this._projectToPage(from, viewport, pageRect);
+        const ahead = this._projectToPage(from.map((part, axis) => part + formA.direction[axis]), viewport, pageRect);
+        const perWorld = Math.hypot(ahead.x - here.x, ahead.y - here.y);
+        const pixels = inWorld === null || !(perWorld > 1e-9)
+            ? MEASUREMENT_ANGLE_RADIUS_PX
+            : Math.max(inWorld * perWorld, MEASUREMENT_ANGLE_MIN_RADIUS_PX);
         const layout = KigumiMeasurements.angleLayout(
-            this._projectToPage(from, viewport, pageRect), fromDirection,
+            here, fromDirection,
             this._projectToPage(to, viewport, pageRect), toDirection,
-            { radius: MEASUREMENT_ANGLE_RADIUS_PX },
+            { radius: pixels },
         );
         if (!layout) {
             return null;
         }
+        const middle = { x: (layout.start.x + layout.end.x) / 2 - layout.vertex.x,
+                         y: (layout.start.y + layout.end.y) / 2 - layout.vertex.y };
+        const out = Math.hypot(middle.x, middle.y);
+        const run = perWorld > 1e-9 && out > 1e-9 ? {
+            vertex: layout.vertex,
+            outward: { x: middle.x / out * perWorld, y: middle.y / out * perWorld },
+            smallest: MEASUREMENT_ANGLE_MIN_RADIUS_PX / perWorld,
+        } : null;
         return {
+            run,
             path: [
                 'M', layout.start.x, layout.start.y,
                 'A', layout.radius, layout.radius, 0, layout.largeArc, layout.sweepFlag,
