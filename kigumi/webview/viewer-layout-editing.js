@@ -2,7 +2,7 @@
  * Editing a drawing's layout on the sheet, in a mode of its own: the views' outlines, the selected
  * view's handles and tools, the lines between a grid's cells, and where a dragged view will land.
  * Every edit sends the whole tree (setDrawingLayout) and draws itself at once; the runner's answer
- * replaces it. Measuring and hover are off while editing.
+ * replaces it. Measuring and hover are off while editing, and a click takes only a face.
  *
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
@@ -44,6 +44,21 @@ function element(name, attributes, parent) {
 }
 
 const add = (a, b, scale = 1) => a.map((value, index) => value + b[index] * scale);
+const neg = (a) => a.map((value) => -value);
+
+// The gizmo's buttons: where in its 3x3 grid, and the camera they turn to from (look, up, right).
+// An orbit moves the camera around what it looks at; a roll turns the picture.
+const TURNS = [
+    { id: 'roll-left', glyph: '↺', key: 'viewer.layout.rollLeft', at: [0, 0], turn: (look, _up, right) => [look, right] },
+    { id: 'orbit-up', glyph: '▲', key: 'viewer.layout.orbitUp', at: [1, 0], turn: (look, up) => [neg(up), look] },
+    { id: 'roll-right', glyph: '↻', key: 'viewer.layout.rollRight', at: [2, 0], turn: (look, _up, right) => [look, neg(right)] },
+    { id: 'orbit-left', glyph: '◀', key: 'viewer.layout.orbitLeft', at: [0, 1], turn: (_look, up, right) => [right, up] },
+    { id: 'orbit-right', glyph: '▶', key: 'viewer.layout.orbitRight', at: [2, 1], turn: (_look, up, right) => [neg(right), up] },
+    { id: 'orbit-down', glyph: '▼', key: 'viewer.layout.orbitDown', at: [1, 2], turn: (look, up) => [up, neg(look)] },
+];
+// Smaller than the tools: it sits on the drawing.
+const GIZMO_BUTTON_PX = 17;
+const GIZMO_CELL_PX = GIZMO_BUTTON_PX + 2;
 
 export const LayoutEditingMixin = (Base) => class extends Base {
     /** Start editing the open drawing's layout. */
@@ -53,9 +68,12 @@ export const LayoutEditingMixin = (Base) => class extends Base {
         }
         while (this.escapeMeasurement()) { /* one end at a time */ }
         this.clearHover();
-        this.layoutEditing = true;
         const focus = this.selectionManager.viewportFocus;
         this._layoutSelected = focus ? focus.viewportId : null;
+        // Faces here, edges and points outside: neither selection means anything in the other.
+        this._dropCsgFocus();
+        this.selectionManager.clearTimberSelection();
+        this.layoutEditing = true;
         this._syncDrawingPanel();
         this.requestUpdate();
     }
@@ -67,6 +85,9 @@ export const LayoutEditingMixin = (Base) => class extends Base {
         this.cancelLayoutDrag();
         this.layoutEditing = false;
         this._layoutSelected = null;
+        this._layoutGestureView = null;
+        this._dropCsgFocus();
+        this.selectionManager.clearTimberSelection();
         this._syncDrawingPanel();
         this.requestUpdate();
     }
@@ -245,6 +266,50 @@ export const LayoutEditingMixin = (Base) => class extends Base {
                 if (!button.disabled) button.act(event);
             });
         });
+        this._drawTurnGizmo(group, box, selected);
+    }
+
+    /** The turning buttons, in the view's bottom right, or below it where the view is too small. */
+    _drawTurnGizmo(group, box, name) {
+        const size = 3 * GIZMO_CELL_PX;
+        const inside = box.width >= size + 8 && box.height >= size + BUTTON_PX + 16;
+        const left = box.x + box.width - size - (inside ? 4 : 0);
+        const top = inside ? box.y + box.height - size - 4 : box.y + box.height + 4;
+        const gizmo = element('g', { class: 'vp-turn', transform: `translate(${left}, ${top})` }, group);
+        for (const turn of TURNS) {
+            const tool = element('g', {
+                class: `vp-tool vp-tool-${turn.id}`,
+                transform: `translate(${turn.at[0] * GIZMO_CELL_PX}, ${turn.at[1] * GIZMO_CELL_PX})`,
+            }, gizmo);
+            element('rect', { width: GIZMO_BUTTON_PX, height: GIZMO_BUTTON_PX, rx: 3 }, tool);
+            element('text', { x: GIZMO_BUTTON_PX / 2, y: GIZMO_BUTTON_PX / 2 + 4, 'text-anchor': 'middle' }, tool).textContent = turn.glyph;
+            element('title', {}, tool).textContent = t(turn.key);
+            tool.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this.turnLayoutView(name, turn.id);
+            });
+        }
+    }
+
+    /** Turn a view's camera a quarter turn (TURNS), and fit it again. */
+    turnLayoutView(name, id) {
+        const layout = this.editableLayout;
+        const turn = TURNS.find((one) => one.id === id);
+        const viewport = this.viewports.find((one) => one.id === name);
+        const camera = viewport && viewport.spec.camera;
+        if (!layout || !turn || !camera || !camera.look || !camera.up) {
+            return;
+        }
+        const { look, up } = camera;
+        // look x up, as the runner builds it (frame_from_look_and_up).
+        const right = camera.right || [
+            look[1] * up[2] - look[2] * up[1], look[2] * up[0] - look[0] * up[2], look[0] * up[1] - look[1] * up[0]];
+        const [newLook, newUp] = turn.turn(look, up, right);
+        const was = Layout.leafCamera(layout, name);
+        this._commitLayout(Layout.setLeafCamera(layout, name, {
+            look: newLook, up: newUp, ...(was && was.projection ? { projection: was.projection } : {}),
+        }), 'turn view');
     }
 
     /** Split a view's cell, the new half a copy of it, and pick out the copy once it comes back. */
@@ -271,24 +336,24 @@ export const LayoutEditingMixin = (Base) => class extends Base {
     }
 
     /**
-     * `after` with each view it moves or resizes fitted to what it draws: a camera the layout
-     * gives it loses its place and zoom. A copy, or a view of a drawing of the file's own, keeps
-     * the extent it had unless given a camera, so it is given its own.
+     * `after` with each view it moves or resizes -- the one dragged and every one it pushes
+     * aside -- fitted to what it draws: a camera the layout gives it loses its place and zoom, and
+     * a view without one is given the way it looks now, since otherwise it keeps the zoom its
+     * code or file gave it.
      */
     _fitMoved(before, after) {
-        const scene = this.sceneStore.activeScene();
         let fitted = after;
         for (const name of Layout.movedLeaves(before, after, this.activePage)) {
             const camera = Layout.leafCamera(fitted, name);
-            const path = Layout.findLeaf(fitted, name);
-            const copyOf = path && this._leafNode(fitted, path).copyOf;
             if (camera) {
                 const { target: _target, extent: _extent, ...rest } = camera;
                 fitted = Layout.setLeafCamera(fitted, name, rest);
-            } else if (copyOf || scene.origin === 'file') {
-                const axes = this._viewAxes(name) || this._viewAxes(copyOf);
-                if (axes) fitted = Layout.setLeafCamera(fitted, name, axes);
+                continue;
             }
+            const path = Layout.findLeaf(fitted, name);
+            const copyOf = path && this._leafNode(fitted, path).copyOf;
+            const axes = this._viewAxes(name) || this._viewAxes(copyOf);
+            if (axes) fitted = Layout.setLeafCamera(fitted, name, axes);
         }
         return fitted;
     }
@@ -313,10 +378,11 @@ export const LayoutEditingMixin = (Base) => class extends Base {
         }
     }
 
-    /** The selected face's way out, or null when no face is selected. */
+    /** The selected face's way out, in the world, or null when no face is selected. */
     get selectedFaceNormal() {
         const detail = this.lastPickDetail;
-        return this.selectionManager.csgFocus && detail && Array.isArray(detail.outwardNormal) ? detail.outwardNormal : null;
+        return this.layoutEditing && this.selectionManager.csgFocus && detail && detail.featureType === 'FACE'
+            && Array.isArray(detail.worldNormal) ? detail.worldNormal : null;
     }
 
     /** The orthographic presets, and the selected face. */
@@ -346,44 +412,77 @@ export const LayoutEditingMixin = (Base) => class extends Base {
         this.requestUpdate();
     }
 
-    /**
-     * The wheel over the selected view while editing zooms it about the pointer, or pans it
-     * (a two-finger scroll, or shift); saved once the wheel stops. Returns whether it was taken.
-     */
-    layoutWheel(event, gesture) {
+    /** The selected view, if (clientX, clientY) is in it and it has a camera to move. */
+    layoutViewAt(clientX, clientY) {
         const name = this.layoutSelection;
-        if (!name || this._layoutDraft) {
-            return false;
+        if (!name || (this._layoutDraft && !this._layoutDraft.settling)) {
+            return null;
         }
         const viewport = this.viewports.find((one) => one.id === name);
         const rect = Layout.resolveLayout(this.editableLayout, this.activePage).get(name);
-        const at = this._pageFraction(event);
-        if (!viewport || !viewport.spec.camera || !rect
-                || at.x < rect[0] || at.x > rect[0] + rect[2] || at.y < rect[1] || at.y > rect[1] + rect[3]) {
+        const at = this._pageFraction({ clientX, clientY });
+        const inside = rect && at.x >= rect[0] && at.x <= rect[0] + rect[2] && at.y >= rect[1] && at.y <= rect[1] + rect[3];
+        return inside && viewport && viewport.spec.camera && viewport.spec.camera.extent ? name : null;
+    }
+
+    /**
+     * Move a view's camera by a wheel, drag or touch gesture (touch-navigation.js): a pan or a
+     * one-finger drag pans it, a zoom zooms it about the pointer, a pinch does both. Saved once
+     * the gesture stops. Returns whether it was taken.
+     */
+    layoutViewGesture(name, clientX, clientY, gesture) {
+        const viewport = this.viewports.find((one) => one.id === name);
+        const layout = this.editableLayout;
+        const rect = layout && Layout.resolveLayout(layout, this.activePage).get(name);
+        if (!viewport || !viewport.spec.camera || !rect) {
             return false;
         }
         const camera = { ...viewport.spec.camera };
         const right = camera.right || [1, 0, 0];
-        const heightPx = rect[3] * at.pageRect.height;
-        const aspect = (rect[2] * at.pageRect.width) / heightPx;
-        if (gesture.kind === 'pan' || gesture.kind === 'orbit') {
+        const pageRect = this._pageFraction({ clientX, clientY }).pageRect;
+        const heightPx = rect[3] * pageRect.height;
+        const aspect = (rect[2] * pageRect.width) / heightPx;
+        const pan = (dx, dy) => {
             const perPixel = (2 * camera.extent) / heightPx;
-            camera.target = add(add(camera.target, right, -gesture.dx * perPixel), camera.up, gesture.dy * perPixel);
-        } else {
-            const factor = gesture.kind === 'zoom' ? gesture.factor : (gesture.out ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP);
+            camera.target = add(add(camera.target, right, -dx * perPixel), camera.up, dy * perPixel);
+        };
+        // The point under (x, y) stays there.
+        const zoom = (factor, x, y) => {
+            const at = this._pageFraction({ clientX: x, clientY: y });
             const u = ((at.x - rect[0]) / rect[2]) * 2 - 1;
             const v = 1 - ((at.y - rect[1]) / rect[3]) * 2;
             const extent = camera.extent * factor;
-            // The point under the pointer stays there.
             const shift = camera.extent - extent;
             camera.target = add(add(camera.target, right, u * aspect * shift), camera.up, v * shift);
             camera.extent = extent;
+        };
+        if (gesture.kind === 'pan' || gesture.kind === 'orbit') {
+            pan(gesture.dx, gesture.dy);
+        } else if (gesture.kind === 'zoom') {
+            zoom(gesture.factor, clientX, clientY);
+        } else if (gesture.kind === 'zoomStep') {
+            zoom(gesture.out ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, clientX, clientY);
+        } else if (gesture.kind === 'pinch') {
+            zoom(gesture.factor, gesture.to.x, gesture.to.y);
+            pan(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y);
+        } else {
+            return false;
         }
         viewport.spec.camera = camera;
         viewport.applySpecCamera();
         this.syncCameraProjection();
+        this._saveViewCameraSoon(name, camera);
+        return true;
+    }
+
+    /** Save a view's camera once nothing has moved it for a moment and no drag or touch is held. */
+    _saveViewCameraSoon(name, camera) {
         clearTimeout(this._wheelCommitTimer);
-        this._wheelCommitTimer = setTimeout(() => {
+        const save = () => {
+            if (this.pointerDrag.isDragging || this.touchGestures.active) {
+                this._wheelCommitTimer = setTimeout(save, WHEEL_SETTLE_MS);
+                return;
+            }
             const layout = this.editableLayout;
             if (!layout || !Layout.findLeaf(layout, name)) return;
             const was = Layout.leafCamera(layout, name);
@@ -391,8 +490,8 @@ export const LayoutEditingMixin = (Base) => class extends Base {
                 look: camera.look, up: camera.up, target: camera.target, extent: camera.extent,
                 ...(was && was.projection ? { projection: was.projection } : {}),
             }), 'zoom view');
-        }, WHEEL_SETTLE_MS);
-        return true;
+        };
+        this._wheelCommitTimer = setTimeout(save, WHEEL_SETTLE_MS);
     }
 
     /**

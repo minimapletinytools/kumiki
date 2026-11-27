@@ -177,6 +177,7 @@ class PickRequest(TypedDict, total=False):
     space: Optional[str]  # "3d" | "projected"
     xrayMembers: List[str]
     drawnMembers: Optional[List[str]]  # in a drawing, the members it draws: what can hide something
+    facesOnly: bool  # editing a drawing's layout: only a face can be taken
 
 
 class PathPickRequest(TypedDict, total=False):
@@ -249,6 +250,7 @@ class NodeDescriptionWire(TypedDict, total=False):
     featureType: Optional[str]
     facesToward: Optional[str]
     outwardNormal: Optional['Float3']
+    worldNormal: Optional['Float3']
 
 
 class DerivationParentWire(TypedDict):
@@ -728,7 +730,7 @@ if TYPE_CHECKING:
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
     from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
-    from kumiki.viewer.picking import DrawnMember, MemberCandidate, Pick
+    from kumiki.viewer.picking import Candidates, DrawnMember, MemberCandidate, Pick
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -4823,6 +4825,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
         "featureType": None,
         "facesToward": None,
         "outwardNormal": None,
+        "worldNormal": None,
         "nodeDisplayName": None,
         "nodeLabel": None,
         "jointName": None,
@@ -4926,7 +4929,7 @@ def _pick_on_member(
     member and which was taken; otherwise this member's own are used.
     """
     from kumiki.viewer.picking import Candidates, best_matching_candidate, choose, find_candidates, navigate
-    from kumiki.viewer.rule_at_home import LocalFrame
+    from kumiki.viewer.rule_at_home import Float3, LocalFrame
 
     if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
         raise ValueError(f"Unknown memberKey: {member_key}")
@@ -4969,6 +4972,12 @@ def _pick_on_member(
         candidate_index = next(position for position, (index, _hit) in enumerate(mine) if index == chosen_index)
     else:
         found = find_candidates(local_csg, local_pt, ask.eps, ask.tolerances, local_ray)
+    if payload.get("facesOnly"):
+        found = _faces_only(found)
+        if not found.visible_count:
+            return _nothing_at_point("")
+        # The first face, not an edge derived from two of them.
+        candidate_index = 0
     feature_hits, visible_count = found
     look, space, eps = ask.look, ask.space, ask.eps
     pick = choose(local_csg, navigated, found, candidate_index,
@@ -5036,6 +5045,10 @@ def _pick_on_member(
             "totalTriangles": total,
         },
     }
+    normal = result.get("outwardNormal")
+    if normal is not None:
+        rows = local_frame.rows
+        result["worldNormal"] = Float3(*(r.x * normal[0] + r.y * normal[1] + r.z * normal[2] for r in rows))
     if lit.parent is not None:
         result["parentHighlightMesh"] = lit.parent
     if lit.edge_segments is not None:
@@ -5043,6 +5056,15 @@ def _pick_on_member(
         result["highlightEdgeSegments"] = lit.edge_segments
     _log_pick(member_key, local_pt, ask.tolerances, feature_hits, result)
     return result
+
+
+def _faces_only(found: 'Candidates') -> 'Candidates':
+    """Return `found` with only its faces, keeping which can be taken."""
+    from kumiki.csg.cutcsg import CSGFeatureType
+    from kumiki.viewer.picking import Candidates
+
+    faces = [(index, hit) for index, hit in enumerate(found.hits) if hit.feature.feature_type() is CSGFeatureType.FACE]
+    return Candidates([hit for _index, hit in faces], sum(1 for index, _hit in faces if index < found.visible_count))
 
 
 class _PickHighlights(NamedTuple):

@@ -664,7 +664,7 @@
   "viewer.layout.done.title": "Stop editing the layout (Esc)",
   "viewer.layout.undo": "Undo",
   "viewer.layout.redo": "Redo",
-  "viewer.layout.fit": "Fit the view to what it draws (the wheel zooms it, shift or a two-finger scroll pans it)",
+  "viewer.layout.fit": "Fit the view to what it draws (the wheel zooms it; shift-scroll, a middle drag or a finger pans it)",
   "viewer.layout.camera": "Camera angle",
   "viewer.layout.camera.front": "Front",
   "viewer.layout.camera.back": "Back",
@@ -672,5 +672,11 @@
   "viewer.layout.camera.right": "Right",
   "viewer.layout.camera.top": "Top",
   "viewer.layout.camera.bottom": "Bottom",
-  "viewer.layout.camera.face": "Selected face"
+  "viewer.layout.camera.face": "Selected face (click a face in a view first)",
+  "viewer.layout.orbitUp": "Turn the camera 90° up, over the top",
+  "viewer.layout.orbitDown": "Turn the camera 90° down, under the bottom",
+  "viewer.layout.orbitLeft": "Turn the camera 90° to the left",
+  "viewer.layout.orbitRight": "Turn the camera 90° to the right",
+  "viewer.layout.rollLeft": "Roll the view 90° counterclockwise",
+  "viewer.layout.rollRight": "Roll the view 90° clockwise"
 }

@@ -664,7 +664,7 @@
   "viewer.layout.done.title": "レイアウトの編集を終える（Esc）",
   "viewer.layout.undo": "元に戻す",
   "viewer.layout.redo": "やり直す",
-  "viewer.layout.fit": "描くものにビューを合わせる（ホイールでズーム、Shift か二本指スクロールでパン）",
+  "viewer.layout.fit": "描くものにビューを合わせる（ホイールでズーム、Shift スクロール・中ボタンドラッグ・指でパン）",
   "viewer.layout.camera": "カメラの向き",
   "viewer.layout.camera.front": "正面",
   "viewer.layout.camera.back": "背面",
@@ -672,5 +672,11 @@
   "viewer.layout.camera.right": "右",
   "viewer.layout.camera.top": "上",
   "viewer.layout.camera.bottom": "下",
-  "viewer.layout.camera.face": "選択した面"
+  "viewer.layout.camera.face": "選択した面（先にビューの面をクリック）",
+  "viewer.layout.orbitUp": "カメラを上へ 90° 回す",
+  "viewer.layout.orbitDown": "カメラを下へ 90° 回す",
+  "viewer.layout.orbitLeft": "カメラを左へ 90° 回す",
+  "viewer.layout.orbitRight": "カメラを右へ 90° 回す",
+  "viewer.layout.rollLeft": "ビューを反時計回りに 90° 回す",
+  "viewer.layout.rollRight": "ビューを時計回りに 90° 回す"
 }

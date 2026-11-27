@@ -262,6 +262,18 @@
     cursor: pointer;
 }
 
+/* A finger on a handle drags it rather than scrolling the page. */
+.vp-edit .vp-handle,
+.vp-edit .vp-divider,
+.vp-grip,
+.vp-tool {
+    touch-action: none;
+}
+
+/* The turning buttons sit lighter than the tools, so they don't cover the drawing. */
+.vp-turn .vp-tool rect { fill-opacity: 0.7; }
+.vp-turn .vp-tool text { font-size: 10px; }
+
 .vp-grip { cursor: move; }
 
 .vp-grip rect,

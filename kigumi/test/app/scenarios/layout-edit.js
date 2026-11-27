@@ -1,6 +1,8 @@
 // Editing a drawing's layout on the sheet: the edit button starts it, a click picks out a view, then
-// split, float, resize, a divider moved, a dock (with where it will land shown first), a drag let go
-// of with Escape, a camera preset and a fit, undo back to the code's, and Escape ends it.
+// split, float, resize, a divider moved, a dock (with where it will land shown first, and every view
+// it resizes fitted), a drag let go of with Escape, a face picked and looked at, a camera preset, a
+// quarter turn, the wheel and a middle drag on the view, a fit, undo back to the code's, and Escape
+// ends it.
 module.exports = {
     name: 'layout-edit',
     async run({ check, inShell, waitFor, capture, runAppCommand, viewDoc, DRAWING_FRAME }) {
@@ -106,6 +108,13 @@ module.exports = {
         const docked = await waitFor(() => inShell(`(() => { const a = ${app}; const l = a.sceneStore.activeScene().layout;
             return !a._layoutDraft && !l.roots.some(r => r.leaf === ${JSON.stringify(first + ' 2')}); })()`), { timeoutMs: 15000 }).catch(() => false);
         check('let go there, it docks beside that view', docked);
+        // The view it was docked beside was squeezed to make room: it is fitted again too.
+        const leafCamera = (name) => `(() => { const walk = (n) => n.leaf === ${JSON.stringify(name)} ? n
+            : n.split ? n.split.portions.map(p => walk(p.node)).find(Boolean) : null;
+            const l = ${app}.sceneStore.activeScene().layout;
+            const found = l.roots.map(walk).find(Boolean); return found ? found.camera || null : null; })()`;
+        const squeezed = await inShell(leafCamera(first));
+        check('a view pushed aside is fitted again', squeezed && squeezed.look && !squeezed.extent, JSON.stringify(squeezed));
         await inShell(frame);
         await capture('07-docked');
 
@@ -120,6 +129,34 @@ module.exports = {
         const kept = await inShell(`(() => { const a = ${app}; return !a._layoutDraft && a.layoutEditing && JSON.stringify(a.sceneStore.activeScene().layout) === ${JSON.stringify(layoutBefore)}; })()`);
         check('escape during a drag lets go of it, still editing', kept);
 
+        // Only a face can be picked while editing: click on a member in the view, then look at that face.
+        const onMember = await inShell(`(() => { const a = ${app};
+            const host = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
+            const view = a.viewports.find(v => v.id === ${JSON.stringify(first)});
+            const drawn = a.activeSceneMembers;
+            const entry = Array.from(a.sceneManager.membersByKey.entries()).find(([key, b]) => b.mesh && (!drawn || drawn.has(key)));
+            if (!entry) return null;
+            const mesh = entry[1].mesh;
+            mesh.geometry.computeBoundingBox();
+            const centre = mesh.geometry.boundingBox.getCenter(mesh.geometry.boundingBox.min.clone()).applyMatrix4(mesh.matrixWorld);
+            const ndc = centre.project(view.camera);
+            const r = view.pixelRect(a.pageScreenRect(host.width, host.height), host.height);
+            const x = host.left + r.x + (ndc.x + 1) / 2 * r.width, y = host.top + (host.height - r.y - r.height) + (1 - ndc.y) / 2 * r.height;
+            a.handleCanvasClick({ clientX: x, clientY: y, shiftKey: false });
+            return [x, y];
+        })()`);
+        const face = await waitFor(() => inShell(`(() => { const d = ${app}.lastPickDetail; return d && d.featureType ? d : null; })()`), { timeoutMs: 15000 }).catch(() => null);
+        check('a click while editing takes a face', face && face.featureType === 'FACE' && Array.isArray(face.worldNormal), JSON.stringify({ onMember, face }));
+        await inShell(frame);
+        await capture('08-face');
+        await press('.vp-tool-camera', 0, 0, 0);
+        const faceItem = await inShell(`(() => { const m = ${app}.contextMenu; const item = (m.items || (m.state && m.state.items) || []).find(i => i.id === 'face'); return item ? !item.disabled : null; })()`);
+        await inShell(`${app}.contextMenu.choose('face')`);
+        const facing = face && face.worldNormal ? await waitFor(() => inShell(`(() => { const a = ${app}; const v = a.viewports.find(v => v.id === ${JSON.stringify(first)});
+            const n = ${JSON.stringify(face.worldNormal)};
+            return !a._layoutDraft && v && v.spec.camera.look.every((c, i) => Math.abs(c + n[i]) < 1e-6); })()`), { timeoutMs: 15000 }).catch(() => false) : false;
+        check('the selected face can be looked at square on', facing, JSON.stringify({ faceItem }));
+
         // Turn the view to look down from the top, then fit it.
         await press('.vp-tool-camera', 0, 0, 0);
         await inShell(`${app}.contextMenu.choose('top')`);
@@ -127,7 +164,42 @@ module.exports = {
             return !a._layoutDraft && v && Math.abs(v.spec.camera.look[2] + 1) < 1e-6; })()`), { timeoutMs: 15000 }).catch(() => false);
         check('a camera preset turns the view', turned);
         await inShell(frame);
-        await capture('08-top');
+        await capture('09-top');
+
+        // A quarter turn: from the top, the camera goes round to the right and looks back along -x.
+        await press('.vp-tool-orbit-right', 0, 0, 0);
+        const quarter = await waitFor(() => inShell(`(() => { const a = ${app}; const v = a.viewports.find(v => v.id === ${JSON.stringify(first)});
+            return !a._layoutDraft && v && Math.abs(v.spec.camera.look[0] + 1) < 1e-6; })()`), { timeoutMs: 15000 }).catch(() => false);
+        check('the turning buttons turn the camera a quarter turn', quarter);
+        await inShell(frame);
+        await capture('10-turned');
+
+        // The wheel zooms the view, and a middle drag pans it, not the sheet.
+        const middleOf = `(() => { const a = ${app}; const host = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
+            const view = a.viewports.find(v => v.id === ${JSON.stringify(first)});
+            const r = view.pixelRect(a.pageScreenRect(host.width, host.height), host.height);
+            return { x: host.left + r.x + r.width / 2, y: host.top + (host.height - r.y - r.height / 2) }; })()`;
+        const camera = () => inShell(`(() => { const v = ${app}.viewports.find(v => v.id === ${JSON.stringify(first)}); return { extent: v.spec.camera.extent, target: v.spec.camera.target }; })()`);
+        const mid = await inShell(middleOf);
+        const beforeWheel = await camera();
+        await inShell(`(() => { const a = ${app}; const win = a.ownerDocument.defaultView;
+            a.renderRoot.querySelector('#viewport').dispatchEvent(new win.WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: ${mid.x}, clientY: ${mid.y}, deltaY: -100 })); })()`);
+        const afterWheel = await camera();
+        check('the wheel zooms the selected view', afterWheel.extent < beforeWheel.extent, JSON.stringify({ beforeWheel, afterWheel }));
+        const pageBefore = await inShell(`JSON.stringify(${app}.pageView || null)`);
+        await inShell(`(() => { const a = ${app}; const win = a.ownerDocument.defaultView; const c = a.renderRoot.querySelector('#c');
+            c.dispatchEvent(new win.MouseEvent('mousedown', { bubbles: true, button: 1, clientX: ${mid.x}, clientY: ${mid.y} }));
+            for (let step = 1; step <= 5; step += 1) win.dispatchEvent(new win.MouseEvent('mousemove', { clientX: ${mid.x} + step * 10, clientY: ${mid.y} }));
+            win.dispatchEvent(new win.MouseEvent('mouseup', { button: 1, clientX: ${mid.x} + 50, clientY: ${mid.y} })); })()`);
+        const afterPan = await camera();
+        const pageAfter = await inShell(`JSON.stringify(${app}.pageView || null)`);
+        check('a middle drag pans the selected view, not the sheet',
+            afterPan.target.some((c, i) => Math.abs(c - afterWheel.target[i]) > 1e-9) && pageAfter === pageBefore,
+            JSON.stringify({ afterWheel, afterPan, pageBefore, pageAfter }));
+        await waitFor(() => inShell(`(() => { const a = ${app}; return !a._layoutDraft && a.viewports.find(v => v.id === ${JSON.stringify(first)}).spec.camera.extent < ${beforeWheel.extent}; })()`), { timeoutMs: 15000 }).catch(() => null);
+        await inShell('new Promise(r => setTimeout(r, 800))');
+        await waitFor(() => inShell(`!${app}._layoutDraft`), { timeoutMs: 15000 }).catch(() => null);
+
         await press('.vp-tool-fit', 0, 0, 0);
         await waitFor(() => inShell(`!${app}._layoutDraft`), { timeoutMs: 15000 }).catch(() => null);
 
@@ -139,7 +211,7 @@ module.exports = {
         const undone = await inShell(`(() => { const a = ${app}; return { edited: a.sceneStore.activeScene().layoutEdited, ids: a.viewports.map(v => v.id) }; })()`);
         check('undo puts the code layout back', !undone.edited && undone.ids.join() === info.ids.join(), JSON.stringify(undone));
         await inShell(frame);
-        await capture('09-undone');
+        await capture('11-undone');
 
         await inShell(`(() => { const win = ${app}.ownerDocument.defaultView; win.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()`);
         check('escape ends editing', await inShell(`${app}.layoutEditing === false`));
