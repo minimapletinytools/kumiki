@@ -1662,3 +1662,19 @@ class TestMovingAMeasurement:
             {"placement": None})
 
         assert self._held(frame, pending)["placement"] is None
+
+
+def test_an_angle_s_flip_is_the_measurement_s_own_and_one_left_in_its_placement_is_ignored(monkeypatch):
+    from kumiki.drawings import kigumi_measuring_helpers
+    from kumiki.drawings.measure import ViewAxes
+
+    frame, faces = mortise_and_tenon_handles()
+    wire = present(runner._serialize_code_measure(Measure(faces["tenon_left"], faces["shoulder_edge"], flip=True), frame))
+    assert wire["flip"] is True and wire["placement"] is None
+
+    asked = []
+    real = kigumi_measuring_helpers.place_pair
+    monkeypatch.setattr(kigumi_measuring_helpers, "place_pair", lambda *args: asked.append(args[-1]) or real(*args))
+    runner._resolve_measurement(frame, wire, ViewAxes())
+    runner._resolve_measurement(frame, {**wire, "flip": None, "placement": {"flip": True}}, ViewAxes())
+    assert asked == [True, False]

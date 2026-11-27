@@ -85,7 +85,6 @@ class MeasureKindWire(TypedDict):
 class PlacementWire(TypedDict, total=False):
     offset: float
     along: float  # Offset.along
-    flip: bool  # Measure.flip
 
 
 class ExtentsWire(TypedDict):
@@ -129,6 +128,7 @@ class MeasureWire(TypedDict, total=False):
     # A name ("perpendicular_distance") in files from before kinds were structured.
     kind: Union[MeasureKindWire, str, None]
     placement: Optional[PlacementWire]
+    flip: bool  # Measure.flip; anything but true is false
     plane: Optional[PlaneWire]
     origin: str  # ORIGIN_*
     suppressed: bool  # MEASURE_SUPPRESSED
@@ -2235,15 +2235,13 @@ def _plane_for_pick(
         in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
-def _placement_wire(placement: Optional['Offset'], flip: bool) -> Optional[PlacementWire]:
+def _placement_wire(placement: Optional['Offset']) -> Optional[PlacementWire]:
     """Return a measure's placement as the viewer reads it, or None when it has none of its own."""
-    if placement is None and not flip:
+    if placement is None:
         return None
-    wire = cast(PlacementWire, {"offset": placement.offset if placement is not None else None})
-    if placement is not None and placement.along is not None:
+    wire = cast(PlacementWire, {"offset": placement.offset})
+    if placement.along is not None:
         wire["along"] = placement.along
-    if flip:
-        wire["flip"] = True
     return wire
 
 
@@ -2262,7 +2260,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         "measureId": str(measure.measure_id) if measure.measure_id else None,
         # Not identity; sent so a file override starts from what the code asked for.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
-        "placement": _placement_wire(placement, bool(getattr(measure, "flip", False))),
+        "placement": _placement_wire(placement),
         # Likewise not identity. Absent on the wire means "take the viewport's
         # plane", which is what an orthographic viewport's measurements may
         # always mean -- FromViewport.as_wire() is how the python side says it.
@@ -2271,6 +2269,8 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
     }
     if getattr(measure, "label", None) is not None:
         wire["label"] = measure.label
+    if getattr(measure, "flip", False):
+        wire["flip"] = True
     return wire
 
 
@@ -2506,6 +2506,8 @@ def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> Measu
                           plane=request.get("plane"), placement=request.get("placement"))
     if "label" in request:
         measure["label"] = request["label"]
+    if request.get("flip") is True:
+        measure["flip"] = True
     return measure
 
 
@@ -3030,7 +3032,7 @@ def _resolve_measurement(
         # Placed for the measurement that will actually be drawn, judged in the space its ends came
         # back in (kigumi_measuring_helpers.place_pair).
         along = (measure.get("placement") or {}).get("along")
-        flip = bool((measure.get("placement") or {}).get("flip", False))
+        flip = measure.get("flip") is True
         placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d,
                                None if along is None else float(along), flip)
         kind = placement.kind

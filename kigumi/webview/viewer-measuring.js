@@ -344,6 +344,7 @@ export const MeasuringMixin = (Base) => class extends Base {
                         kind: measure.kind || null,
                         plane: measure.plane || null,
                         placement: measure.placement || null,
+                        flip: measure.flip === true,
                     },
             });
             this._sendMeasurementCommand(payload);
@@ -788,14 +789,18 @@ export const MeasuringMixin = (Base) => class extends Base {
         if (!found) {
             return;
         }
-        const was = found.measure.placement || { offset: 0 };
-        this._writeMeasurementPlacement(
-            viewportId, measureKey, { ...was, flip: !was.flip }, was, 'flip angle');
-        this.emitViewerLog('measure-flip', { viewport: viewportId, flip: !was.flip });
+        const was = found.measure.flip === true;
+        this._writeMeasurementChanges(viewportId, measureKey, { flip: !was }, { flip: was }, 'flip angle');
+        this.emitViewerLog('measure-flip', { viewport: viewportId, flip: !was });
     }
 
     /** Write where a dimension now sits, and what would put it back. */
     _writeMeasurementPlacement(viewportId, measureKey, placement, was, label = 'move measurement') {
+        this._writeMeasurementChanges(viewportId, measureKey, { placement }, { placement: was }, label);
+    }
+
+    /** Write a change to a measurement, and what would undo it. */
+    _writeMeasurementChanges(viewportId, measureKey, changes, was, label) {
         const found = this.focusedMeasurement(viewportId, measureKey);
         if (!found) {
             return;
@@ -811,11 +816,10 @@ export const MeasuringMixin = (Base) => class extends Base {
         this._focusMeasurementOnArrival = { viewportId, measureKey };
         this.undoStacks.push(this.frameKey, drawingId, {
             label,
-            redo: { type: 'updateMeasurement', ...where, changes: { placement } },
-            undo: { type: 'updateMeasurement', ...where, changes: { placement: was } },
+            redo: { type: 'updateMeasurement', ...where, changes },
+            undo: { type: 'updateMeasurement', ...where, changes: was },
         });
-        this._sendMeasurementCommand(
-            { type: 'updateMeasurement', ...where, changes: { placement } });
+        this._sendMeasurementCommand({ type: 'updateMeasurement', ...where, changes });
     }
 
     /**
