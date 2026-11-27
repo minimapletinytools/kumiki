@@ -93,17 +93,44 @@ module.exports = {
         await inShell(frame);
         await capture('05-divider');
 
-        // Drag the floating view onto the left edge of the first view, and hold it there.
-        const target = await inShell(`(() => { const a = ${app}; const h = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
+        // Where the grip is, and how to hold the floating view at a point and read what a drop there would do.
+        const holdAt = async (point) => {
+            await inShell(frame);
+            const grip = await inShell(`(() => { const el = ${app}.renderRoot.querySelector('.vp-grip');
+                if (!el) return { missing: { editing: ${app}.layoutEditing, selected: ${app}.layoutSelection, draft: !!${app}._layoutDraft } };
+                const g = el.getBoundingClientRect(); return { x: g.left + g.width / 2, y: g.top + g.height / 2 }; })()`);
+            if (grip.missing) return { gripMissing: grip.missing };
+            await press('.vp-grip', 0, Math.round(point.x - grip.x), Math.round(point.y - grip.y), { capturing: true });
+            await inShell(frame);
+            return inShell(`(() => { const d = ${app}._layoutDraft; return d && d.drop ? { kind: d.drop.kind, target: d.drop.target, side: d.drop.side } : null; })()`);
+        };
+        const escape = () => inShell(`(() => { const win = ${app}.ownerDocument.defaultView; win.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()`);
+        const geometry = await inShell(`(() => { const a = ${app}; const h = a.renderRoot.querySelector('#viewport').getBoundingClientRect();
+            const page = a.pageScreenRect(h.width, h.height);
             const view = a.viewports.find(v => v.id === ${JSON.stringify(first)});
-            const r = view.pixelRect(a.pageScreenRect(h.width, h.height), h.height);
-            const g = a.renderRoot.querySelector('.vp-grip').getBoundingClientRect();
-            return { dx: h.left + r.x + 8 - (g.left + g.width / 2), dy: h.top + (h.height - r.y - r.height / 2) - (g.top + g.height / 2) }; })()`);
-        await press('.vp-grip', 0, Math.round(target.dx), Math.round(target.dy), { capturing: true });
-        await inShell(frame);
-        const drop = await inShell(`(() => { const d = ${app}._layoutDraft; return d && d.drop; })()`);
-        check('dragging onto a view\'s edge shows where it will land', drop && drop.target === first && drop.side === 'left', JSON.stringify(drop));
-        await capture('06-drop-zone');
+            const r = view.pixelRect(page, h.height);
+            const divider = a.renderRoot.querySelector('.vp-divider-rows');
+            const d = divider ? divider.getBoundingClientRect() : null;
+            return { right: { x: h.left + r.x + r.width - 30, y: h.top + (h.height - r.y - r.height / 2) },
+                divider: d ? { x: d.left + d.width / 2, y: d.top + d.height / 2 } : null,
+                sheet: { x: h.left + page.x + page.width / 2, y: h.top + page.y + page.height - 6 } }; })()`);
+
+        // On a divider: one more in that column. Along the sheet's edge: a new row. Let go of both.
+        const onDivider = geometry.divider ? await holdAt(geometry.divider) : null;
+        check('held on a divider, it would join that row or column', onDivider && onDivider.kind === 'insert', JSON.stringify(onDivider));
+        await capture('06-drop-divider');
+        await escape();
+        await release();
+        const onSheet = await holdAt(geometry.sheet);
+        check('held along the sheet\'s edge, it would be a new row', onSheet && onSheet.kind === 'sheet', JSON.stringify(onSheet));
+        await capture('06-drop-sheet');
+        await escape();
+        await release();
+
+        // Near the first view's edge: a split of it, docked there when let go.
+        const drop = await holdAt(geometry.right);
+        check('held near a view\'s edge, it would split that view', drop && drop.kind === 'split' && drop.target === first && drop.side === 'right', JSON.stringify(drop));
+        await capture('06-drop-split');
         await release();
         const docked = await waitFor(() => inShell(`(() => { const a = ${app}; const l = a.sceneStore.activeScene().layout;
             return !a._layoutDraft && !l.roots.some(r => r.leaf === ${JSON.stringify(first + ' 2')}); })()`), { timeoutMs: 15000 }).catch(() => false);

@@ -225,46 +225,23 @@ function placeBesidePath(layout, node, path, side) {
 
 const directionOf = (side) => (side === 'left' || side === 'right' ? 'columns' : 'rows');
 
-/** Whether the node at `path` sits in a split running `direction`. */
-function inSplitRunning(layout, path, direction) {
-    return path.length > 1 && nodeAt(layout, path.slice(0, -1)).split.direction === direction;
-}
-
 /**
- * The group around `target` a new row or column on its `side` edge would go beside: the nearest
- * enclosing node, above the target's own list, that sits in a split running that way (or the
- * root), and whose edge that is too. Its path, or null.
+ * Put `node` into the split at `splitPath`, before its portion `index` (its length: at the end), as
+ * big as its others are on average: they give up the room.
  */
-function outerPlace(layout, target, side, page) {
-    const path = findLeaf(layout, target);
-    if (!path) return null;
-    const direction = directionOf(side);
-    let at = inSplitRunning(layout, path, direction) ? path.slice(0, -1) : path;
-    while (at.length > 1 && !inSplitRunning(layout, at, direction)) at = at.slice(0, -1);
-    if (at.join('.') === path.join('.')) return null;
-    const cells = new Map(layoutCells(layout, page).map((cell) => [cell.path.join('.'), cell.inner]));
-    const edge = (rect) => ({ left: rect[0], right: rect[0] + rect[2], top: rect[1], bottom: rect[1] + rect[3] }[side]);
-    return Math.abs(edge(cells.get(path.join('.'))) - edge(cells.get(at.join('.')))) < 1e-6 ? at : null;
-}
-
-/**
- * Put `node` into the list the node at `path` is in, beside it on `side`, as big as it is: the
- * list's others give up the room. A node in no list running that way is put in a new one with it.
- */
-function insertBesidePath(layout, node, path, side) {
+function insertInto(layout, node, splitPath, index) {
     const next = clone(layout);
-    const before = side === 'left' || side === 'top';
-    if (inSplitRunning(next, path, directionOf(side))) {
-        const index = path[path.length - 1];
-        const portions = nodeAt(next, path.slice(0, -1)).split.portions;
-        const { node: _node, ...size } = portions[index];
-        portions.splice(before ? index : index + 1, 0, { ...size, node });
-        return next;
-    }
-    return wrapPath(next, node, path, side);
+    const portions = nodeAt(next, splitPath).split.portions;
+    const lengths = portions.filter((portion) => portion.length !== undefined);
+    const size = lengths.length === portions.length
+        ? { length: lengths.reduce((sum, portion) => sum + portion.length, 0) / lengths.length }
+        : { share: portions.filter((portion) => portion.length === undefined)
+            .reduce((sum, portion) => sum + (portion.share || 1), 0) / (portions.length - lengths.length) };
+    portions.splice(index, 0, { ...size, node });
+    return next;
 }
 
-/** Split the node at `path` in two with `node`, on `side`, whatever list it is in. */
+/** Split the node at `path` in two with `node` on `side`, halves alike. */
 function wrapPath(layout, node, path, side) {
     const next = clone(layout);
     const before = side === 'left' || side === 'top';
@@ -274,50 +251,54 @@ function wrapPath(layout, node, path, side) {
     return next;
 }
 
-/**
- * `node` put beside `target` on `side`, one of three ways (`level`): 'outer', a new row or column
- * of the group around it (outerPlace); 'sibling', one more in the target's own list; 'split', the
- * target's cell split in two. One that can't be done here falls back to the next.
- */
-function placeAt(layout, node, target, side, level, page) {
-    const path = findLeaf(layout, target);
-    if (!path) return clone(layout);
-    const outer = level === 'outer' && page ? outerPlace(layout, target, side, page) : null;
-    if (outer) return insertBesidePath(layout, node, outer, side);
-    if (level !== 'split' && inSplitRunning(layout, path, directionOf(side))) return insertBesidePath(layout, node, path, side);
-    return wrapPath(layout, node, path, side);
+/** Which root is the sheet's grid: the first that isn't a view floating over it. */
+function gridRoot(layout) {
+    const index = layout.roots.findIndex((root) => root.leaf === undefined || !root.rect
+        || root.rect.every((value, at) => Math.abs(value - [0, 0, 1, 1][at]) < 1e-9));
+    return index < 0 ? 0 : index;
 }
 
-/**
- * What a view dropped on `target`'s `side` edge can do, nearest the edge first: 'outer', 'sibling'
- * and 'split' (placeAt), those that can be done here and come out differently, each with the rect
- * the view would take.
- */
-function dropChoices(layout, target, side, page) {
-    const path = findLeaf(layout, target);
-    if (!path) return [];
-    const probe = '\u0000drop';
-    const choices = [];
-    const levels = [
-        ...(outerPlace(layout, target, side, page) ? ['outer'] : []),
-        ...(inSplitRunning(layout, path, directionOf(side)) ? ['sibling'] : []),
-        'split',
-    ];
-    for (const level of levels) {
-        const rect = resolveLayout(placeAt(layout, { leaf: probe }, target, side, level, page), page).get(probe);
-        if (rect && !choices.some((one) => one.rect.every((value, index) => Math.abs(value - rect[index]) < 1e-9))) {
-            choices.push({ level, rect });
-        }
+/** `node` as a new row or column along the sheet's `side`, across the whole grid. */
+function besideSheet(layout, node, side) {
+    const root = [gridRoot(layout)];
+    const grid = layout.roots[root[0]];
+    if (grid && grid.split && grid.split.direction === directionOf(side)) {
+        const before = side === 'left' || side === 'top';
+        return insertInto(layout, node, root, before ? 0 : grid.split.portions.length);
     }
-    return choices;
+    return grid ? wrapPath(layout, node, root, side) : clone(layout);
 }
 
-/** The tree with `name` moved beside `target`, `level` of the ways placeAt has. */
-function dockLeaf(layout, name, target, side, level = 'split', page = null) {
+/**
+ * The tree with the leaf `name` moved to wherever `place(layout, node)` puts a node in the tree as
+ * it stands: placed first and taken out of its old place after, so `place` can name paths in it.
+ */
+function moveLeaf(layout, name, place) {
     const path = findLeaf(layout, name);
-    if (!path || name === target || !findLeaf(layout, target)) return clone(layout);
+    if (!path) return clone(layout);
     const node = bare(clone(nodeAt(layout, path)));
-    return placeAt(removeLeaf(layout, name), node, target, side, level, page);
+    const probe = '\u0000moving';
+    const moved = removeLeaf(place(layout, { leaf: probe }), name);
+    const at = findLeaf(moved, probe);
+    if (!at) return clone(layout);
+    replaceAt(moved, at, node);
+    return moved;
+}
+
+/** The tree with `name` moved into `target`'s cell, which it splits on `side`. */
+function dockLeaf(layout, name, target, side) {
+    if (name === target || !findLeaf(layout, target)) return clone(layout);
+    return moveLeaf(layout, name, (tree, node) => wrapPath(tree, node, findLeaf(tree, target), side));
+}
+
+/** The tree with `name` moved into the split at `splitPath`, before portion `index` (dividers). */
+function insertLeaf(layout, name, splitPath, index) {
+    return moveLeaf(layout, name, (tree, node) => insertInto(tree, node, splitPath, index));
+}
+
+/** The tree with `name` moved to a new row or column along the sheet's `side`. */
+function edgeLeaf(layout, name, side) {
+    return moveLeaf(layout, name, (tree, node) => besideSheet(tree, node, side));
 }
 
 /** A name for a copy of `name` that no view has: "Front 2", "Front 3", ... */
@@ -414,5 +395,5 @@ function movedLeaves(before, after, page) {
 export {
     leafNames, findLeaf, isFloating, layoutCells, resolveLayout, dividers, removeLeaf, floatLeaf,
     setFloatingRect, dockLeaf, splitLeaf, moveDivider, restack, clampRect, copyName,
-    leafCamera, setLeafCamera, movedLeaves, dropChoices,
+    leafCamera, setLeafCamera, movedLeaves, insertLeaf, edgeLeaf,
 };

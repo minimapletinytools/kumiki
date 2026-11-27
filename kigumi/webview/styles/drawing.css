@@ -292,20 +292,16 @@
 
 .vp-tool-disabled { cursor: not-allowed; opacity: 0.4; }
 
-/* The ways a drop on this edge can go, a strip each, outermost nearest the edge. */
-.vp-zone {
-    fill: var(--hv-accent, #4a7dbd);
-    fill-opacity: 0.08;
+/* A row or column the view joins (a divider) or starts (the sheet's edge): dashed apart from a split. */
+.vp-drop-insert,
+.vp-drop-sheet { stroke-dasharray: 8 4; }
+
+/* The divider a view will go in at. */
+.vp-drop-line {
     stroke: var(--hv-accent, #4a7dbd);
-    stroke-opacity: 0.5;
-    stroke-dasharray: 3 3;
+    stroke-width: 4;
+    stroke-linecap: round;
 }
-
-.vp-zone-active { fill-opacity: 0.3; }
-
-/* A new row or column of the grid, and one more in a row or column: dashed apart from a split of one view. */
-.vp-drop-outer { stroke-dasharray: 10 4; }
-.vp-drop-sibling { stroke-dasharray: 3 3; }
 
 .vp-drop-label {
     fill: var(--hv-accent, #4a7dbd);
