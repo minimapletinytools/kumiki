@@ -650,7 +650,7 @@
   "message.publishedDone": "Done",
   "editor.readOnly.shared": "Read only. Make a copy to make changes.",
   "editor.readOnly.makeCopy": "Make a Copy",
-  "viewer.layout.move": "Move: let go on a divider to put it in that row or column, along the sheet's edge for a new row or column, near another view's edge to split that view, anywhere else to float it",
+  "viewer.layout.move": "Move: let go on a divider, or just inside the first or last view of a row or column, to put it in that row or column there; just outside the sheet for a new row or column; near another view's edge to split that view; anywhere else to float it",
   "viewer.layout.splitAcross": "Split side by side (the new half shows the same view)",
   "viewer.layout.splitDown": "Split top and bottom (the new half shows the same view)",
   "viewer.layout.toFront": "Bring to front",

@@ -14,11 +14,13 @@ import * as Layout from './viewport-layout.js';
 const SVG = 'http://www.w3.org/2000/svg';
 // How far a press travels before it is a drag rather than a click, in pixels.
 const DRAG_SLOP_PX = 3;
-// Where a dragged view lands, each place meaning one thing: on a divider line, one more in that
-// row or column; along the sheet's edge, a new row or column across it; near a view's edge, a
+// Where a dragged view lands, each place meaning one thing: on a divider line, or just inside the
+// first or last view of a row or column, one more in it there; just outside the sheet (or inside
+// its edge, where no row or column ends), a new row or column across it; near a view's edge, a
 // split of that view (a quarter of it in, at most this many pixels).
 const DROP_DIVIDER_PX = 12;
 const DROP_SHEET_PX = 18;
+const DROP_SHEET_OUTSIDE_PX = 40;
 const DROP_BAND_PX = 48;
 const HANDLE_PX = 9;
 const BUTTON_PX = 22;
@@ -610,8 +612,9 @@ export const LayoutEditingMixin = (Base) => class extends Base {
     }
 
     /**
-     * Where a view let go at `at` would go, or null to float: on a divider, into that row or
-     * column there; along the sheet's edge, a new row or column; near a view's edge, splitting it.
+     * Where a view let go at `at` would go, or null to float: on a divider, or just inside a row's
+     * or column's first or last view, into it there; outside the sheet, or just inside its edge, a
+     * new row or column; near a view's edge, splitting it.
      * The layout it makes, the rect it takes there, and what to call it.
      */
     _dropAt(layout, name, at, page) {
@@ -636,24 +639,45 @@ export const LayoutEditingMixin = (Base) => class extends Base {
                 Layout.insertLeaf(layout, name, divider.path, divider.index + 1), { line: divider.line });
         }
 
+        const rects = Layout.resolveLayout(layout, page);
+        // Topmost first: the scene's viewports are in draw order.
+        const under = [...this.viewports].reverse().find((viewport) => {
+            const rect = rects.get(viewport.id);
+            return rect && viewport.id !== name && at.x >= rect[0] && at.x <= rect[0] + rect[2]
+                && at.y >= rect[1] && at.y <= rect[1] + rect[3];
+        });
+        if (under) {
+            const [x, y, width, height] = rects.get(under.id);
+            const end = [
+                { side: 'left', px: (at.x - x) * pageRect.width, line: [x, y, x, y + height] },
+                { side: 'right', px: (x + width - at.x) * pageRect.width, line: [x + width, y, x + width, y + height] },
+                { side: 'top', px: (at.y - y) * pageRect.height, line: [x, y, x + width, y] },
+                { side: 'bottom', px: (y + height - at.y) * pageRect.height, line: [x, y + height, x + width, y + height] },
+            ].filter((edge) => edge.px <= DROP_DIVIDER_PX)
+                .map((edge) => ({ ...edge, place: Layout.listEnd(layout, under.id, edge.side) }))
+                .filter((edge) => edge.place)
+                .sort((a, b) => a.px - b.px)[0];
+            if (end) {
+                const across = end.side === 'left' || end.side === 'right';
+                return made('insert', across ? 'viewer.layout.dropSiblingRow' : 'viewer.layout.dropSiblingColumn',
+                    Layout.insertLeaf(layout, name, end.place.splitPath, end.place.index), { line: end.line });
+            }
+        }
+
+        // Outside the sheet, or just inside its edge.
         const sheet = [
             { side: 'left', px: at.x * pageRect.width },
             { side: 'right', px: (1 - at.x) * pageRect.width },
             { side: 'top', px: at.y * pageRect.height },
             { side: 'bottom', px: (1 - at.y) * pageRect.height },
-        ].filter((edge) => edge.px >= 0 && edge.px <= DROP_SHEET_PX).sort((a, b) => a.px - b.px)[0];
+        ].filter((edge) => edge.px >= -DROP_SHEET_OUTSIDE_PX && edge.px <= DROP_SHEET_PX).sort((a, b) => a.px - b.px)[0];
         if (sheet) {
             const across = sheet.side === 'left' || sheet.side === 'right';
             return made('sheet', across ? 'viewer.layout.dropColumn' : 'viewer.layout.dropRow', Layout.edgeLeaf(layout, name, sheet.side));
         }
 
-        const rects = Layout.resolveLayout(layout, page);
-        // Topmost first: the scene's viewports are in draw order.
-        for (const viewport of [...this.viewports].reverse()) {
-            const rect = rects.get(viewport.id);
-            if (!rect || viewport.id === name) continue;
-            const [x, y, width, height] = rect;
-            if (at.x < x || at.x > x + width || at.y < y || at.y > y + height) continue;
+        if (under) {
+            const [x, y, width, height] = rects.get(under.id);
             const bandX = Math.min(width / 4, DROP_BAND_PX / pageRect.width);
             const bandY = Math.min(height / 4, DROP_BAND_PX / pageRect.height);
             const edge = [
@@ -662,8 +686,10 @@ export const LayoutEditingMixin = (Base) => class extends Base {
                 { side: 'top', inside: (at.y - y) / bandY },
                 { side: 'bottom', inside: (y + height - at.y) / bandY },
             ].filter((one) => one.inside <= 1).sort((a, b) => a.inside - b.inside)[0];
-            return edge ? made('split', 'viewer.layout.dropSplit', Layout.dockLeaf(layout, name, viewport.id, edge.side),
-                { target: viewport.id, side: edge.side }) : null;
+            if (edge) {
+                return made('split', 'viewer.layout.dropSplit', Layout.dockLeaf(layout, name, under.id, edge.side),
+                    { target: under.id, side: edge.side });
+            }
         }
         return null;
     }

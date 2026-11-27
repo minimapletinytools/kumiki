@@ -291,6 +291,29 @@ function dockLeaf(layout, name, target, side) {
     return moveLeaf(layout, name, (tree, node) => wrapPath(tree, node, findLeaf(tree, target), side));
 }
 
+/**
+ * Where `target`'s `side` edge is the start or end of a row or column -- the list nearest it
+ * running that way, through any that run across -- as the place to insert there: { splitPath,
+ * index }. Null where another view is beside it in that list (a divider is there instead) or
+ * no list runs that way (the sheet's edge is).
+ */
+function listEnd(layout, target, side) {
+    const direction = directionOf(side);
+    const before = side === 'left' || side === 'top';
+    let at = findLeaf(layout, target);
+    while (at && at.length > 1) {
+        const splitPath = at.slice(0, -1);
+        const split = nodeAt(layout, splitPath).split;
+        const index = at[at.length - 1];
+        if (split.direction === direction) {
+            const end = before ? index === 0 : index === split.portions.length - 1;
+            return end ? { splitPath, index: before ? 0 : split.portions.length } : null;
+        }
+        at = splitPath;
+    }
+    return null;
+}
+
 /** The tree with `name` moved into the split at `splitPath`, before portion `index` (dividers). */
 function insertLeaf(layout, name, splitPath, index) {
     return moveLeaf(layout, name, (tree, node) => insertInto(tree, node, splitPath, index));
@@ -395,5 +418,5 @@ function movedLeaves(before, after, page) {
 export {
     leafNames, findLeaf, isFloating, layoutCells, resolveLayout, dividers, removeLeaf, floatLeaf,
     setFloatingRect, dockLeaf, splitLeaf, moveDivider, restack, clampRect, copyName,
-    leafCamera, setLeafCamera, movedLeaves, insertLeaf, edgeLeaf,
+    leafCamera, setLeafCamera, movedLeaves, insertLeaf, edgeLeaf, listEnd,
 };

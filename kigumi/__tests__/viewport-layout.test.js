@@ -131,3 +131,17 @@ test('dropped along the sheet\'s edge, a view is a new row or column across the 
     expect(L.leafNames(again)).toEqual(['C', 'A', 'B']);
     expect(rects(again).get('C')[3]).toBeCloseTo(rects(again).get('A')[3], 6);
 });
+
+test('a row\'s or column\'s first and last views are where to add at its ends', () => {
+    // A over B, in a column beside C: below B is the column's end, between A and B a divider.
+    expect(L.listEnd(GRID, 'B', 'bottom')).toEqual({ splitPath: [0, 0], index: 2 });
+    expect(L.listEnd(GRID, 'A', 'top')).toEqual({ splitPath: [0, 0], index: 0 });
+    expect(L.listEnd(GRID, 'A', 'bottom')).toBeNull();
+    // Across A, through its column: the grid's first; to A's right, C is beside the column.
+    expect(L.listEnd(GRID, 'A', 'left')).toEqual({ splitPath: [0], index: 0 });
+    expect(L.listEnd(GRID, 'A', 'right')).toBeNull();
+    const floated = L.floatLeaf(GRID, 'C', [0.5, 0.5, 0.3, 0.3]);
+    const end = L.listEnd(floated, 'B', 'bottom');
+    const added = L.insertLeaf(floated, 'C', end.splitPath, end.index);
+    expect(L.leafNames(added)).toEqual(['A', 'B', 'C']);
+});

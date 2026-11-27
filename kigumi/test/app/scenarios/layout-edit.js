@@ -114,7 +114,8 @@ module.exports = {
             const d = divider ? divider.getBoundingClientRect() : null;
             return { right: { x: h.left + r.x + r.width - 30, y: h.top + (h.height - r.y - r.height / 2) },
                 divider: d ? { x: d.left + d.width / 2, y: d.top + d.height / 2 } : null,
-                sheet: { x: h.left + page.x + page.width / 2, y: h.top + page.y + page.height - 6 } }; })()`);
+                sheet: { x: h.left + page.x + page.width / 2, y: h.top + page.y + page.height + 15 },
+                end: { x: h.left + page.x + page.width * 0.2, y: h.top + page.y + page.height - 6 } }; })()`);
 
         // On a divider: one more in that column. Along the sheet's edge: a new row. Let go of both.
         const onDivider = geometry.divider ? await holdAt(geometry.divider) : null;
@@ -123,8 +124,14 @@ module.exports = {
         await escape();
         await release();
         const onSheet = await holdAt(geometry.sheet);
-        check('held along the sheet\'s edge, it would be a new row', onSheet && onSheet.kind === 'sheet', JSON.stringify(onSheet));
+        check('held just outside the sheet, it would be a new row', onSheet && onSheet.kind === 'sheet', JSON.stringify(onSheet));
         await capture('06-drop-sheet');
+        await escape();
+        await release();
+        // Just inside the bottom of the last view in a column: one more at that column's end.
+        const atEnd = await holdAt(geometry.end);
+        check('held just inside a column\'s last view, it would go at that column\'s end', atEnd && atEnd.kind === 'insert', JSON.stringify(atEnd));
+        await capture('06-drop-end');
         await escape();
         await release();
 
