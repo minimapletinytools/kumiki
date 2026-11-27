@@ -2838,7 +2838,10 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
         }
 
         // Parented like the silhouette, so they follow the member's visibility and offset.
-        const drawingLines = this.drawingOverlays.linesFor(mesh, key);
+        const drawingLines = [
+            ...this.drawingOverlays.linesFor(mesh, key),
+            ...this.drawingOverlays.referenceOutlinesFor(vertexSource, indexSource, mesh.referenceFacePlanes, key),
+        ];
         const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
         for (const line of drawingLines) {
             edgeMesh.add(line.object);
