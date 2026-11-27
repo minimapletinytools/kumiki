@@ -216,3 +216,12 @@ def test_a_centerplane_lights_its_outline_and_no_triangles(picked, name):
     assert result["featureLabel"] == name
     assert result["highlightMesh"]["indices"] == []
     assert result["highlightEdgeSegments"]  # cropped to the beam, so not just a rectangle
+
+
+def test_editing_a_layout_takes_only_the_face_and_says_where_it_faces_in_the_world(picked):
+    # Right by the flank's front edge, which a pick would otherwise take: faces only, and its
+    # normal turned out of the beam's own frame.
+    result = picked(-0.0004, "3d", facesOnly=True)
+
+    assert result["featureType"] == "FACE"
+    assert [round(value, 6) for value in result["worldNormal"]] == [0.0, 1.0, 0.0]

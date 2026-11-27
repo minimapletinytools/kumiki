@@ -45,6 +45,7 @@ const TO_EXTENSION = Object.freeze([
     'saveParameters',
     'selectionChanged',
     'setBetaFeature',
+    'setDrawingLayout',
     'setRefreshOptions',
     'updateMeasurement',
     'viewerLog',

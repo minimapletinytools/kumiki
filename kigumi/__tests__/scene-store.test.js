@@ -1,7 +1,7 @@
 const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
     isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, pixelRect, viewportAspect, viewportAtPoint,
-    normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
+    normalizePage, normalizePageView, pageScreenRect, lineWidthScale, viewportScale, extentForScale,
     panPage, zoomPageAt, MAX_TILT_RADIANS, normalizeOrbit,
 } = require('../webview/scene-store.js');
 
@@ -248,6 +248,23 @@ describe('normalizePageView', () => {
         expect(normalizePageView({ zoom: 0 }).zoom).toBeGreaterThan(0);
         expect(normalizePageView({ zoom: -3 }).zoom).toBeGreaterThan(0);
         expect(normalizePageView({ zoom: 1e9 }).zoom).toBeLessThan(1e9);
+    });
+});
+
+describe('lineWidthScale', () => {
+    const page = { width: 0.42, height: 0.297 };
+    const wide = (px) => lineWidthScale(page, { width: px });
+
+    test('off a sheet lines keep their set width', () => {
+        expect(lineWidthScale(null, { width: 5000 })).toBe(1);
+    });
+
+    test('a sheet\'s lines thicken with its size on screen, between a floor and a ceiling', () => {
+        expect(wide(420 * 4)).toBeCloseTo(1);
+        expect(wide(420 * 6)).toBeCloseTo(1.5);
+        expect(wide(420 * 6)).toBeGreaterThan(wide(420 * 5));
+        expect(wide(100)).toBe(0.6);
+        expect(wide(420 * 100)).toBe(2);
     });
 });
 

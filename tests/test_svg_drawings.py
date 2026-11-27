@@ -76,7 +76,7 @@ def test_partially_flush_faces_only_draw_the_exposed_crease():
     assert np.asarray(along_y) == pytest.approx(np.array([[.5, 1.]]))
 
 
-def test_reference_arris_centerline_ptw_and_two_independently_colored_faces():
+def test_reference_arris_centerline_ptw_and_both_faces_tinted_light_blue():
     edge = TimberFeature.RIGHT_FRONT_EDGE
     timber = Timber(length=4, size=create_v2(2, 2), transform=Transform.identity(),
                     rough_half_sizes=(create_v2(1, 1.2), create_v2(1, 1.2)),
@@ -93,7 +93,7 @@ def test_reference_arris_centerline_ptw_and_two_independently_colored_faces():
     tinted = _view(members, right, (0, 0, 1), DrawingStyles(reference_faces=True))
     fills = tinted.findall(".//{*}g[@class='face-fills']/{*}path")
     assert {p.get('data-feature') for p in fills} == {face.name for face in edge.long_faces_it_rests_on()}
-    assert len({p.get('fill') for p in fills}) == 2
+    assert {p.get('fill') for p in fills} == {'#cfdfec'}
 
 
 def test_centerline_dashes_align_across_centerplane_outlines_and_foreground_clipping():

@@ -38,6 +38,9 @@ const SUITES = [
         'kigumi/webview/highlights.js', 'kigumi/webview/feature-states.js', 'kigumi/webview/hover-state.js',
         'kumiki/drawings/**', 'kumiki/viewer/picking.py', 'hidden_structures/my_cute_frame_drawing_test.py',
         'patterns/structures/my_cute_frame.py'] },
+    { name: 'app:layout-edit', seconds: 30, covers: 'editing a drawing\'s layout', paths: [
+        'kigumi/webview/viewer-layout-editing.js', 'kigumi/webview/viewport-layout.js', 'kumiki/drawings/layout.py',
+        'hidden_structures/my_cute_frame_drawing_test.py'] },
     { name: 'app:stl-placement', seconds: 35, covers: 'mesh timbers', paths: [
         'kigumi/webview/stl-placement-*.js', 'kigumi/stl_placement.py', 'kigumi/stl-placement-source.js', 'kumiki/stl.py'] },
     { name: 'app:new-files', seconds: 14, covers: 'new frame, new file', paths: [

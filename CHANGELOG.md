@@ -9,6 +9,34 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kumiki 0.9.10 / kigumi 0.9.13] - 2026-11-26
+
+### kumiki
+
+#### Added
+- Drawings by hand in code: `View.of_face(timber, face)` / `View.world(...)` with a scale and centre, dimensions placed with `Auto`, `Offset` or `Beside(side, lane)`, and `with_drawings(frame, edit)` to change the generated drawings in code.
+- Find features by name: `joint.feature(name, index=)`, and `CutTimber.feature`, `.face`, `.edge` and `.corner`.
+- `unknown_features(frame, drawing)`: what a hand-dimensioned drawing leaves unknown.
+- Drawing viewports are named by `id` or label instead of position; positions are still read.
+- A square peg hole names its centre planes, as a round one names its axis.
+- Hand-made drawings for the starter frame and the cat corner cot; measured reference drawings for the workshop joint catalog. New pattern: wedged twin-tenon bench.
+
+#### Fixed
+- Picking in a drawing takes what is nearest the pointer, and a click beside a drawn line takes that line, from either side.
+- The solver handles a midplane whose two planes face the same way.
+
+### kigumi
+
+#### Added
+- The Linux app: a `.deb` (x64 and arm64) and an AppImage (x64 and arm64), which updates itself and takes sign-in links.
+- Drawing reference lines show where measured, always, or not at all.
+- An agent tool that lists a timber's features for drawings.
+
+#### Changed
+- X-ray shows by default in drawings.
+- Lines on a drawing sheet keep a steady width as it zooms, thickening only between 0.6 and 2 times their set width.
+- Needs kumiki 0.9.10 or newer.
+
 ## [kumiki 0.9.9 / kigumi 0.9.12] - 2026-11-21
 
 ### kumiki

@@ -34,7 +34,8 @@ export const PickingMixin = (Base) => class extends Base {
      * is not drawing.
      */
     pumpHover() {
-        if (!this._hover || typeof vscode === 'undefined') {
+        // Nothing lights while a drawing's layout is being edited.
+        if (!this._hover || typeof vscode === 'undefined' || this.layoutEditing) {
             return;
         }
         const due = this._hover.due();
@@ -211,6 +212,31 @@ export const PickingMixin = (Base) => class extends Base {
         return true;
     }
 
+    /** Take the face under the pointer, or let go of the one taken. */
+    _pickLayoutFace(event) {
+        const { hits, camera, ray, viewHeight } = this._findMembersAlongRay(event.clientX, event.clientY);
+        const first = hits[0];
+        if (!first || typeof vscode === 'undefined') {
+            this._dropCsgFocus();
+            this.selectionManager.clearTimberSelection();
+            return;
+        }
+        const point = [first.hit.point.x, first.hit.point.y, first.hit.point.z];
+        vscode.postMessage({
+            type: 'findCSGAtPoint',
+            memberKey: first.memberKey,
+            point,
+            currentPath: [],
+            ctrlClick: false,
+            tolerances: this._pickTolerances(point, camera, viewHeight),
+            ray,
+            candidateIndex: null,
+            ...this._pickContext(camera),
+            space: '3d',
+            facesOnly: true,
+        });
+    }
+
     handleCanvasClick(event) {
         if (!event) {
             return;
@@ -219,6 +245,14 @@ export const PickingMixin = (Base) => class extends Base {
         const under = this._resolvePointer(event.clientX, event.clientY);
         if (under) {
             this.selectionManager.enterScope(under.viewport.id);
+        }
+        // A click while editing the layout picks out the view it is in (selectViewportForClick),
+        // and a face in it: nothing else can be taken there.
+        this._clickViewportId = under ? under.viewport.id : null;
+        if (this.layoutEditing) {
+            this.selectViewportForClick();
+            this._pickLayoutFace(event);
+            return;
         }
         const { hits, camera: pickCamera, ray: pickRay, viewHeight: pickViewHeight } =
             this._findMembersAlongRay(event.clientX, event.clientY);

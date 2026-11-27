@@ -137,7 +137,9 @@
 }
 
 /* Below the shell's buttons at the top right. */
-#view-layout.is-compact #gizmo-panel {
+#view-layout.is-compact #gizmo-panel,
+#view-layout.is-compact #layout-edit-btn,
+#view-layout.is-compact #layout-edit-bar {
     top: calc(var(--compact-top) + 56px);
     right: 8px;
 }

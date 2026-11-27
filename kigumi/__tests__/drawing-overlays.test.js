@@ -97,3 +97,40 @@ describe('round dots', () => {
         expect(() => roundDashShader('void main() {}')).toThrow(/no dash test/);
     });
 });
+
+describe('a reference face\'s outline', () => {
+    class Geometry { setPositions(positions) { this.positions = positions; } }
+    class Line { constructor(geometry, material) { this.geometry = geometry; this.material = material; } }
+    const THREE = {
+        LineSegmentsGeometry: Geometry,
+        LineSegments2: Line,
+        Vector3: class { constructor(x, y, z) { Object.assign(this, vector(x, y, z)); } },
+    };
+    const overlays = Object.create(DrawingOverlays.prototype);
+    overlays.THREE = THREE;
+    overlays.memberIds = null;
+    overlays.materials = { reference: { clone: () => ({ uniforms: { diffuse: { value: null }, resolution: {} } }), uniforms: { resolution: {} } } };
+
+    // A unit square on z = 0 in two triangles, and one triangle standing off it.
+    const vertices = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1];
+    const indices = [0, 1, 2, 0, 2, 3, 0, 1, 4];
+
+    test('is its edges that only one of its triangles has', () => {
+        const [line, ...rest] = overlays.referenceOutlinesFor(vertices, indices, [{ normal: [0, 0, 1], offset: 0, color: '#cfdfec' }], 'post#0');
+
+        expect(rest).toEqual([]);
+        expect(line.object.geometry.positions.length).toBe(4 * 6);  // the square's sides, not its diagonal
+        expect(line.option).toBe('highlightReferenceEdges');
+    });
+
+    test('is drawn face-on too, as the reference edges are', () => {
+        const [line] = overlays.referenceOutlinesFor(vertices, indices, [{ normal: [0, 0, 1], offset: 0, color: '#9cc' }], 'post#0');
+        line.object.visible = false;
+        overlays._look = vector(0, 0, -1);
+        const camera = { getWorldDirection: () => overlays._look };
+
+        expect(overlays.showFor([{ drawingLines: [line] }], camera, { inDrawing: true, options: { highlightReferenceEdges: true } })).toBe(true);
+        expect(overlays.showFor([{ drawingLines: [line] }], camera, { inDrawing: true, options: { highlightReferenceEdges: false } })).toBe(false);
+    });
+});
+

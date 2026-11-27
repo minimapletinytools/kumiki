@@ -503,6 +503,15 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'setDrawingLayout') {
+                this._handleDrawingsCommand('set_drawing_layout', {
+                    drawingId: message.drawingId,
+                    layout: message.layout || null,
+                }, { enter: false }).catch((err) => {
+                    this.log(`[drawing] ${err.message || err}`, 'error');
+                });
+                return;
+            }
             if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
                 || message.type === 'deleteMeasurement' || message.type === 'restoreMeasurement') {
                 // Through the same path every other drawings command takes, so
