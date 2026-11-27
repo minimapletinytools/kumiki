@@ -2818,7 +2818,8 @@ def _aim_viewports(scene: DrawingWire, frame: 'Frame') -> Dict[str, CameraWire]:
             continue
         camera = cast(CameraWire, dict(view.get("camera") or {}))
         was = camera.get("look")
-        if was is not None and abs(abs(sum(a * b for a, b in zip(normalize([float(v) for v in was]), axes.look))) - 1) > 1e-6:
+        # Turned round to look from the other side counts: what was measured may be hidden there.
+        if was is not None and sum(a * b for a, b in zip(normalize([float(v) for v in was]), axes.look)) < 1 - 1e-6:
             turned[str(view.get("id"))] = cast(CameraWire, dict(camera))
         camera.update(right=list(axes.right), up=list(axes.up), look=list(axes.look))
         if isinstance(wanted.get("target"), list) and isinstance(wanted.get("extent"), (int, float)):
@@ -3098,13 +3099,18 @@ def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']
 def _resolve_in_view(
     frame: 'Frame', scene: DrawingWire, viewport: str, measure: MeasureWire, was: Optional[CameraWire],
 ) -> MeasureWire:
-    """Resolve a measurement in its view; in a turned view, one without a plane as the view was."""
+    """Resolve a measurement in its view; in a turned view, one without a plane as the view was, and
+    marked as not matching it -- turned round, the same plane is seen from the other side, where what it
+    measures may be hidden."""
     from kumiki.drawings.measure import ViewAxes
 
     if was is None or measure.get("plane"):
         return _resolve_measurement(frame, measure, _viewport_axes(scene, viewport))
     resolved = _resolve_measurement(frame, measure, ViewAxes.from_wire(was))
     resolved["plane"] = {"at": list(was.get("target") or [0.0, 0.0, 0.0]), "normal": list(was["look"])}
+    settled = resolved.get("settled")
+    if settled is not None:
+        resolved["settled"] = {**settled, "reason": "plane-mismatch"}
     return resolved
 
 

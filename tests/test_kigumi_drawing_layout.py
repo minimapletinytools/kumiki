@@ -276,4 +276,9 @@ def test_a_turned_view_keeps_its_measurements_on_the_plane_they_were_made_in(exa
     # Without a plane of its own: given the one it was made in, which the turned view no longer shows.
     resolved = runner._resolve_in_view(frame, turned, name, {"a": None, "b": None}, was[name])
     assert resolved["plane"]["normal"] == look
+
+    # Turned round to look from behind: the same plane, but measured from the other side.
+    behind = copy.deepcopy(scene)
+    behind["layout"] = _aimed(scene["layout"], name, {"look": [-v for v in look], "up": _views(scene)[name]["camera"]["up"]})
+    assert name in runner._aim_viewports(behind, frame)
     assert "plane" not in runner._resolve_in_view(frame, zoomed, name, {"a": None, "b": None}, None)
