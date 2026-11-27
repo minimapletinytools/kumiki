@@ -7,7 +7,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
-import { html } from 'lit';
+import { html, nothing } from 'lit';
 import { t, vscode } from './viewer-shared.js';
 import * as Layout from './viewport-layout.js';
 
@@ -129,6 +129,15 @@ export const LayoutEditingMixin = (Base) => class extends Base {
             return true;
         }
         return false;
+    }
+
+    /** The button in the sheet's top right that starts editing, where the drawing has a layout. */
+    renderLayoutEditButton() {
+        if (!this.isInDrawing || this._exportingDrawing || !this.sceneStore.activeScene().layout) {
+            return nothing;
+        }
+        return html`<button type="button" id="layout-edit-btn" title=${t('viewer.layout.edit.title')}
+            @click=${() => this.enterLayoutEditing()}>${t('viewer.layout.edit')}</button>`;
     }
 
     /** The bar in the sheet's top right while editing: undo, redo, and done. */

@@ -280,7 +280,7 @@ class KigumiViewerApp extends LayoutEditingMixin(DrawingsMixin(AssemblyMixin(Ren
             ${this.sidebar.render(this.sidebarPages())}
             <div id="viewport" class=${[compact && this.pageZoomed ? 'page-zoomed' : '', this.layoutEditing ? 'layout-editing' : ''].join(' ')}>
                 ${compact ? this.compactChrome.render() : nothing}
-                ${this.layoutEditing ? this.renderLayoutEditBar() : nothing}
+                ${this.layoutEditing ? this.renderLayoutEditBar() : this.renderLayoutEditButton()}
                 ${this.isInDrawing
                     ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
                         @click=${() => this.leaveDrawing()}>← ${t('viewer.drawing.backTo3d')}</button>`

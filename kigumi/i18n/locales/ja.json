@@ -657,7 +657,7 @@
   "viewer.layout.toBack": "最背面へ",
   "viewer.layout.delete": "ビューを削除",
   "viewer.layout.deleteLast": "最後のビューは削除できません",
-  "viewer.layout.edit": "編集",
+  "viewer.layout.edit": "レイアウトを編集",
   "viewer.layout.edit.title": "この図面のレイアウトを編集：ビューの移動・サイズ変更・分割・向き",
   "viewer.layout.editing": "レイアウト編集中",
   "viewer.layout.done": "完了",

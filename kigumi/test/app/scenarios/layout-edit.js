@@ -21,7 +21,8 @@ module.exports = {
         check('the drawing carries its layout', info.layout, JSON.stringify(info));
         const first = info.ids.find(id => !/preview/i.test(id)) || info.ids[0];
 
-        await inShell(`${app}.renderRoot.querySelector('.dp-edit-layout').click()`);
+        await capture('00-edit-button');
+        await inShell(`${app}.renderRoot.querySelector('#layout-edit-btn').click()`);
         await inShell(frame);
         check('the edit button starts editing the layout', await inShell(`${app}.layoutEditing === true`));
 

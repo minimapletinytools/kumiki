@@ -470,10 +470,6 @@ export const DrawingsMixin = (Base) => class extends Base {
             host.addEventListener('kigumi-select-viewport', (event) => {
                 this.selectDrawingViewport(event.detail.viewportId);
             });
-            host.addEventListener('kigumi-edit-layout', () => {
-                if (this.layoutEditing) this.exitLayoutEditing();
-                else this.enterLayoutEditing();
-            });
             host.addEventListener('kigumi-measurement-contextmenu', (event) => {
                 this.showMeasurementContextMenu(event.detail || {});
             });
@@ -496,7 +492,6 @@ export const DrawingsMixin = (Base) => class extends Base {
             : Array.from(this.memberMetadataByKey.keys());
         this._drawingPanel.setDrawing({
             drawing: scene,
-            layoutEditing: this.layoutEditing ? true : (scene.layout ? false : null),
             viewports: this.viewports.map((viewport) => this._measurementRows(viewport)),
             members: keys.map((key) => ({
                 key,

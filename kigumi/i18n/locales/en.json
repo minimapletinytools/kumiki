@@ -657,7 +657,7 @@
   "viewer.layout.toBack": "Send to back",
   "viewer.layout.delete": "Delete view",
   "viewer.layout.deleteLast": "The last view can't be deleted",
-  "viewer.layout.edit": "edit",
+  "viewer.layout.edit": "Edit layout",
   "viewer.layout.edit.title": "Edit this drawing's layout: move, resize, split and aim its views",
   "viewer.layout.editing": "Editing layout",
   "viewer.layout.done": "done",
