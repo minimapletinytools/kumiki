@@ -650,7 +650,7 @@
   "message.publishedDone": "閉じる",
   "editor.readOnly.shared": "読み取り専用です。変更するにはコピーを作成してください。",
   "editor.readOnly.makeCopy": "コピーを作成",
-  "viewer.layout.move": "移動：別のビューの端で離すとその隣に、それ以外で離すとフロートします",
+  "viewer.layout.move": "移動：他のビューの端で離すとその隣へ（端ぎりぎりでグリッドに新しい行・列、少し内側でそのビューを分割）、それ以外の場所では浮かせる",
   "viewer.layout.splitAcross": "左右に分割（新しい側は同じビューを表示）",
   "viewer.layout.splitDown": "上下に分割（新しい側は同じビューを表示）",
   "viewer.layout.toFront": "最前面へ",
@@ -678,5 +678,8 @@
   "viewer.layout.orbitLeft": "カメラを左へ 90° 回す",
   "viewer.layout.orbitRight": "カメラを右へ 90° 回す",
   "viewer.layout.rollLeft": "ビューを反時計回りに 90° 回す",
-  "viewer.layout.rollRight": "ビューを時計回りに 90° 回す"
+  "viewer.layout.rollRight": "ビューを時計回りに 90° 回す",
+  "viewer.layout.dropSplit": "このビューを分割",
+  "viewer.layout.dropRow": "新しい行",
+  "viewer.layout.dropColumn": "新しい列"
 }

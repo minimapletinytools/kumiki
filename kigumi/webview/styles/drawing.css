@@ -292,6 +292,30 @@
 
 .vp-tool-disabled { cursor: not-allowed; opacity: 0.4; }
 
+/* The two ways a drop on this edge can go: the band nearer the edge, and the one further in. */
+.vp-zone {
+    fill: var(--hv-accent, #4a7dbd);
+    fill-opacity: 0.08;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-opacity: 0.5;
+    stroke-dasharray: 3 3;
+}
+
+.vp-zone-active { fill-opacity: 0.3; }
+
+/* A new row or column of the grid: dashed, so it reads apart from a split of one view. */
+.vp-drop-outer { stroke-dasharray: 8 4; }
+
+.vp-drop-label {
+    fill: var(--hv-accent, #4a7dbd);
+    font-size: 13px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: var(--hv-panel-bg, #fff);
+    stroke-width: 3px;
+    user-select: none;
+}
+
 /* Where a dragged view will land. */
 .vp-drop {
     fill: var(--hv-accent, #4a7dbd);

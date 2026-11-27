@@ -199,9 +199,13 @@ function setFloatingRect(layout, name, rect) {
  * target's own split when that runs the same way, else a new split of the two in target's cell.
  */
 function placeBeside(layout, node, target, side) {
+    const path = findLeaf(layout, target);
+    return path ? placeBesidePath(layout, node, path, side) : clone(layout);
+}
+
+/** placeBeside, beside the node at `path`, leaf or split. */
+function placeBesidePath(layout, node, path, side) {
     const next = clone(layout);
-    const path = findLeaf(next, target);
-    if (!path) return next;
     const direction = side === 'left' || side === 'right' ? 'columns' : 'rows';
     const before = side === 'left' || side === 'top';
     const parent = path.length > 1 ? nodeAt(next, path.slice(0, -1)) : null;
@@ -219,12 +223,60 @@ function placeBeside(layout, node, target, side) {
     return next;
 }
 
-/** The tree with `name` moved beside `target` (placeBeside). */
-function dockLeaf(layout, name, target, side) {
+/**
+ * Where else a view dropped on `target`'s `side` edge could go: beside the largest group around
+ * the target whose edge that is too -- a new row or column of the grid rather than a split of the
+ * one view. Its path, or null when that is the target's own place (placeBeside's).
+ */
+function outerPlace(layout, target, side, page) {
+    const path = findLeaf(layout, target);
+    if (!path) return null;
+    const direction = side === 'left' || side === 'right' ? 'columns' : 'rows';
+    const runs = (at) => at.length > 1 && nodeAt(layout, at.slice(0, -1)).split.direction === direction;
+    let at = runs(path) ? path.slice(0, -1) : path;
+    while (at.length > 1 && !runs(at)) at = at.slice(0, -1);
+    if (at.join('.') === path.join('.')) return null;
+    const cells = new Map(layoutCells(layout, page).map((cell) => [cell.path.join('.'), cell.inner]));
+    const mine = cells.get(path.join('.'));
+    const outer = cells.get(at.join('.'));
+    const edge = (rect) => ({ left: rect[0], right: rect[0] + rect[2], top: rect[1], bottom: rect[1] + rect[3] }[side]);
+    return Math.abs(edge(mine) - edge(outer)) < 1e-6 ? at : null;
+}
+
+/** `rect`'s half on `side`: where a view put beside it lands. */
+function halfOn(rect, side) {
+    const [x, y, width, height] = rect;
+    return { left: [x, y, width / 2, height], right: [x + width / 2, y, width / 2, height],
+        top: [x, y, width, height / 2], bottom: [x, y + height / 2, width, height / 2] }[side];
+}
+
+/**
+ * What a view dropped on `target`'s `side` edge can do, nearest the edge first: join the group
+ * whose edge it also is ('outer', see outerPlace), and split the target's own place ('inner').
+ * Each with the rect it would take.
+ */
+function dropChoices(layout, target, side, page) {
+    const cells = new Map(layoutCells(layout, page).map((cell) => [cell.path.join('.'), cell.inner]));
+    const path = findLeaf(layout, target);
+    if (!path) return [];
+    const outer = outerPlace(layout, target, side, page);
+    return [
+        ...(outer ? [{ level: 'outer', rect: halfOn(cells.get(outer.join('.')), side) }] : []),
+        { level: 'inner', rect: halfOn(cells.get(path.join('.')), side) },
+    ];
+}
+
+/**
+ * The tree with `name` moved beside `target`: into the target's own place (placeBeside), or with
+ * `level` 'outer' beside the group around it (dropChoices).
+ */
+function dockLeaf(layout, name, target, side, level = 'inner', page = null) {
     const path = findLeaf(layout, name);
     if (!path || name === target || !findLeaf(layout, target)) return clone(layout);
     const node = bare(clone(nodeAt(layout, path)));
-    return placeBeside(removeLeaf(layout, name), node, target, side);
+    const rest = removeLeaf(layout, name);
+    const outer = level === 'outer' && page ? outerPlace(rest, target, side, page) : null;
+    return outer ? placeBesidePath(rest, node, outer, side) : placeBeside(rest, node, target, side);
 }
 
 /** A name for a copy of `name` that no view has: "Front 2", "Front 3", ... */
@@ -321,5 +373,5 @@ function movedLeaves(before, after, page) {
 export {
     leafNames, findLeaf, isFloating, layoutCells, resolveLayout, dividers, removeLeaf, floatLeaf,
     setFloatingRect, dockLeaf, splitLeaf, moveDivider, restack, clampRect, copyName,
-    leafCamera, setLeafCamera, movedLeaves,
+    leafCamera, setLeafCamera, movedLeaves, dropChoices,
 };

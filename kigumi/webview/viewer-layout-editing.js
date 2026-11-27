@@ -14,8 +14,10 @@ import * as Layout from './viewport-layout.js';
 const SVG = 'http://www.w3.org/2000/svg';
 // How far a press travels before it is a drag rather than a click, in pixels.
 const DRAG_SLOP_PX = 3;
-// A drop beside a view lands within this much of its edge: a quarter of it, at most this many pixels.
-const DROP_BAND_PX = 48;
+// A drop beside a view lands within this much of its edge: a third of it, at most this many pixels.
+// Where it can go two ways, the half nearer the edge joins the group around the view, the inner
+// half splits the view (Layout.dropChoices).
+const DROP_BAND_PX = 64;
 const HANDLE_PX = 9;
 const BUTTON_PX = 22;
 // Held after a drop until the runner's answer redraws it, or for this long if none comes.
@@ -196,8 +198,18 @@ export const LayoutEditingMixin = (Base) => class extends Base {
 
         const draft = this._layoutDraft;
         if (draft && draft.drop) {
-            const box = toPixels(draft.drop.rect);
-            element('rect', { class: 'vp-drop', x: box.x, y: box.y, width: box.width, height: box.height }, group);
+            const drop = draft.drop;
+            for (const zone of drop.zones || []) {
+                const strip = toPixels(zone.rect);
+                element('rect', { class: `vp-zone${zone.active ? ' vp-zone-active' : ''}`,
+                    x: strip.x, y: strip.y, width: strip.width, height: strip.height }, group);
+            }
+            const box = toPixels(drop.rect);
+            element('rect', { class: `vp-drop vp-drop-${drop.level}`, x: box.x, y: box.y, width: box.width, height: box.height }, group);
+            const across = drop.side === 'left' || drop.side === 'right';
+            const key = drop.level === 'outer' ? (across ? 'viewer.layout.dropColumn' : 'viewer.layout.dropRow') : 'viewer.layout.dropSplit';
+            element('text', { class: 'vp-drop-label', x: box.x + box.width / 2, y: box.y + box.height / 2 + 4,
+                'text-anchor': 'middle' }, group).textContent = t(key);
         }
         if (draft && draft.ghost) {
             const box = toPixels(draft.ghost);
@@ -543,7 +555,7 @@ export const LayoutEditingMixin = (Base) => class extends Base {
             }
             if (grab.kind === 'move') {
                 const layout = draft.drop
-                    ? Layout.dockLeaf(start, grab.name, draft.drop.target, draft.drop.side)
+                    ? Layout.dockLeaf(start, grab.name, draft.drop.target, draft.drop.side, draft.drop.level, page)
                     : (grab.floating ? draft.layout : Layout.floatLeaf(start, grab.name, draft.ghost));
                 this._commitLayout(this._fitMoved(start, layout), draft.drop ? 'dock view' : 'move view', originalRects);
             } else {
@@ -597,15 +609,29 @@ export const LayoutEditingMixin = (Base) => class extends Base {
             if (!rect || viewport.id === name) continue;
             const [x, y, width, height] = rect;
             if (at.x < x || at.x > x + width || at.y < y || at.y > y + height) continue;
-            const bandX = Math.min(width / 4, DROP_BAND_PX / pageRect.width);
-            const bandY = Math.min(height / 4, DROP_BAND_PX / pageRect.height);
+            const bandX = Math.min(width / 3, DROP_BAND_PX / pageRect.width);
+            const bandY = Math.min(height / 3, DROP_BAND_PX / pageRect.height);
+            // Each edge's band, and its halves: nearer the edge, then further in.
             const edges = [
-                { side: 'left', inside: (at.x - x) / bandX, rect: [x, y, width / 2, height] },
-                { side: 'right', inside: (x + width - at.x) / bandX, rect: [x + width / 2, y, width / 2, height] },
-                { side: 'top', inside: (at.y - y) / bandY, rect: [x, y, width, height / 2] },
-                { side: 'bottom', inside: (y + height - at.y) / bandY, rect: [x, y + height / 2, width, height / 2] },
+                { side: 'left', inside: (at.x - x) / bandX, halves: [[x, y, bandX / 2, height], [x + bandX / 2, y, bandX / 2, height]] },
+                { side: 'right', inside: (x + width - at.x) / bandX,
+                    halves: [[x + width - bandX / 2, y, bandX / 2, height], [x + width - bandX, y, bandX / 2, height]] },
+                { side: 'top', inside: (at.y - y) / bandY, halves: [[x, y, width, bandY / 2], [x, y + bandY / 2, width, bandY / 2]] },
+                { side: 'bottom', inside: (y + height - at.y) / bandY,
+                    halves: [[x, y + height - bandY / 2, width, bandY / 2], [x, y + height - bandY, width, bandY / 2]] },
             ].filter((edge) => edge.inside <= 1).sort((a, b) => a.inside - b.inside);
-            return edges.length ? { target: viewport.id, side: edges[0].side, rect: edges[0].rect } : null;
+            if (!edges.length) return null;
+            const edge = edges[0];
+            const choices = Layout.dropChoices(layout, viewport.id, edge.side, page);
+            if (!choices.length) return null;
+            const which = choices.length > 1 && edge.inside > 0.5 ? 1 : 0;
+            return {
+                target: viewport.id,
+                side: edge.side,
+                level: choices[which].level,
+                rect: choices[which].rect,
+                zones: choices.length > 1 ? edge.halves.map((rect, index) => ({ rect, active: index === which })) : [],
+            };
         }
         return null;
     }

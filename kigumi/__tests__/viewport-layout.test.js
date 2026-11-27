@@ -108,3 +108,21 @@ test('the views a change moves are the ones whose rects changed', () => {
     expect(L.movedLeaves(GRID, moved, PAGE).sort()).toEqual(['A', 'B']);
     expect(L.movedLeaves(GRID, GRID, PAGE)).toEqual([]);
 });
+
+test('a drop on an edge the group around the view shares can join that group or split the view', () => {
+    // A's bottom is only A's; its right edge is the left column's too, which C is beside.
+    expect(L.dropChoices(GRID, 'A', 'bottom', PAGE).map((one) => one.level)).toEqual(['inner']);
+    const right = L.dropChoices(GRID, 'A', 'right', PAGE);
+    expect(right.map((one) => one.level)).toEqual(['outer', 'inner']);
+    near(right[0].rect, [0.375, 0, 0.375, 1]);  // half the left column
+    near(right[1].rect, [0.375, 0, 0.375, 0.483164983]);  // half of A
+
+    const floated = L.floatLeaf(GRID, 'C', [0.5, 0.5, 0.3, 0.3]);
+    const outer = L.dockLeaf(floated, 'C', 'A', 'right', 'outer', PAGE);
+    const inner = L.dockLeaf(floated, 'C', 'A', 'right', 'inner', PAGE);
+    // A new column, the whole height; and a split of A alone.
+    expect(rects(outer).get('C')[3]).toBeCloseTo(1, 6);
+    expect(rects(outer).get('B')[2]).toBeCloseTo(rects(outer).get('A')[2], 6);
+    expect(rects(inner).get('C')[3]).toBeCloseTo(rects(inner).get('A')[3], 6);
+    expect(rects(inner).get('B')[2]).toBeGreaterThan(rects(inner).get('A')[2] * 1.5);
+});
