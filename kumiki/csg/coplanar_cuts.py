@@ -141,7 +141,7 @@ def _sweep(mesh: trimesh.Trimesh, patch: np.ndarray, direction: np.ndarray, dist
         faces=np.concatenate([kept, walls, moved[faces]]),
         process=False,
     )
-    swept.fix_normals()
+    swept.fix_normals(multibody=False)
     return swept
 
 
