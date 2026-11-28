@@ -9,6 +9,30 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kumiki 0.9.11 / kigumi 0.9.14] - 2026-11-27
+
+### kumiki
+
+#### Added
+- Drawing layouts as data the viewer edits (`kumiki.drawings.layout`).
+- An angle's `Offset` is the radius of its arc.
+
+#### Fixed
+- Joints with swept cuts (mortise and tenon, dovetails, laps and more) failed to mesh with "No module named 'scipy'" in an environment without scipy, since 0.9.9.
+
+### kigumi
+
+#### Added
+- Edit a drawing's layout on the sheet: select, move, resize, split, dock, float and delete views, with undo and redo, from a button in the sheet's top right.
+- Drag an angle's arc nearer to or further from its corner, down to a least radius.
+- Lock or hide a whole frame from its header in the tree.
+
+#### Changed
+- A measurement made in the viewer, or given to a view, is marked as not matching a view that looks at the back of its plane.
+- Reference faces are tinted light blue and outlined in a deeper shade, so one seen edge-on still shows.
+- An angle's flip is saved on the measurement itself, not its placement. A flip saved by an earlier kigumi is ignored; flip the angle again.
+- Needs kumiki 0.9.11 or newer.
+
 ## [kumiki 0.9.10 / kigumi 0.9.13] - 2026-11-26
 
 ### kumiki
