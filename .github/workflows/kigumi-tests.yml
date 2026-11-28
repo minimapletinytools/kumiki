@@ -65,6 +65,40 @@ jobs:
       - name: Run unit tests
         run: xvfb-run -a npm run test:unit
 
+  # The kumikis this kigumi accepts (kumikiMinimum up, from PyPI) and the checkout's own.
+  kumiki-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      kumikis: ${{ steps.list.outputs.kumikis }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: echo "kumikis=$(python3 kigumi/test/kumiki_compat.py versions | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin) + ["checkout"]))')" >> "$GITHUB_OUTPUT"
+
+  # Every bundled pattern through runner.py, with only kumiki's own dependencies, as a user has
+  # (the dev environment's extras hid kumiki 0.9.10's need for scipy).
+  kumiki-compat:
+    needs: kumiki-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kumiki: ${{ fromJSON(needs.kumiki-versions.outputs.kumikis) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Check kigumi against kumiki ${{ matrix.kumiki }}
+        run: |
+          if [ "${{ matrix.kumiki }}" = checkout ]; then
+            uv build --wheel -o "$RUNNER_TEMP/wheel" .
+            spec=$(ls "$RUNNER_TEMP"/wheel/*.whl)
+          else
+            spec="kumiki==${{ matrix.kumiki }}"
+          fi
+          cd "$RUNNER_TEMP"
+          uv run --isolated --no-project --python 3.13 --with "$spec" \
+            python -W ignore "$GITHUB_WORKSPACE/kigumi/test/kumiki_compat.py"
+
   # Each host's integration suites: the extension in a real VS Code, the standalone app, and Kigumi
   # in a browser. Each needs a display, so they run under xvfb.
   integration:

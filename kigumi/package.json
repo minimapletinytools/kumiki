@@ -294,5 +294,5 @@
     "electron-updater": "^6.8.11",
     "zod": "^4.6.7"
   },
-  "kumikiMinimum": "0.9.10"
+  "kumikiMinimum": "0.9.11"
 }
